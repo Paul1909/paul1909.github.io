@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Neon Pong">
+<meta name="description" content="Two-player neon Pong for one phone. Lay it flat between you and play.">
+<title>Neon Pong Duo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --p1: #3b82f6;
+    --p2: #ef4444;
+    --ball: #ffffff;
+    --go: #10b981;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    overflow: hidden;
+    background: #050505;
+    color: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+
+  #stage { position: fixed; inset: 0; }
+  #c { display: block; width: 100%; height: 100%; }
+
+  /* edge glows */
+  .edge { position: absolute; left: 0; right: 0; height: 3px; opacity: .25; pointer-events: none; }
+  .edge.top { top: 0; background: linear-gradient(90deg, transparent, var(--p1), transparent); box-shadow: 0 0 20px var(--p1); }
+  .edge.bot { bottom: 0; background: linear-gradient(90deg, transparent, var(--p2), transparent); box-shadow: 0 0 20px var(--p2); }
+
+  /* overlays never intercept touches (except the pause button) */
+  .layer { position: absolute; inset: 0; pointer-events: none; }
+  .hidden { display: none !important; }
+  .flip { transform: rotate(180deg); }
+
+  .score {
+    position: absolute; left: 50%;
+    font-size: 8rem; font-weight: 900; line-height: 1; opacity: .2;
+    font-variant-numeric: tabular-nums;
+  }
+  #s1 { top: 25%; transform: translate(-50%, -50%) rotate(180deg); color: var(--p1); }
+  #s2 { top: 75%; transform: translate(-50%, -50%); color: var(--p2); }
+
+  .ready {
+    position: absolute; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  #r1 { top: calc(var(--sat) + 80px); }
+  #r2 { bottom: calc(var(--sab) + 80px); }
+  .ready b {
+    font-size: 1.5rem; font-weight: 900; letter-spacing: .15em; text-transform: uppercase;
+    opacity: .4; transition: transform .25s, opacity .25s, color .25s, text-shadow .25s;
+  }
+  .ready small { font-size: 10px; color: rgba(255,255,255,.35); letter-spacing: .3em; text-transform: uppercase; }
+  .ready.on b { opacity: 1; transform: scale(1.1); }
+  .ready.on small { visibility: hidden; }
+  #r1.on b { color: var(--p1); text-shadow: 0 0 20px var(--p1); }
+  #r2.on b { color: var(--p2); text-shadow: 0 0 20px var(--p2); }
+
+  .count {
+    position: absolute; left: 50%;
+    font-size: 10rem; font-weight: 900; font-style: italic; line-height: 1;
+    text-shadow: 0 0 30px rgba(255,255,255,.5);
+  }
+  #c1 { top: 28%; transform: translate(-50%, -50%) rotate(180deg); }
+  #c2 { top: 72%; transform: translate(-50%, -50%); }
+  .count span { display: inline-block; }
+  .pop span { animation: pop .45s ease-out; }
+  .fade span { animation: fadeout .7s ease-out forwards; }
+  @keyframes pop { from { transform: scale(1.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes fadeout { from { transform: scale(1); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+
+
+  /* menus */
+  .sheet {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,.9);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain;
+    display: flex;
+  }
+  .panel {
+    margin: auto; width: 100%; max-width: 420px;
+    padding: calc(var(--sat) + 28px) 28px calc(var(--sab) + 28px);
+    display: flex; flex-direction: column; align-items: center; gap: 26px;
+  }
+  h1 {
+    margin: 0; text-align: center;
+    font-size: 3.6rem; font-weight: 900; font-style: italic; letter-spacing: -.04em;
+    line-height: .95; text-transform: uppercase;
+  }
+  h1 em { color: var(--go); font-style: italic; text-shadow: 0 0 24px rgba(16,185,129,.5); }
+  .sub { margin: 8px 0 0; text-align: center; color: rgba(255,255,255,.4); font-size: 11px; letter-spacing: .3em; text-transform: uppercase; }
+  h2 { margin: 0 0 12px; text-align: center; color: rgba(255,255,255,.6); font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+  .section { width: 100%; }
+
+  .result {
+    width: 100%; text-align: center; padding: 16px;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 18px;
+  }
+  .result p { margin: 0; }
+  .result .lbl { font-size: 12px; text-transform: uppercase; color: rgba(255,255,255,.6); letter-spacing: .1em; }
+  .result .final { font-size: 2.4rem; font-weight: 900; margin: 4px 0; display: flex; justify-content: center; gap: 16px; }
+  .result .final i { font-style: normal; color: rgba(255,255,255,.2); }
+  .result .win { font-size: 1.25rem; font-weight: 800; animation: bounce 1s infinite; }
+  @keyframes bounce { 0%,100% { transform: translateY(-15%); } 50% { transform: translateY(0); } }
+
+  .themes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .theme {
+    padding: 14px; border-radius: 14px; border: 2px solid rgba(255,255,255,.1); background: rgba(0,0,0,.4);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    transition: border-color .15s, background .15s;
+  }
+  .theme.sel { border-color: #fff; background: rgba(255,255,255,.1); }
+  .theme .dots { display: flex; gap: 5px; }
+  .theme .dots span { width: 16px; height: 16px; border-radius: 50%; }
+
+  .pills { display: flex; gap: 8px; }
+  .pill {
+    flex: 1; padding: 10px 0; border-radius: 10px; font-size: 14px; font-weight: 700;
+    background: rgba(255,255,255,.05); color: rgba(255,255,255,.45);
+    transition: background .15s, color .15s;
+  }
+  .pill.sel { background: #fff; color: #000; }
+
+  .actions { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .primary {
+    width: 100%; padding: 20px 0; border-radius: 18px;
+    background: var(--go); color: #000;
+    font-size: 1.25rem; font-weight: 900; text-transform: uppercase; letter-spacing: -.02em;
+    box-shadow: 0 0 30px rgba(16,185,129,.4);
+    transition: transform .1s;
+  }
+  .secondary {
+    width: 100%; padding: 12px 0; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.6);
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .15em;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .1s;
+  }
+  .primary:active, .secondary:active, .pill:active, .theme:active { transform: scale(.96); }
+  .hint { margin: 0; color: rgba(255,255,255,.3); font-size: 10px; text-transform: uppercase; text-align: center; line-height: 1.7; letter-spacing: .05em; }
+
+  #pauseSheet .panel { gap: 16px; max-width: 320px; }
+  #pauseSheet h1 { font-size: 2.6rem; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div class="edge top"></div>
+  <div class="edge bot"></div>
+
+  <div id="hud" class="layer hidden">
+    <div id="s1" class="score">0</div>
+    <div id="s2" class="score">0</div>
+
+    <div id="readyLayer" class="hidden">
+      <div id="r1" class="ready flip"><b>Waiting...</b><small>Touch your half</small></div>
+      <div id="r2" class="ready"><b>Waiting...</b><small>Touch your half</small></div>
+    </div>
+
+    <div id="countLayer" class="hidden">
+      <div id="c1" class="count"><span></span></div>
+      <div id="c2" class="count"><span></span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Start / Game over -->
+<div id="menu" class="sheet">
+  <div class="panel">
+    <div>
+      <h1>Neon <em>Pong</em> Duo</h1>
+      <p class="sub">Mobile Shared Arena</p>
+    </div>
+
+    <div id="result" class="result hidden">
+      <p class="lbl">Final Score</p>
+      <div class="final"><span id="f1"></span><i>—</i><span id="f2"></span></div>
+      <p id="winText" class="win"></p>
+    </div>
+
+    <div class="section">
+      <h2>Arena Theme</h2>
+      <div id="themes" class="themes"></div>
+    </div>
+
+    <div class="section">
+      <h2>Score to Win</h2>
+      <div id="lengths" class="pills"></div>
+    </div>
+
+    <div class="section">
+      <h2>Ball Speed</h2>
+      <div id="speeds" class="pills"></div>
+    </div>
+
+    <div class="actions">
+      <button id="startBtn" class="primary">Enter Arena</button>
+      <button id="fsBtn" class="secondary">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/></svg>
+        <span>Full Screen</span>
+      </button>
+      <button id="vibBtn" class="secondary"><span>Vibration: On</span></button>
+    </div>
+
+    <p class="hint">Lay the phone flat between the two players.<br>Player 1 (top) • Player 2 (bottom)<br>Both touch your half to serve<br>Swipe up from the bottom edge to pause</p>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="pauseSheet" class="sheet hidden">
+  <div class="panel">
+    <h1>Paused</h1>
+    <p class="sub" id="pauseScore"></p>
+    <p class="hint">Resume, then both players touch to serve again</p>
+    <div class="actions">
+      <button id="resumeBtn" class="primary">Resume</button>
+      <button id="quitBtn" class="secondary">Quit to Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
