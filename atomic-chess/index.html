@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="script-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0d111b">
 <meta name="mobile-web-app-capable" content="yes">
@@ -47,6 +46,20 @@
   .bar .last b { color: var(--text); }
   .bar.result .msg { font-size: 18px; color: #ffd27a; }
   #app.table #barB { transform: rotate(180deg); }
+  .bar .clock { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 21px; line-height: 1; padding: 6px 9px; border-radius: 9px;
+    background: #0b0f18; color: #8b97ad; min-width: 70px; text-align: center; flex: none; transition: background .2s, color .2s; }
+  .bar .clock.on { background: #eef1f6; color: #0d111b; }
+  .bar .clock.low { background: #3a1216; color: #ff8a8a; }
+  .bar .clock.on.low { background: #e53935; color: #fff; animation: lowpulse 1s ease-in-out infinite; }
+  @keyframes lowpulse { 50% { background: #b71c1c; } }
+  .bar .clock.off { display: none; }
+  .thinking::after { content: ''; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+  #pauseOv { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; text-align: center;
+    background: rgba(8,11,18,.62); border-radius: 6px; color: #fff; font-size: 24px; font-weight: 800; }
+  #pauseOv small { display: block; font-size: 14px; font-weight: 600; color: #c9d1de; margin-top: 6px; }
+  input[type=range] { width: 100%; height: 34px; accent-color: var(--accent); margin: 2px 0 4px; }
+  .lvl { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: -4px; }
 
   #boardWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
   #board { position: relative; width: 320px; height: 320px; touch-action: none; border-radius: 6px;
@@ -140,7 +153,7 @@
 <body>
 <div id="app" class="table">
   <section class="bar" id="barB">
-    <div class="row"><span class="chip"></span><span class="name">Black</span><span class="msg"></span></div>
+    <div class="row"><span class="chip"></span><span class="name">Black</span><span class="msg"></span><span class="clock off"></span></div>
     <div class="sub"><span class="lost"></span><span class="last"></span></div>
   </section>
 
@@ -148,11 +161,12 @@
     <div id="board">
       <div id="squares"></div>
       <div id="pieces"></div>
+      <div id="pauseOv" class="hidden"><div>⏸ Paused<small>Tap the board to resume</small></div></div>
     </div>
   </div>
 
   <section class="bar" id="barW">
-    <div class="row"><span class="chip"></span><span class="name">White</span><span class="msg"></span></div>
+    <div class="row"><span class="chip"></span><span class="name">White</span><span class="msg"></span><span class="clock off"></span></div>
     <div class="sub"><span class="lost"></span><span class="last"></span></div>
   </section>
 
@@ -182,22 +196,44 @@
   </div>
 </div>
 
-<div class="modal hidden" id="confirm">
+<div class="modal hidden" id="newGame">
   <div class="card">
-    <h2>Start a new game?</h2>
-    <p>The current game will be lost.</p>
-    <div class="btns"><button class="btn" id="confirmNo">Cancel</button><button class="btn primary" id="confirmYes">New game</button></div>
+    <h2>New game</h2>
+    <div class="label">Opponent</div>
+    <div class="seg" id="ngMode"><button data-v="friend">👥 Friend</button><button data-v="bot">🤖 Bot</button></div>
+    <div id="ngBot">
+      <div class="label">You play</div>
+      <div class="seg" id="ngColor"><button data-v="w">White</button><button data-v="b">Black</button><button data-v="r">Random</button></div>
+      <div class="label">Bot level: <span id="ngLevelName"></span></div>
+      <input type="range" id="ngLevel" min="1" max="8" step="1">
+      <div class="lvl"><span>easy</span><span>hard</span></div>
+    </div>
+    <div class="label">Clock: minutes each</div>
+    <div class="seg" id="ngMin"><button data-v="0">Off</button><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="10">10</button><button data-v="15">15</button></div>
+    <div id="ngIncWrap">
+      <div class="label">+ seconds per move</div>
+      <div class="seg" id="ngInc"><button data-v="0">0</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="10">10</button></div>
+    </div>
+    <p id="ngWarn" class="hidden">The current game will be lost.</p>
+    <div class="btns"><button class="btn" id="ngCancel">Cancel</button><button class="btn primary" id="ngStart">Start</button></div>
   </div>
 </div>
 
 <div class="modal hidden" id="menu">
   <div class="card">
     <h2>Menu</h2>
-    <div class="label">Seating</div>
-    <div class="seg" id="layoutSeg">
-      <button data-v="table">Face to face</button>
-      <button data-v="side">Side by side</button>
-      <button data-v="pass">Pass &amp; flip</button>
+    <div id="menuSeat">
+      <div class="label">Seating</div>
+      <div class="seg" id="layoutSeg">
+        <button data-v="table">Face to face</button>
+        <button data-v="side">Side by side</button>
+        <button data-v="pass">Pass &amp; flip</button>
+      </div>
+    </div>
+    <div id="menuBot">
+      <div class="label">Bot level: <span id="mLevelName"></span></div>
+      <input type="range" id="mLevel" min="1" max="8" step="1">
+      <div class="lvl"><span>easy</span><span>hard</span></div>
     </div>
     <div class="opt"><span>Sound</span><button class="toggle" id="tSound" aria-label="Sound"></button></div>
     <div class="opt"><span>Vibration</span><button class="toggle" id="tVibe" aria-label="Vibration"></button></div>
@@ -222,6 +258,7 @@
       <li><b>Touching kings are safe:</b> when the two kings stand next to each other, neither is in check.</li>
     </ul>
     <p>Tap a piece, then tap where it goes, or drag it. While dragging onto a capture, the blast zone glows.</p>
+    <p>Tap <b>New</b> to play a friend or the bot, with or without a clock. Opening the menu pauses the clock. Undo against the bot takes back your last move.</p>
     <div class="btns"><button class="btn primary" id="rulesClose">Let's play</button></div>
   </div>
 </div>

@@ -1,9 +1,10 @@
 // Offline cache (lives in its own folder on the shared arcade site). Change VERSION whenever any file changes, so installed copies update.
-const VERSION = 'atomic-chess-v3';
+const VERSION = 'atomic-chess-v4';
 const FILES = [
   './',
   './index.html',
   './engine.js',
+  './bot.js',
   './pieces.js',
   './sound.js',
   './fx.js',

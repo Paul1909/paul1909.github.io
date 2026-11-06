@@ -94,6 +94,11 @@ const Sound = (() => {
     }),
     win: () => go(t => [392, 494, 587, 784, 988].forEach((f, i) =>
       tone({ t: t + i * 0.09, type: 'triangle', f0: f, dur: 1.3 - i * 0.1, peak: 0.12, a: 0.02 }))),
+    tick: () => go(t => tone({ t, type: 'sine', f0: 1900, dur: 0.035, peak: 0.07 })),
+    flag: () => go(t => {
+      tone({ t, type: 'square', f0: 330, dur: 0.18, peak: 0.1 });
+      tone({ t: t + 0.2, type: 'square', f0: 220, dur: 0.4, peak: 0.1 });
+    }),
     draw: () => go(t => {
       tone({ t, type: 'triangle', f0: 523, dur: 0.35, peak: 0.14 });
       tone({ t: t + 0.25, type: 'triangle', f0: 392, dur: 0.6, peak: 0.14 });
