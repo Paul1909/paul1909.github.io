@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paolo's Arcade</title>
+<meta name="description" content="A growing collection of little games, vibe-coded by Paolo.">
+<meta name="theme-color" content="#0a0716">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+<style>
+  :root {
+    --bg: #0a0716;
+    --panel: #140f2a;
+    --line: #2a2150;
+    --text: #ece8ff;
+    --muted: #9a92c4;
+    --cyan: #3ef2ff;
+    --pink: #ff4fd8;
+    --lime: #b6ff4a;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #2b0f4a 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #06304a 0%, transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 20px 64px; }
+
+  header { margin-bottom: 40px; }
+  .eyebrow {
+    font-size: 13px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--cyan); text-shadow: 0 0 12px rgba(62,242,255,.6);
+  }
+  h1 {
+    font-size: clamp(40px, 8vw, 72px); line-height: 1; margin: 10px 0 14px;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(255,79,216,.35));
+  }
+  .tagline { color: var(--muted); font-size: 17px; max-width: 560px; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+  .stat {
+    border: 1px solid var(--line); background: rgba(20,15,42,.7);
+    border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--muted);
+  }
+  .stat b { color: var(--text); }
+
+  h2 { font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; margin-bottom: 56px; }
+  .card {
+    position: relative; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 20px; text-decoration: none; color: inherit;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-3px); border-color: var(--accent, var(--cyan));
+    box-shadow: 0 0 0 1px var(--accent, var(--cyan)), 0 10px 40px -10px var(--accent, var(--cyan));
+    outline: none;
+  }
+  .icon {
+    width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center;
+    font-size: 30px; margin-bottom: 14px;
+    background: color-mix(in srgb, var(--accent, var(--cyan)) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent, var(--cyan)) 40%, transparent);
+  }
+  .card h3 { font-size: 20px; margin-bottom: 6px; }
+  .card p { color: var(--muted); font-size: 15px; flex: 1; }
+  .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+  .play { color: var(--accent, var(--cyan)); font-weight: 600; white-space: nowrap; }
+  .badge {
+    position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    color: #0a0716; background: var(--lime); border-radius: 6px; padding: 2px 7px;
+    box-shadow: 0 0 14px rgba(182,255,74,.6);
+  }
+  .soon { opacity: .55; pointer-events: none; border-style: dashed; }
+
+  .log { list-style: none; padding: 0; border-left: 2px solid var(--line); margin-left: 6px; }
+  .log li { position: relative; padding: 0 0 18px 22px; }
+  .log li::before {
+    content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--bg); border: 2px solid var(--pink); box-shadow: 0 0 10px rgba(255,79,216,.6);
+  }
+  .log time { font-size: 13px; color: var(--muted); display: block; }
+  .log span { font-size: 15px; }
+
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
+  footer a { color: var(--cyan); }
+
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Vibe-coded with AI</div>
+    <h1>Paolo's Arcade</h1>
+    <p class="tagline">A growing collection of little games I build for fun. Tap one to play. Most work offline and can be added to your home screen.</p>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <h2>Games</h2>
+  <div class="grid" id="grid"></div>
+
+  <h2>Growth log</h2>
+  <ul class="log" id="log"></ul>
+
+  <footer>Built by Paolo · hosted on GitHub Pages</footer>
+</div>
+
+<script>
+/* ===========================================================
+   ADD A NEW GAME: copy one block below, paste it at the top
+   of the list, change the details, and commit. That's it.
+   - url:   the game's live link (Netlify, or a subfolder here)
+   - added: date it joined the arcade (YYYY-MM-DD)
+   - color: card glow colour (any CSS colour)
+   - soon:  true = shows as "coming soon", not clickable
+   =========================================================== */
+const GAMES = [
+  {
+    title: "Neon Ice Hockey",
+    emoji: "🏒",
+    desc: "Air-hockey duel for two on one phone. Move your mallet freely in your half, with sound effects.",
+    url: "https://REPLACE-WITH-ICE-HOCKEY.netlify.app",
+    added: "2026-11-05",
+    tags: ["2 players", "action"],
+    color: "#3ef2ff"
+  },
+  {
+    title: "Neon Pong Duo",
+    emoji: "🏓",
+    desc: "Classic pong, neon style. Two players, one screen, first to the target score wins.",
+    url: "https://REPLACE-WITH-NEON-PONG.netlify.app",
+    added: "2026-11-05",
+    tags: ["2 players", "classic"],
+    color: "#ff4fd8"
+  },
+  {
+    title: "Dots and Lines",
+    emoji: "🔲",
+    desc: "Punti e Linee: take turns drawing lines and close boxes to score. The pen-and-paper classic.",
+    url: "https://candid-paprenjak-02f057.netlify.app",
+    added: "2026-11-04",
+    tags: ["2 players", "strategy"],
+    color: "#b6ff4a"
+  },
+  // { title: "Next game", emoji: "❓", desc: "Something new is on the way…", url: "#", added: "2026-12-01", tags: [], color: "#9a92c4", soon: true },
+];
+
+/* ---------- nothing to edit below this line ---------- */
+const NEW_DAYS = 14;
+const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const games = [...GAMES].sort((a, b) => b.added.localeCompare(a.added));
+const live = games.filter(g => !g.soon);
+const isNew = g => (Date.now() - new Date(g.added + "T12:00:00")) / 864e5 <= NEW_DAYS;
+
+document.getElementById("stats").innerHTML = `
+  <div class="stat"><b>${live.length}</b> games and counting</div>
+  ${live.length ? `<div class="stat">Latest: <b>${esc(live[0].title)}</b></div>` : ""}
+  ${live.length ? `<div class="stat">Since <b>${fmt(live[live.length - 1].added)}</b></div>` : ""}`;
+
+document.getElementById("grid").innerHTML = games.map(g => `
+  <a class="card${g.soon ? " soon" : ""}" href="${esc(g.url)}" ${g.soon ? 'aria-disabled="true"' : ""} style="--accent:${esc(g.color || "#3ef2ff")}">
+    ${g.soon ? '<span class="badge" style="background:#9a92c4">SOON</span>' : isNew(g) ? '<span class="badge">NEW</span>' : ""}
+    <div class="icon">${esc(g.emoji || "🎮")}</div>
+    <h3>${esc(g.title)}</h3>
+    <p>${esc(g.desc)}</p>
+    <div class="meta">
+      <div class="tags">${(g.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+      <span class="play">${g.soon ? "Coming soon" : "Play ▶"}</span>
+    </div>
+  </a>`).join("");
+
+document.getElementById("log").innerHTML = live.map(g => `
+  <li><time datetime="${esc(g.added)}">${fmt(g.added)}</time><span>${esc(g.emoji || "🎮")} <b>${esc(g.title)}</b> joined the arcade</span></li>`).join("");
+</script>
+</body>
+</html>
