@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs><radialGradient id="g" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff6c2"/><stop offset=".35" stop-color="#ffc23a"/><stop offset=".7" stop-color="#ff6a1a"/><stop offset="1" stop-color="#d22a10"/></radialGradient>
+<radialGradient id="h" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ff8a2a" stop-opacity=".45"/><stop offset="1" stop-color="#ff8a2a" stop-opacity="0"/></radialGradient></defs>
+<rect width="512" height="512" rx="112" fill="#0d111b"/>
+<circle cx="256" cy="256" r="269" fill="url(#h)"/>
+<polygon points="256.0,41.0 285.7,126.0 336.2,89.4 339.1,151.8 424.1,121.9 376.1,198.2 436.3,214.9 389.3,256.0 465.6,303.8 376.1,313.8 400.6,371.3 339.1,360.2 349.3,449.7 285.7,386.0 256.0,440.9 226.3,386.0 162.7,449.7 172.9,360.2 111.4,371.3 135.9,313.8 46.4,303.8 122.7,256.0 75.7,214.9 135.9,198.2 87.9,121.9 172.9,151.8 175.8,89.4 226.3,126.0" fill="url(#g)" stroke="#ffdf8a" stroke-width="4" stroke-linejoin="round"/>
+<g transform="translate(256 262) scale(2.55) translate(-50 -50)" fill="#f6f0e2" stroke="#1b1e26" stroke-width="5" stroke-linejoin="round"><path d="M37 79 C37 64 42 55 45 47 H55 C58 55 63 64 63 79 Z"/>
+<rect x="36" y="42" width="28" height="7" rx="3.5"/><circle cx="50" cy="29" r="12.5"/><rect x="22" y="78" width="56" height="10" rx="4"/></g>
+</svg>

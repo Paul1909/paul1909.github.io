@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d111b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atomic">
+<title>Atomic Chess</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #0d111b; --panel: #161d2c; --panel2: #1e2739; --text: #e9edf4; --muted: #8b97ad;
+    --accent: #ff7a1a; --light: #d6dee5; --dark: #7a92a6; --s: 40px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+  #app { height: 100%; max-width: 640px; margin: 0 auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  #barB { order: 1; } #boardWrap { order: 2; } #barW { order: 3; } #toolbar { order: 4; }
+  #app.swap #barW { order: 1; } #app.swap #barB { order: 3; }
+
+  .bar { background: var(--panel); border: 2px solid transparent; border-radius: 14px; padding: 7px 12px; min-height: 56px;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; transition: border-color .25s, box-shadow .25s, background .25s; }
+  .bar.active { border-color: var(--accent); box-shadow: 0 0 18px rgba(255,122,26,.3); background: var(--panel2); }
+  .bar.check { border-color: #ff3b3b; box-shadow: 0 0 22px rgba(255,59,59,.45); }
+  .bar .row { display: flex; align-items: center; gap: 8px; }
+  .bar .name { font-weight: 700; font-size: 16px; }
+  .bar .chip { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #000; flex: none; }
+  #barW .chip { background: #f6f0e2; } #barB .chip { background: #2a2f39; border-color: #9aa5b8; }
+  .bar .msg { margin-left: auto; font-weight: 700; font-size: 15px; color: var(--muted); text-align: right; }
+  .bar.active .msg { color: var(--accent); }
+  .bar.check .msg { color: #ff5a5a; }
+  .bar .sub { display: flex; align-items: center; gap: 8px; min-height: 20px; font-size: 13px; color: var(--muted); }
+  .bar .lost { display: flex; flex-wrap: wrap; align-items: center; }
+  .bar .lost svg { width: 19px; height: 19px; margin-right: -3px; }
+  .bar .last { margin-left: auto; white-space: nowrap; }
+  .bar .last b { color: var(--text); }
+  .bar.result .msg { font-size: 18px; color: #ffd27a; }
+  #app.table #barB { transform: rotate(180deg); }
+
+  #boardWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #board { position: relative; width: 320px; height: 320px; touch-action: none; border-radius: 6px;
+    box-shadow: 0 0 0 3px #26304a, 0 12px 34px rgba(0,0,0,.55); }
+  #squares { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+    border-radius: 6px; overflow: hidden; }
+  .sq { position: relative; }
+  .sq.light { background: var(--light); } .sq.dark { background: var(--dark); }
+  .sq::before, .sq::after { content: ''; position: absolute; pointer-events: none; }
+  .sq::before { inset: 0; }
+  .sq.last::before { background: rgba(255,200,40,.38); }
+  .sq.sel::before { background: rgba(255,128,30,.6); }
+  .sq.hover::before { background: rgba(255,255,255,.3); }
+  .sq.check::before { background: radial-gradient(circle, rgba(255,30,30,1) 0%, rgba(255,40,40,.6) 45%, rgba(255,40,40,0) 75%); }
+  .sq.blast::before { background: rgba(255,70,15,.55); animation: pulse .45s ease-in-out infinite alternate; }
+  @keyframes pulse { to { background: rgba(255,170,30,.35); } }
+  .sq.mv::after { left: 35%; top: 35%; width: 30%; height: 30%; border-radius: 50%; background: rgba(12,18,32,.33); }
+  .sq.cap::after { inset: 5%; border-radius: 50%; border: calc(var(--s) * .085) solid rgba(255,85,20,.9);
+    box-shadow: 0 0 calc(var(--s) * .15) rgba(255,90,20,.7); }
+  .sq .burn { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle, rgba(25,12,6,.6) 0%, rgba(40,18,8,.4) 50%, rgba(40,18,8,.12) 85%);
+    animation: burn 3s ease-out forwards; }
+  @keyframes burn { 0% { opacity: 0; } 8% { opacity: 1; } 55% { opacity: .85; } 100% { opacity: 0; } }
+  .coord { position: absolute; font-size: calc(var(--s) * .2); font-weight: 700; line-height: 1; z-index: 1; pointer-events: none; }
+  .coord.rk { left: 4%; top: 4%; } .coord.fl { right: 5%; bottom: 4%; }
+  .sq.light .coord { color: var(--dark); } .sq.dark .coord { color: var(--light); }
+
+  #pieces { position: absolute; inset: 0; pointer-events: none; }
+  .pc { position: absolute; left: 0; top: 0; width: 12.5%; height: 12.5%; transition: transform .17s cubic-bezier(.3,.7,.4,1); will-change: transform; }
+  .pc svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 2px 1.5px rgba(0,0,0,.35)); transition: transform .3s; }
+  .pc.upside svg { transform: rotate(180deg); }
+  .pc.dragging, .pc.notrans { transition: none; }
+  .pc.dragging { z-index: 5; }
+  .pc.dragging svg { filter: drop-shadow(0 9px 7px rgba(0,0,0,.45)); }
+  .pc.lift { z-index: 4; }
+
+  #toolbar { display: flex; gap: 8px; }
+  #toolbar button { flex: 1; min-height: 46px; border: 0; border-radius: 12px; background: var(--panel); font-weight: 600; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 6px; }
+  #toolbar button:active { background: var(--panel2); }
+  #toolbar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+
+  .modal { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(5,8,14,.72); animation: fadein .2s; }
+  @keyframes fadein { from { opacity: 0; } }
+  .hidden { display: none !important; }
+  .card { background: #182033; border-radius: 18px; padding: 20px; width: 100%; max-width: 420px; max-height: 86vh; overflow: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6); border: 1px solid #27324a; animation: pop .25s cubic-bezier(.2,1.4,.5,1); }
+  @keyframes pop { from { transform: scale(.9); opacity: 0; } }
+  .card h2 { margin: 0 0 12px; font-size: 22px; }
+  .card p, .card li { line-height: 1.45; color: #c9d1de; font-size: 15px; }
+  .card ul { padding-left: 20px; margin: 8px 0; }
+  .card li { margin: 5px 0; }
+  .card b { color: var(--text); }
+  .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .btn { flex: 1; min-height: 46px; border: 0; border-radius: 12px; background: #273149; font-weight: 700; font-size: 15px; padding: 0 14px; }
+  .btn.primary { background: var(--accent); color: #1c0d00; }
+  .btn:active { filter: brightness(1.15); }
+
+  .opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #253048; }
+  .opt:last-of-type { border-bottom: 0; }
+  .opt span { font-weight: 600; }
+  .opt small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; margin-top: 2px; }
+  .toggle { width: 54px; height: 32px; border-radius: 16px; border: 0; background: #34405c; position: relative; flex: none; transition: background .2s; }
+  .toggle::after { content: ''; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { transform: translateX(22px); }
+  .seg { display: flex; gap: 6px; margin: 6px 0 10px; }
+  .seg button { flex: 1; min-height: 44px; border-radius: 10px; border: 2px solid #34405c; background: transparent; font-weight: 600; font-size: 13px; padding: 4px; }
+  .seg button.on { border-color: var(--accent); background: rgba(255,122,26,.15); }
+  #moveList { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; color: #c9d1de; max-height: 150px; overflow: auto;
+    background: #121828; border-radius: 10px; padding: 8px 10px; line-height: 1.6; margin-top: 6px; user-select: text; -webkit-user-select: text; }
+  #moveList .n { color: var(--muted); }
+  .label { color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-top: 12px; }
+
+  #promoCard { text-align: center; }
+  #promoCard.upside { transform: rotate(180deg); }
+  #promoChoices { display: flex; gap: 10px; justify-content: center; }
+  #promoChoices button { width: 70px; height: 70px; border-radius: 14px; border: 0; background: var(--light); padding: 6px; }
+  #promoChoices button:nth-child(even) { background: var(--dark); }
+  #promoChoices svg { width: 100%; height: 100%; }
+
+  #overCard { text-align: center; }
+  #overCard .big { font-size: 30px; font-weight: 800; margin: 4px 0 6px;
+    background: linear-gradient(90deg, #ffd27a, #ff7a1a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #overIcon { font-size: 44px; line-height: 1; }
+</style>
+</head>
+<body>
+<div id="app" class="table">
+  <section class="bar" id="barB">
+    <div class="row"><span class="chip"></span><span class="name">Black</span><span class="msg"></span></div>
+    <div class="sub"><span class="lost"></span><span class="last"></span></div>
+  </section>
+
+  <div id="boardWrap">
+    <div id="board">
+      <div id="squares"></div>
+      <div id="pieces"></div>
+    </div>
+  </div>
+
+  <section class="bar" id="barW">
+    <div class="row"><span class="chip"></span><span class="name">White</span><span class="msg"></span></div>
+    <div class="sub"><span class="lost"></span><span class="last"></span></div>
+  </section>
+
+  <nav id="toolbar">
+    <button id="btnUndo" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Undo</button>
+    <button id="btnNew" aria-label="New game"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>New</button>
+    <button id="btnRules" aria-label="Rules"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17.5h.01"/></svg>Rules</button>
+    <button id="btnMenu" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Menu</button>
+  </nav>
+</div>
+
+<canvas id="fx"></canvas>
+
+<div class="modal hidden" id="promo">
+  <div class="card" id="promoCard">
+    <h2>Promote to</h2>
+    <div id="promoChoices"></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="over">
+  <div class="card" id="overCard">
+    <div id="overIcon">💥</div>
+    <div class="big" id="overTitle"></div>
+    <p id="overReason"></p>
+    <div class="btns"><button class="btn" id="overClose">View board</button><button class="btn primary" id="overNew">Rematch</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="confirm">
+  <div class="card">
+    <h2>Start a new game?</h2>
+    <p>The current game will be lost.</p>
+    <div class="btns"><button class="btn" id="confirmNo">Cancel</button><button class="btn primary" id="confirmYes">New game</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="menu">
+  <div class="card">
+    <h2>Menu</h2>
+    <div class="label">Seating</div>
+    <div class="seg" id="layoutSeg">
+      <button data-v="table">Face to face</button>
+      <button data-v="side">Side by side</button>
+      <button data-v="pass">Pass &amp; flip</button>
+    </div>
+    <div class="opt"><span>Sound</span><button class="toggle" id="tSound" aria-label="Sound"></button></div>
+    <div class="opt"><span>Vibration</span><button class="toggle" id="tVibe" aria-label="Vibration"></button></div>
+    <div class="opt"><span>Show legal moves<small>Dots for moves, rings for captures</small></span><button class="toggle" id="tHints" aria-label="Show legal moves"></button></div>
+    <div class="opt"><span>Coordinates</span><button class="toggle" id="tCoords" aria-label="Coordinates"></button></div>
+    <div class="label">Moves</div>
+    <div id="moveList"></div>
+    <div class="btns"><button class="btn" id="btnFull">Fullscreen</button><button class="btn primary" id="menuClose">Done</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="rules">
+  <div class="card">
+    <h2>💥 Atomic chess</h2>
+    <p>Normal chess moves, with one explosive twist:</p>
+    <ul>
+      <li><b>Every capture is an explosion.</b> The captured piece, the capturing piece and every piece on the 8 surrounding squares are destroyed.</li>
+      <li><b>Pawns resist blasts.</b> Pawns next to an explosion survive (unless they captured or were captured).</li>
+      <li><b>Win by blowing up the enemy king</b>, either by capturing it or by a capture right next to it. Checkmate also wins.</li>
+      <li><b>Kings cannot capture</b> — they would blow themselves up.</li>
+      <li>You may never blow up your own king, even if it would also blow up theirs.</li>
+      <li><b>Touching kings are safe:</b> when the two kings stand next to each other, neither is in check.</li>
+    </ul>
+    <p>Tap a piece, then tap where it goes, or drag it. While dragging onto a capture, the blast zone glows.</p>
+    <div class="btns"><button class="btn primary" id="rulesClose">Let's play</button></div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="pieces.js"></script>
+<script src="sound.js"></script>
+<script src="fx.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

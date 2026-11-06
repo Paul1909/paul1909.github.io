@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dots and Lines">
+<title>Dots and Lines</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --p1: #00d2ff;
+    --p2: #ff2e63;
+    --gold: #ffd166;
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --panel: rgba(255, 255, 255, 0.06);
+    --edge: rgba(255, 255, 255, 0.14);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body {
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(130% 90% at 50% 0%, #26264e 0%, var(--bg) 55%, #12121f 100%);
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+
+  /* ---------- screens ---------- */
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px)
+             calc(env(safe-area-inset-right, 0px) + 14px)
+             calc(env(safe-area-inset-bottom, 0px) + 16px)
+             calc(env(safe-area-inset-left, 0px) + 14px);
+  }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; flex: 0 0 auto; }
+  .group { display: flex; gap: 8px; }
+  .icon-btn {
+    width: 44px; height: 44px; padding: 0;
+    border-radius: 14px; border: 1px solid var(--edge); background: var(--panel);
+    display: grid; place-items: center; transition: transform .12s, background .2s;
+  }
+  .icon-btn:active { transform: scale(.92); background: rgba(255,255,255,.12); }
+  .icon-btn svg { width: 22px; height: 22px; }
+  .lang-btn { width: auto; padding: 0 14px; font-size: .8rem; font-weight: 700; letter-spacing: .08em; }
+
+  /* ---------- start ---------- */
+  .start-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px; min-height: 0; }
+  .logo { width: min(34vw, 150px); height: auto; border-radius: 22%; box-shadow: 0 18px 40px rgba(0,0,0,.45); animation: float 4s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-6px); } }
+  .title {
+    margin: 0; font-size: clamp(2.2rem, 11vw, 3.4rem); font-weight: 800; letter-spacing: -.02em;
+    background: linear-gradient(45deg, var(--p1), var(--p2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .rules { background: var(--panel); border: 1px solid var(--edge); border-radius: 18px; padding: 16px 20px; max-width: 380px; text-align: left; }
+  .rules h3 { margin: 0 0 8px; color: var(--p1); font-size: 1rem; }
+  .rules ul { margin: 0; padding-left: 20px; }
+  .rules li { margin: 6px 0; font-size: .95rem; line-height: 1.4; color: rgba(255,255,255,.88); }
+  .menu-buttons { display: flex; flex-direction: column; gap: 12px; width: min(100%, 300px); }
+  .btn-primary {
+    border: none; border-radius: 999px; padding: 16px 28px;
+    font-size: 1.25rem; font-weight: 800; letter-spacing: .06em;
+    color: var(--bg); background: #fff; box-shadow: 0 0 28px rgba(255,255,255,.22);
+    transition: transform .12s;
+  }
+  .btn-primary:active { transform: scale(.95); }
+  .btn-secondary {
+    border-radius: 999px; padding: 14px 28px; font-size: 1rem; font-weight: 700;
+    background: transparent; border: 1px solid rgba(255,255,255,.5);
+    transition: transform .12s;
+  }
+  .btn-secondary:active { transform: scale(.95); }
+
+  /* ---------- game ---------- */
+  .game-title { font-size: 1.05rem; font-weight: 700; opacity: .85; margin: 0; text-align: center; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scoreboard { display: flex; gap: 12px; margin: 12px auto 4px; width: 100%; max-width: 420px; flex: 0 0 auto; }
+  .player {
+    flex: 1; text-align: center; padding: 8px 6px; border-radius: 16px;
+    border: 2px solid currentColor; opacity: .45;
+    transition: opacity .25s, transform .25s, box-shadow .25s, background .25s;
+  }
+  .player.p1 { color: var(--p1); }
+  .player.p2 { color: var(--p2); }
+  .player.active { opacity: 1; transform: scale(1.04); }
+  .player.p1.active { background: rgba(0,210,255,.14); box-shadow: 0 0 18px rgba(0,210,255,.55); }
+  .player.p2.active { background: rgba(255,46,99,.14); box-shadow: 0 0 18px rgba(255,46,99,.55); }
+  .player .label { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
+  .player .score { display: block; font-size: 2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .player .score.bump { animation: bump .35s ease; }
+  @keyframes bump { 40% { transform: scale(1.35); } }
+  .hint { text-align: center; font-size: .78rem; color: var(--muted); margin: 4px 0 0; flex: 0 0 auto; }
+
+  .board-wrap { position: relative; flex: 1 1 auto; min-height: 0; margin: 8px 0; }
+  #board { position: absolute; inset: 0; display: block; touch-action: none; }
+
+  .controls { display: flex; gap: 12px; justify-content: center; flex: 0 0 auto; }
+  .ctrl {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 20px; border-radius: 999px; font-size: .95rem; font-weight: 700;
+    background: var(--panel); border: 1px solid var(--edge); min-width: 130px; justify-content: center;
+    transition: transform .12s, opacity .2s, background .2s, border-color .2s;
+  }
+  .ctrl svg { width: 20px; height: 20px; }
+  .ctrl:active { transform: scale(.95); }
+  .ctrl:disabled { opacity: .3; transform: none; }
+  .ctrl.undo { color: var(--gold); border-color: rgba(255,209,102,.5); }
+  .ctrl.armed { background: rgba(255,46,99,.2); border-color: var(--p2); color: #fff; }
+
+  /* ---------- result overlay ---------- */
+  .result {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: rgba(10,10,22,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    animation: fade .3s ease;
+  }
+  .result-card {
+    width: min(86%, 340px); padding: 26px 22px; border-radius: 22px; text-align: center;
+    background: rgba(20,20,40,.96); border: 2px solid currentColor;
+    box-shadow: 0 0 40px currentColor; animation: pop .4s cubic-bezier(.2,1.6,.4,1);
+  }
+  .result-card h2 { margin: 0 0 6px; font-size: 1.4rem; line-height: 1.25; }
+  .result-score { font-size: 1.1rem; color: #fff; opacity: .8; margin-bottom: 18px; font-variant-numeric: tabular-nums; }
+  .result-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .result-actions .btn-primary { font-size: 1rem; padding: 12px 22px; }
+  .result-actions .btn-secondary { font-size: 1rem; padding: 12px 22px; color: #fff; }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<!-- ======================= START SCREEN ======================= -->
+<section id="start" class="screen">
+  <div class="topbar">
+    <button class="icon-btn lang-btn" id="btn-lang" aria-label="Language">IT / EN</button>
+    <div class="group">
+      <button class="icon-btn js-sound" data-i18n-label="sound" aria-label="Sound"></button>
+      <button class="icon-btn js-fs" data-i18n-label="fullscreen" aria-label="Fullscreen"></button>
+    </div>
+  </div>
+
+  <div class="start-body">
+    <img class="logo" src="favicon.svg" alt="" width="150" height="150">
+    <h1 class="title" data-i18n="title">Punti e Linee</h1>
+    <div class="rules">
+      <h3 data-i18n="rulesHeader">Regole</h3>
+      <ul>
+        <li data-i18n="rule1"></li>
+        <li data-i18n="rule2"></li>
+        <li data-i18n="rule3"></li>
+      </ul>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn-primary" id="btn-continue" data-i18n="continue" hidden>CONTINUA</button>
+      <button class="btn-primary" id="btn-play" data-i18n="play">GIOCA</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= GAME SCREEN ======================= -->
+<section id="game" class="screen" hidden>
+  <div class="topbar">
+    <button class="icon-btn" id="btn-home" data-i18n-label="menu" aria-label="Menu"></button>
+    <h1 class="game-title" data-i18n="title">Punti e Linee</h1>
+    <div class="group">
+      <button class="icon-btn js-sound" data-i18n-label="sound" aria-label="Sound"></button>
+      <button class="icon-btn js-fs" data-i18n-label="fullscreen" aria-label="Fullscreen"></button>
+    </div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="player p1" id="panel-1">
+      <span class="label" data-i18n="p1">Giocatore 1</span>
+      <span class="score" id="score-1">0</span>
+    </div>
+    <div class="player p2" id="panel-2">
+      <span class="label" data-i18n="p2">Giocatore 2</span>
+      <span class="score" id="score-2">0</span>
+    </div>
+  </div>
+  <p class="hint" data-i18n="hint"></p>
+
+  <div class="board-wrap" id="board-wrap">
+    <canvas id="board"></canvas>
+    <div class="result" id="result" hidden>
+      <div class="result-card" id="result-card">
+        <h2 id="result-title"></h2>
+        <div class="result-score" id="result-score"></div>
+        <div class="result-actions">
+          <button class="btn-primary" id="btn-again" data-i18n="again">Gioca ancora</button>
+          <button class="btn-secondary" id="btn-result-menu" data-i18n="menu">Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl undo" id="btn-undo"><span class="ic-undo"></span><span data-i18n="undo">Annulla</span></button>
+    <button class="ctrl" id="btn-new"><span class="ic-new"></span><span id="new-label" data-i18n="newGame">Nuova</span></button>
+  </div>
+</section>
+
+<script src="game.js"></script>
+</body>
+</html>
