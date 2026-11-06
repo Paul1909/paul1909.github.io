@@ -2,7 +2,7 @@
   "name": "Finger Twist",
   "short_name": "FingerTwist",
   "description": "Twister for fingers: up to 4 players, one phone, one colour each.",
-  "id": "./",
+  "id": "/finger-twist/",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

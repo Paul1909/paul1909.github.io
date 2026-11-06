@@ -2,7 +2,7 @@
   "name": "Dots and Lines",
   "short_name": "Dots and Lines",
   "description": "Punti e Linee – the classic dots-and-boxes game for two players on one phone.",
-  "id": "./",
+  "id": "/dots-and-lines/",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

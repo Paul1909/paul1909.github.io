@@ -1,7 +1,7 @@
 // Dots and Lines – service worker
 // Network first (so updates you upload show up automatically),
 // falling back to the cached copy when the phone is offline.
-const CACHE = 'dots-and-lines-v3';
+const CACHE = 'dots-and-lines-v4';
 const ASSETS = [
   './',
   './index.html',

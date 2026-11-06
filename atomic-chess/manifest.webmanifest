@@ -2,7 +2,7 @@
   "name": "Atomic Chess",
   "short_name": "Atomic",
   "description": "Explosive two-player atomic chess for one phone, works offline.",
-  "id": "./",
+  "id": "/atomic-chess/",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

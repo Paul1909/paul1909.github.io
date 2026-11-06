@@ -1,5 +1,5 @@
 // Offline cache (lives in its own folder on the shared arcade site). Change VERSION whenever any file changes, so installed copies update.
-const VERSION = 'finger-twist-v2';
+const VERSION = 'finger-twist-v3';
 const FILES = [
   './',
   './index.html',
