@@ -283,12 +283,20 @@ function render() {
   if (!c && tab !== 'offline') tab = 'heroes';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   document.getElementById('heroBtn').textContent = c ? `${CLASSES[buildById(c.build).cls].name} · ${c.level}` : 'Heroes';
+  // Replacing the content would otherwise reset the scroll position, so keep it.
+  const y = window.scrollY;
+  app.style.minHeight = app.offsetHeight + 'px';
   app.innerHTML = tab === 'now' ? renderNow(c) : tab === 'road' ? renderRoad(c) : tab === 'offline' ? renderOffline(c) : renderHeroes();
-  if (tab === 'road') {
-    const here = app.querySelector('.r.cur');
-    if (here && !render.skipScroll) here.scrollIntoView({ block: 'center' });
+  app.style.minHeight = '';
+  const tabChanged = render.lastTab !== tab;
+  render.lastTab = tab;
+  if (tabChanged) {
+    window.scrollTo(0, 0);
+    const here = tab === 'road' && app.querySelector('.r.cur');
+    if (here) here.scrollIntoView({ block: 'center' });
+  } else {
+    window.scrollTo(0, y);
   }
-  render.skipScroll = false;
 }
 
 function setLevel(c, L) {
@@ -306,7 +314,7 @@ document.addEventListener('click', e => {
     case 'diff': if (c) { c.diff = Number(t.dataset.i); save(); render(); } break;
     case 'edit': if (c) openSetup(c); break;
     case 'goto': if (c) { c.level = Number(t.dataset.l); state.tab = 'now'; save(); render(); window.scrollTo(0, 0); } break;
-    case 'pick': state.active = t.dataset.id; state.tab = 'now'; save(); render(); window.scrollTo(0, 0); break;
+    case 'pick': state.active = t.dataset.id; state.tab = 'now'; render.lastTab = null; save(); render(); break;
     case 'new': openSetup(null); break;
     case 'dcls': d.cls = t.dataset.k; if (!d.build || buildById(d.build).cls !== d.cls) d.build = null; renderSheet(); break;
     case 'dbuild': d.build = t.dataset.id; renderSheet(); break;
@@ -326,7 +334,7 @@ document.addEventListener('click', e => {
       obj.name = (obj.name || '').trim();
       const i = state.chars.findIndex(x => x.id === obj.id);
       if (i >= 0) state.chars[i] = obj; else state.chars.push(obj);
-      state.active = obj.id; state.tab = 'now'; save();
+      state.active = obj.id; state.tab = 'now'; render.lastTab = null; save();
       history.back();
       break;
     }
@@ -345,7 +353,7 @@ function confirmDelete(d) {
 
 document.addEventListener('change', e => {
   const t = e.target, c = cur();
-  if (t.dataset.act === 'quest' && c) { c.quests = { ...(c.quests || {}), [t.dataset.q]: t.checked }; save(); render.skipScroll = true; render(); }
+  if (t.dataset.act === 'quest' && c) { c.quests = { ...(c.quests || {}), [t.dataset.q]: t.checked }; save(); render(); }
   if (t.dataset.act === 'maxblock' && c) { c.maxBlock = t.checked; save(); render(); }
   if (t.dataset.act === 'shield' && c) { c.shieldBlock = clamp(Number(t.value) || 0, 10, 90); save(); render(); }
 });
