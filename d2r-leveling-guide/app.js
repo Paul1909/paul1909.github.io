@@ -20,6 +20,7 @@ const state = {
   active: store.get('active', null),
   tab: store.get('tab', 'now'),
   draft: null,
+  open: {}, // which collapsible sections are open, so a redraw keeps them open
 };
 if (!state.chars.find(c => c.id === state.active)) state.active = state.chars[0] ? state.chars[0].id : null;
 
@@ -132,7 +133,7 @@ function renderNow(c) {
   </section>`;
 
   // Quests
-  html += `<section class="card"><details><summary>Quest rewards</summary>
+  html += `<section class="card"><details data-keep="quests" ${state.open.quests ? 'open' : ''}><summary>Quest rewards</summary>
     <p class="small muted">Ticked = done. Skill/stat points from these are included in the plan. Den of Evil also unlocks that difficulty's Akara respec.</p>
     ${QUESTS.filter(q => q.diff <= c.diff).map(q => {
       const done = c.quests && q.id in c.quests ? c.quests[q.id] : Engine.defaultDone(q, c);
@@ -220,7 +221,7 @@ function renderOffline(c) {
     const keys = [...new Set(b.stages.flatMap(s => s.gear || []))].sort((x, y) => RW[x][3] - RW[y][3]);
     html += `<section class="card"><h2>Runewords for ${esc(b.name)}</h2><p class="small muted">All runewords, including former ladder-only ones, work in offline single player.</p>${keys.map(rwHtml).join('')}</section>`;
   }
-  html += `<section class="card"><details><summary>All leveling runewords</summary>${Object.keys(RW).sort((x, y) => RW[x][3] - RW[y][3]).map(rwHtml).join('')}</details></section>`;
+  html += `<section class="card"><details data-keep="runewords" ${state.open.runewords ? 'open' : ''}><summary>All leveling runewords</summary>${Object.keys(RW).sort((x, y) => RW[x][3] - RW[y][3]).map(rwHtml).join('')}</details></section>`;
   html += `<section class="card"><h2>Max block math</h2><p class="small">Block% = Shield block × (Dex − 15) ÷ (Level × 2), capped at 75%. So the Dexterity you need is <b>15 + 150 × Level ÷ Shield block</b>. Use the "Chance to Block" shown on the shield (it already includes your class bonus).</p></section>`;
   html += `<p class="foot">Plans follow common community leveling routes (Icy Veins, Maxroll) for D2R: Reign of the Warlock, patch 3.2. Skill caps, prerequisites and quest rewards are simulated level by level.<br>Not affiliated with Blizzard Entertainment.</p>`;
   return html;
@@ -364,6 +365,11 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => {
   if (e.target.dataset.act === 'dname' && state.draft) state.draft.name = e.target.value;
 });
+// 'toggle' does not bubble, so listen in the capture phase.
+document.addEventListener('toggle', e => {
+  const k = e.target.dataset && e.target.dataset.keep;
+  if (k) state.open[k] = e.target.open;
+}, true);
 window.addEventListener('popstate', () => { if (state.draft) { closeSetup(); render(); } });
 
 render();

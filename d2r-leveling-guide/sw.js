@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'd2r-leveling-guide';
-const VERSION = APP + '-v4';
+const VERSION = APP + '-v5';
 const FILES = [
   './',
   './index.html',
