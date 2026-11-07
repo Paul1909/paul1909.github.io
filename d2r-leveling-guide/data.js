@@ -254,6 +254,20 @@ const BUILDS = [
         gear: ['leaf', 'stealth', 'nadir', 'pledge', 'spirit', 'insight', 'lore', 'smoke'] },
     ] },
 
+  { id: 'sorc-orbhydra', cls: 'sorceress', name: 'Frozen Orb / Hydra Sorceress', tag: 'Cold + fire · no respec', respecs: 0,
+    blurb: 'Levels with Fire Ball (which later boosts Hydra), then Frozen Orb and Hydra together from 30. Two elements, so immunes are rarely a problem — and all three respecs stay free.',
+    merc: 'Act 2 Defensive merc hired in Nightmare (Holy Freeze) with Insight for mana.',
+    stats: { str: [[9, 25], [20, 35], [25, 45], [55, 60]] },
+    statNote: 'Strength 45 for a Spirit Crystal Sword, more only if gear needs it. Everything else Vitality — no Energy.',
+    stages: [
+      { at: 1, title: 'Fire Bolt → Fire Ball', pri: [['firebolt', 5], ['warmth', 1], ['frozenarmor', 1], ['staticfield', 1], ['telekinesis', 1], ['fireball', 20], ['teleport', 1], [['frozenorb', 'hydra'], 20], ['firebolt', 20]],
+        play: 'Fire Bolt until 12, then Fire Ball for everything. Teleport at 18. Fire Ball points are not wasted: they boost Hydra later.',
+        gear: ['leaf', 'stealth', 'nadir', 'pledge', 'spirit', 'lore'] },
+      { at: 30, title: 'Frozen Orb + Hydra', pri: [['teleport', 1], ['staticfield', 1], ['fireball', 20], [['frozenorb', 'hydra'], 20], ['firemastery', 20], ['icebolt', 5], ['coldmastery', 20], ['firebolt', 20], ['icebolt', 20]],
+        play: 'Drop Hydras next to a pack or boss, then throw Frozen Orbs while they burn. Cold immunes → Hydra; fire immunes → Orb. Order: Frozen Orb and Hydra together, then Fire Mastery, a few Ice Bolt (Orb synergy), Cold Mastery, Fire Bolt.',
+        gear: ['spirit', 'insight', 'lore', 'rhyme', 'smoke', 'memory'] },
+    ] },
+
   // ---------- PALADIN ----------
   { id: 'pal-hammer', cls: 'paladin', name: 'Hammerdin', tag: 'Blessed Hammer · magic damage', respecs: 1, shield: 65,
     blurb: 'Zeal + Holy Fire through Normal Act 1–3, respec at 24 into Blessed Hammer + Concentration. Magic damage — almost nothing is immune.',
@@ -367,6 +381,20 @@ const BUILDS = [
       { at: 30, title: 'Strafe + passives', pri: [['strafe', 20], ['valkyrie', 1], ['penetrate', 1], ['criticalstrike', 10], ['pierce', 10], ['multipleshot', 20], ['criticalstrike', 20], ['penetrate', 20], ['valkyrie', 20]],
         play: 'Valkyrie tanks while you Strafe elites and Multiple Shot packs. Critical Strike doubles physical damage, Pierce hits lines.',
         gear: ['edge', 'harmony', 'insight', 'lore', 'smoke', 'peace'] },
+    ] },
+
+  { id: 'ama-multi', cls: 'amazon', name: 'Multishot Bowazon', tag: 'Physical bow · screen-wide arrows', respecs: 1,
+    blurb: 'Exploding Arrow carries you through Normal, then a respec at 30 into Multiple Shot with Pierce, Critical Strike and Guided Arrow for bosses. Clears open maps fast; damage grows with your bow.',
+    merc: 'Act 2 Offensive merc hired in Nightmare (Might aura) with Insight for mana.',
+    stats: { str: [[9, 30], [20, 40], [40, 60], [60, 75]], dex: [[2, 35], [15, 50], [30, 80], [50, 115], [70, 150]] },
+    statNote: 'Dexterity is bow damage and attack rating, so it gets a big share. Strength just for the bow. Rest Vitality.',
+    stages: [
+      { at: 1, title: 'Exploding Arrow', pri: [['magicarrow', 2], ['firearrow', 3], ['innersight', 1], ['multipleshot', 1], ['explodingarrow', 20], ['immolationarrow', 1], ['firearrow', 20]],
+        play: 'Magic and Fire Arrow early, Exploding Arrow from 12 — it blows up whole packs with any bow. Inner Sight on bosses.',
+        gear: ['zephyr', 'edge', 'stealth', 'nadir', 'insight'] },
+      { at: 30, respec: true, title: 'Respec → Multiple Shot', pri: [['multipleshot', 20], ['innersight', 1], ['dodge', 1], ['avoid', 1], ['evade', 1], ['valkyrie', 1], ['strafe', 1], ['pierce', 9], ['criticalstrike', 20], ['penetrate', 20], ['guidedarrow', 20], ['magicarrow', 20], ['valkyrie', 20]],
+        play: 'Multiple Shot sprays the screen; Guided Arrow never misses on bosses. Pierce (about 9 points, plus a Razortail belt if you find one) makes arrows pass through. Valkyrie tanks.',
+        gear: ['edge', 'harmony', 'insight', 'peace', 'lore', 'smoke', 'hustle'] },
     ] },
 
   // ---------- ASSASSIN ----------
