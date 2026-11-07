@@ -253,6 +253,9 @@ function renderSheet() {
   const d = state.draft, el = document.getElementById('sheet');
   if (!d) { el.innerHTML = ''; return; }
   document.body.style.overflow = 'hidden';
+  // The sheet scrolls on its own; keep its position when it is redrawn after a tap.
+  const oldSheet = el.querySelector('.sheet');
+  const y = oldSheet ? oldSheet.scrollTop : 0;
   const builds = d.cls ? BUILDS.filter(b => b.cls === d.cls) : [];
   el.innerHTML = `<div class="sheet"><div class="wrap">
     <h1>${d.editing ? 'Edit hero' : 'New hero'}</h1>
@@ -274,6 +277,7 @@ function renderSheet() {
     ${state.chars.length || d.editing ? '<button class="btn" data-act="dcancel">Cancel</button>' : ''}
     <button class="btn pri" data-act="dsave" ${d.build ? '' : 'disabled style="opacity:.45"'}>${d.editing ? 'Save' : 'Start guide'}</button>
   </div></div>`;
+  el.querySelector('.sheet').scrollTop = y;
 }
 
 // ---------------- MAIN RENDER ----------------
