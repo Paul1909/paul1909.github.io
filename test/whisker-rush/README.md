@@ -19,7 +19,7 @@ To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
 
-### v3 (8 Nov 2026)
+### v3 (8 Nov 2026) · commit 874623c
 - 3 new tracks: Space Station (low gravity), Alpine Meadow, House Chase (room to room).
 - Controls: left thumb stick steers, up = faster, down = brake; right thumb tap = jump, hold = sprint. Computer: arrows + Space (tap jump, hold sprint), C camera.
 - How to play page; shown once before the first race.
