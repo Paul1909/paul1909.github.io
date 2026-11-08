@@ -19,6 +19,12 @@ const T = {
   '11': [10, 17], '#11': [10, 18], 'b13': [12, 20], '13': [12, 21],
 };
 const sym = s => s.replace(/b/g, '♭').replace(/#/g, '♯');
+// Swap ♭/♯ characters for engraved Bravura glyphs, so every device draws them the same and well spaced.
+const ACC_SVG = {
+  '♭': `<svg class="ac fl" viewBox="0 -439 226 614" aria-hidden="true"><path transform="scale(1,-1)" d="${GLYPH.flat}"/></svg>`,
+  '♯': `<svg class="ac sh" viewBox="0 -350 249 698" aria-hidden="true"><path transform="scale(1,-1)" d="${GLYPH.sharp}"/></svg>`,
+};
+const typo = s => String(s).replace(/[♭♯]/g, c => ACC_SVG[c]);
 const accTxt = a => (a > 0 ? '♯'.repeat(a) : '♭'.repeat(-a));
 
 // Modifier buttons. g = group (triad/sev/ext are exclusive within the group; add/alt combine freely).
@@ -216,8 +222,9 @@ function engraveAll(chords) {
   for (const y0 of [0, 100]) for (let i = 0; i < 5; i++) frame += `<line class="sl" x1="7" x2="${f1(right)}" y1="${y0 + i * 10}" y2="${y0 + i * 10}"/>`;
   frame += `<line class="sl" x1="7" x2="7" y1="0" y2="140"/><line class="sl" x1="${f1(right)}" x2="${f1(right)}" y1="0" y2="140"/>`;
   frame += glyph('brace', 0, 140, '', 1.5, 140 / (997 * K)) + glyph('gClef', 12, 30) + glyph('fClef', 12, 110);
-  const y0 = Math.floor(ext.min - 4), y1 = Math.ceil(ext.max + 4);
-  return { svgs: bodies.map(b => frame + b), vb: [-1, y0, f1(right + 2), y1 - y0] };
+  // symmetric around the middle of the grand staff, so the system centre is the svg centre
+  const half = Math.ceil(Math.max(70 - ext.min, ext.max - 70) + 4);
+  return { svgs: bodies.map(b => frame + b), vb: [-1, 70 - half, f1(right + 2), 2 * half] };
 }
 
 /* ---------- keyboard ---------- */
@@ -233,6 +240,22 @@ function kbRange(chords) {
   return { lo, hi, whites };
 }
 
+const CAPW = { C: .68, D: .74, E: .63, F: .58, G: .74, A: .72, B: .66 };   // serif capital widths (em)
+function keyLabel(name, cx, y, fs, bold) {
+  const L = name[0], accs = [...name.slice(1)], sc = fs / 800;
+  const lw = CAPW[L] * fs * (bold ? 1.06 : 1);
+  const aw = accs.reduce((w, a) => w + (a === '♭' ? 226 : 249) * sc + fs * 0.03, 0);
+  let x = cx - (lw + aw) / 2;
+  let out = `<text class="kl" x="${f1(x + lw / 2)}" y="${f1(y)}" font-size="${fs}"${bold ? ' font-weight="bold"' : ''}>${L}</text>`;
+  x += lw + fs * 0.04;
+  for (const a of accs) {
+    const flat = a === '♭', oy = flat ? y - 175 * sc : y + fs * 0.1 - 348 * sc;
+    out += `<path class="kla" transform="translate(${f1(x)} ${f1(oy)}) scale(${f1(sc * 1e4) / 1e4} ${-f1(sc * 1e4) / 1e4})" d="${GLYPH[flat ? 'flat' : 'sharp']}"/>`;
+    x += (flat ? 226 : 249) * sc + fs * 0.03;
+  }
+  return out;
+}
+
 function keyboard(notes, R, hU, labels) {
   const on = new Map(notes.map(n => [n.midi, n]));
   const W = 20, bw = 12.4, bh = hU * 0.62;
@@ -243,12 +266,12 @@ function keyboard(notes, R, hU, labels) {
     if (!isBlack(m)) {
       const x = pos[m] * W;
       wk += `<rect class="w${cls}" x="${x}" y="0" width="${W}" height="${f1(hU)}" rx="1.5"/>`;
-      if (labels && n) wk += `<text class="kl" x="${x + W / 2}" y="${f1(hU - 7)}" font-size="9"${n.root ? ' font-weight="bold"' : ''}>${n.name}</text>`;
+      if (labels && n) wk += keyLabel(n.name, x + W / 2, hU - 7, 9, n.root);
       else if (labels && m % 12 === 0) wk += `<text class="kc" x="${x + W / 2}" y="${f1(hU - 7)}" font-size="7">C${m / 12 - 1}</text>`;
     } else {
       const x = (pos[m - 1] + 1) * W - bw / 2 + BOFF[m % 12] * W;
       bk += `<rect class="b${cls}" x="${f1(x)}" y="0" width="${bw}" height="${f1(bh)}" rx="1"/>`;
-      if (labels && n) bk += `<text class="kl" x="${f1(x + bw / 2)}" y="${f1(bh - 6)}" font-size="7"${n.root ? ' font-weight="bold"' : ''}>${n.name}</text>`;
+      if (labels && n) bk += keyLabel(n.name, x + bw / 2, bh - 6, n.name.length > 2 ? 5.6 : 7, n.root);
     }
   }
   return wk + bk;
@@ -312,7 +335,7 @@ const blocks = [...document.querySelectorAll('.block')];
 const tip = $('tip');
 let current = null;
 
-function mkBtn(label, cls) { const b = document.createElement('button'); b.innerHTML = label; if (cls) b.className = cls; return b; }
+function mkBtn(label, cls) { const b = document.createElement('button'); b.innerHTML = typo(label); if (cls) b.className = cls; return b; }
 
 // notes + accidentals
 const noteBtns = [...LET].map((L, i) => {
@@ -344,7 +367,7 @@ $('octDown').onclick = () => { S.oct = Math.max(2, S.oct - 1); update(); };
 $('octUp').onclick = () => { S.oct = Math.min(6, S.oct + 1); update(); };
 
 function showTip(m) {
-  tip.innerHTML = `<div class="h"><span><b>${m.label || sym(m.id)}</b> <i>${m.name}</i></span><span class="f">${m.f}</span></div><p>${m.what}</p><p class="k">${m.key}</p>`;
+  tip.innerHTML = typo(`<div class="h"><span><b>${m.label || sym(m.id)}</b> <i>${m.name}</i></span><span class="f">${m.f}</span></div><p>${m.what}</p><p class="k">${m.key}</p>`);
   tip.hidden = false;
   const r = m.el.getBoundingClientRect(), tw = tip.offsetWidth;
   tip.style.left = Math.max(10, Math.min(innerWidth - tw - 10, r.left + r.width / 2 - tw / 2)) + 'px';
@@ -376,18 +399,18 @@ function update() {
   const c = build();
   c.inv = [c.notes, invert(c.notes, 1), invert(c.notes, 2)];
   current = c;
-  $('name').innerHTML = c.label + (c.suffix ? `<small>${c.suffix}</small>` : '');
-  $('formula').innerHTML = c.notes.map(n => sym(n.k)).join('&ensp;') + '&emsp;·&emsp;<b>' + c.notes.map(n => n.name).join('&ensp;') + '</b>';
+  $('name').innerHTML = typo(c.label) + (c.suffix ? `<small>${typo(c.suffix)}</small>` : '');
+  $('formula').innerHTML = typo(c.notes.map(n => sym(n.k)).join('&ensp;') + '&emsp;·&emsp;<b>' + c.notes.map(n => n.name).join('&ensp;') + '</b>');
   draw();
 }
 
 function draw() {
   if (!current) return;
   const eng = engraveAll(current.inv), R = kbRange(current.inv);
-  const W = blocks[0].clientWidth, H = blocks[0].clientHeight - 4;
+  const W = blocks[0].clientWidth, H = blocks[0].clientHeight - 26;  // 13px each side: room for the inversion label
   if (W < 10 || H < 10) return;
   const [vx, vy, vw, vh] = eng.vb;
-  let sh = H - 13, sw = sh * vw / vh;  // leave room for the inversion label above the staff
+  let sh = H, sw = sh * vw / vh;
   if (sw > W * 0.34) { sw = W * 0.34; sh = sw * vh / vw; }
   const aw = W - sw - 8;
   let wpx = aw / R.whites, kh = Math.min(H, wpx * 6.2);

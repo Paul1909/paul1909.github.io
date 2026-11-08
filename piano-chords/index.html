@@ -35,7 +35,7 @@
   #formula { font-size: 13px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
   #formula b { font-weight: normal; color: var(--ink); }
 
-  .row { display: flex; gap: 5px; max-width: 640px; width: 100%; margin: 0 auto; }
+  .row { display: flex; gap: clamp(3px, 1.2vw, 5px); max-width: 640px; width: 100%; margin: 0 auto; }
   button {
     font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--ink); border-radius: 3px;
     padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 0;
@@ -45,9 +45,9 @@
   button.dim { opacity: .35; }
   #notes button { flex: 1; aspect-ratio: 1; max-width: 58px; font-size: clamp(17px, 2.8vh, 24px); }
   #notes .sep { margin-left: 10px; }
-  .mods button { flex: 1 1 auto; min-width: 1.9em; height: var(--bh); padding: 0 .35em; white-space: nowrap; font-size: clamp(14px, 2.2vh, 18px); }
-  .mods .sep { margin-left: 8px; }
-  #more { position: relative; flex: 0 1 auto; padding: 0 .3em; font-size: 18px; border-style: dashed; }
+  .mods button { flex: 1 1 auto; min-width: auto; height: var(--bh); padding: 0 clamp(4px, 1.5vw, 8px); white-space: nowrap; font-size: clamp(12px, min(2.2vh, 3.9vw), 18px); }
+  .mods .sep { margin-left: clamp(4px, 1.7vw, 8px); }
+  #more { position: relative; padding: 0 .5em; border-style: dashed; }
   #more.open { border-style: solid; }
   #more.has::after { content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--root); }
   #rare { display: flex; flex-direction: column; gap: 5px; }
@@ -58,7 +58,6 @@
   .block { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; }
   .lbl { position: absolute; left: 0; top: 2px; font-size: 11px; font-style: italic; color: var(--grey); pointer-events: none; }
   .block svg { display: block; cursor: pointer; flex: none; overflow: visible; }
-  .block svg.staff { align-self: flex-end; }
 
   /* staff */
   .sl { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -75,6 +74,13 @@
   .t { fill: var(--tone); } .r { fill: var(--root); }
   .kb.on .t { fill: var(--tone-on); } .kb.on .r { fill: var(--root-on); }
   .kl { font-family: var(--serif); text-anchor: middle; fill: var(--paper); }
+  .kla { fill: var(--paper); }
+  /* engraved accidentals inside text */
+  .ac { display: inline-block; fill: currentColor; margin: 0 .05em 0 .06em; }
+  #name .ac { margin: 0 .07em 0 .08em; }
+  .ac.fl { width: .283em; height: .77em; vertical-align: 0; }
+  .ac.sh { width: .31em; height: .87em; vertical-align: -.1em; }
+  button, #name, #formula, #tip { font-variant-numeric: lining-nums; font-feature-settings: "lnum" 1, "kern" 1; }
   .kc { font-family: var(--serif); text-anchor: middle; fill: var(--grey); }
 
   #controls { display: flex; flex-direction: column; gap: 6px; flex: none; }
