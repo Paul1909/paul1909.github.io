@@ -14,7 +14,7 @@ Hidden test copy of Whisker Rush, not linked from the arcade page. It has the �
 Tap = jump, hold = sprint, stick or tilt to steer. Keyboard: ↑/W tap = jump, hold = sprint; Space = jump; ←/→ steer; P = pause.
 
 ## Versions and rollback
-See `CHANGELOG.md`. Every version is tagged `whisker-rush-test-vN` in the repo; to roll back, restore this folder from the tag and push.
+See `CHANGELOG.md`, which lists the commit of every version. To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
 
 ## Updating
 Change the files, bump `VERSION` in `sw.js`, push. To bake tuned values in, change the `def` values in `TUNING` (game.js).
