@@ -3,7 +3,7 @@
 const { buildCat, FURS, EYES, PATTERNS } = window.WRCat;
 const { Race, TRACKS, DIFFS, TUNING, DEFAULTS } = window.WRGame;
 const TEST_BUILD = true;   // shows the Tuning lab; the test copy also keeps its own saves
-const BUILD = 'v2';
+const BUILD = 'v3';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -22,7 +22,7 @@ const $$ = s => [...document.querySelectorAll(s)];
 // ---------- state ----------
 const defaultCat = { name: 'Whiskers', gender: 'male', fur: 'ginger', pattern: 'tabby', eyes: 'green', speed: 5, jump: 5 };
 let cat = { ...defaultCat, ...store.get('cat', {}) };
-let settings = { control: 'joystick', side: 'left', sens: 1, invert: false, sound: true, music: true, musicVol: 35, muted: false, vibe: true, ...store.get('settings', {}) };
+let settings = { control: 'joystick', side: 'left', view: 'first', sens: 1, invert: false, sound: true, music: true, musicVol: 35, muted: false, vibe: true, ...store.get('settings', {}) };
 let pick = { track: 'desert', diff: 'jaguar', ...store.get('pick', {}) };
 let board = store.get('board', {});   // leaderboard: 'track:difficulty' -> top 10 entries
 let tuning = store.get('tuning', {});   // only the values changed from the defaults
@@ -77,9 +77,16 @@ const preview = {
     this.ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), this.camera);
     if (this.ray.intersectObject(this.cat.root, true).length) this.love();
   },
+  petN: 0,
   love() {
-    audio.init(); audio.purr(); vibe([25, 35, 25, 35, 25, 35, 25, 35, 25]);
-    this.loveT = 1.8;
+    audio.init(); vibe([25, 35, 25, 35, 25, 35, 25, 35, 25]);
+    // Luna's own voice: a purr, then an "auuu", then a purr again...
+    if (settings.sound && !settings.muted) {
+      const clip = ['luna-purr.mp3', 'luna-auuu.mp3'][this.petN++ % 2];
+      (this.clips ||= {})[clip] ||= new Audio(clip);
+      const a = this.clips[clip]; a.currentTime = 0; a.volume = 1; a.play().catch(() => audio.purr());
+    }
+    this.loveT = 1.9;
     if (!this.heartGeo) {
       const sh = new THREE.Shape();
       sh.moveTo(0, -0.38);
@@ -111,8 +118,8 @@ const preview = {
     }
     this.hearts = this.hearts.filter(h => { if (h.t < h.life) return true; this.scene.remove(h.m); h.m.material.dispose(); return false; });
     if (this.cat) {
-      if (this.loveT > 0) { this.loveT -= dt; this.cat.head.rotation.z = Math.sin(this.loveT * 9) * 0.22; this.cat.head.rotation.x = -0.15; }
-      else { this.cat.head.rotation.z = 0; this.cat.head.rotation.x = 0; }
+      if (this.loveT > 0) { this.loveT -= dt; this.cat.wag = 1; this.cat.head.rotation.z = Math.sin(this.loveT * 9) * 0.22; this.cat.head.rotation.x = -0.15; }
+      else { this.cat.wag = 0; this.cat.head.rotation.z = 0; this.cat.head.rotation.x = 0; }
     }
   },
   render() {
@@ -239,6 +246,15 @@ const audio = {
     g.exponentialRampToValueAtTime(0.75, t + 1.1); g.setValueAtTime(0.65, t + 1.6); g.exponentialRampToValueAtTime(0.0001, t + 2.0);
     [src, lfo, hum].forEach(n => { n.start(t); n.stop(t + 2.05); });
   },
+  ghost() {
+    if (!this.ctx || !settings.sound) return;
+    const c = this.ctx, t = c.currentTime, o = c.createOscillator(), v = c.createOscillator(), vg = c.createGain(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(320, t); o.frequency.linearRampToValueAtTime(620, t + 0.5); o.frequency.linearRampToValueAtTime(260, t + 1.1);
+    v.frequency.value = 7; vg.gain.value = 25; v.connect(vg); vg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+    o.connect(g); g.connect(this.sfx); o.start(t); v.start(t); o.stop(t + 1.2); v.stop(t + 1.2);
+  },
+  unghost() { this.tone(500, 900, 0.18, 'triangle', 0.15); },
   goldFish() { this.fish(); [1568, 2093, 2637].forEach((f, i) => this.tone(f, f, 0.12, 'sine', 0.12, 0.22 + i * 0.07)); },
   setMute(m) { if (this.master) this.master.gain.value = m ? 0 : 1; },
 };
@@ -269,6 +285,12 @@ const music = {
 };
 // phones only allow sound after a tap, so the menu music starts on the first one
 document.addEventListener('pointerdown', () => { audio.init(); if (mode === 'menu' && (!music.menu || music.menu.paused)) music.play('menu'); }, true);
+function toggleView() {
+  settings.view = settings.view === 'third' ? 'first' : 'third'; saveSettings();
+  if (race) race.setView(settings.view);
+  toast(settings.view === 'third' ? 'Camera: behind the cat' : 'Camera: cat\'s eyes', 1000);
+}
+$('#viewBtn').addEventListener('click', e => { e.stopPropagation(); toggleView(); });
 function setMuted(m, user = true) {
   settings.muted = m; saveSettings();
   if (user) { audio.init(); audio.setMute(m); music.apply(); }
@@ -291,6 +313,7 @@ function show(id) {
   if (id === 'title') renderTitle();
   if (id === 'tune') renderTune();
   if (id === 'board') renderBoard();
+  if (id === 'howto') store.set('seenHowto', true);
 }
 function go(id) { screenStack.push(id); show(id); }
 function back() { screenStack.pop(); show(screenStack[screenStack.length - 1] || 'title'); }
@@ -299,6 +322,7 @@ $('#goRace').onclick = () => go('tracks');
 $('#goCustom').onclick = () => go('custom');
 $('#goSettings').onclick = () => go('settings');
 $('#goTune').onclick = () => go('tune');
+$('#goHow').onclick = () => go('howto');
 $('#goBoard').onclick = () => go('board');
 if (!TEST_BUILD) $('#goTune').style.display = 'none';
 
@@ -382,6 +406,7 @@ function renderTracks() {
   seg($('#diff'), DIFFS.map(d => ({ v: d.id, html: `${d.emoji} ${d.name}<small>${d.sub}</small>` })), pick.diff, v => { pick.diff = v; store.set('pick', pick); renderTracks(); });
 }
 $('#startRace').onclick = async () => {
+  if (!store.get('seenHowto', false)) { store.set('seenHowto', true); go('howto'); return; }
   audio.init();
   if (settings.control === 'tilt') await askTilt();
   startRace(pick.track, pick.diff);
@@ -391,6 +416,7 @@ $('#startRace').onclick = async () => {
 function renderSettings() {
   const bool = [{ v: false, html: 'Off' }, { v: true, html: 'On' }];
   seg($('#setControl'), [{ v: 'joystick', html: '🕹️ Stick' }, { v: 'tilt', html: '📱 Tilt' }], settings.control, async v => { settings.control = v; saveSettings(); if (v === 'tilt') await askTilt(); });
+  seg($('#setView'), [{ v: 'first', html: '👀 Cat\'s eyes' }, { v: 'third', html: '🎥 Behind' }], settings.view, v => { settings.view = v; saveSettings(); });
   seg($('#setSide'), [{ v: 'left', html: 'Left' }, { v: 'right', html: 'Right' }], settings.side, v => { settings.side = v; saveSettings(); });
   seg($('#setInvert'), bool, settings.invert, v => { settings.invert = v; saveSettings(); });
   seg($('#setSound'), bool, settings.sound, v => { settings.sound = v; saveSettings(); audio.init(); if (v) audio.fish(); });
@@ -409,7 +435,8 @@ function toast(t, ms = 1800) {
 }
 
 // ---------- input ----------
-const input = { steer: 0, sprint: false, jumpBuf: 0 };
+const input = { steer: 0, throttle: 0, sprint: false, jumpBuf: 0 };
+let joyThrottle = 0;
 let joySteer = 0, tiltSteer = 0, tiltAngle = null, tiltNeutral = 0, tiltSeen = false, useTilt = false;
 const keys = {};
 const acts = new Map();
@@ -443,13 +470,16 @@ touch.addEventListener('pointerdown', e => {
 });
 touch.addEventListener('pointermove', e => {
   if (e.pointerId !== joyId) return;
-  const dx = Math.max(-JOY_R, Math.min(JOY_R, e.clientX - joyOrigin.x));
-  knob.style.transform = `translateX(${dx}px)`;
-  const v = dx / JOY_R;
+  let dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
+  const len = Math.hypot(dx, dy); if (len > JOY_R) { dx *= JOY_R / len; dy *= JOY_R / len; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  const v = dx / JOY_R, t = -dy / JOY_R;
   joySteer = Math.abs(v) < 0.08 ? 0 : v;
+  // up = accelerate, down = brake; a dead zone in the middle so steering doesn't brake by accident
+  joyThrottle = Math.abs(t) < 0.3 ? 0 : Math.sign(t) * (Math.abs(t) - 0.3) / 0.7;
 });
 function release(e) {
-  if (e.pointerId === joyId) { joyId = null; joySteer = 0; joyRest(); return; }
+  if (e.pointerId === joyId) { joyId = null; joySteer = 0; joyThrottle = 0; joyRest(); return; }
   const a = acts.get(e.pointerId); if (!a) return;
   clearTimeout(a.timer); acts.delete(e.pointerId);
   if (a.sprint) sprintHolds = Math.max(0, sprintHolds - 1);
@@ -457,21 +487,23 @@ function release(e) {
 }
 touch.addEventListener('pointerup', release);
 touch.addEventListener('pointercancel', release);
-function clearTouches() { acts.forEach(a => clearTimeout(a.timer)); acts.clear(); sprintHolds = 0; joyId = null; joySteer = 0; joyRest(); }
+function clearTouches() { acts.forEach(a => clearTimeout(a.timer)); acts.clear(); sprintHolds = 0; joyId = null; joySteer = 0; joyThrottle = 0; kbSprint = false; joyRest(); }
 
-// Up arrow / W behave like the screen: quick tap = jump, hold = sprint. Space always jumps.
-let kbSprint = false, kbTimer = null;
+// Computer: arrows (or WASD) are the joystick: ←/→ steer, ↑ accelerate, ↓ brake.
+// Space is the right thumb: quick tap = jump, hold = sprint.
+var kbSprint = false, kbTimer = null;
 addEventListener('keydown', e => {
   keys[e.code] = true;
   if (mode !== 'race' || e.target.tagName === 'INPUT') return;
-  if (e.repeat) { if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); return; }
-  if (e.code === 'Space') { input.jumpBuf = 0.15; e.preventDefault(); }
-  if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); clearTimeout(kbTimer); kbTimer = setTimeout(() => { kbTimer = null; kbSprint = true; }, 200); }
+  if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+  if (e.repeat) return;
+  if (e.code === 'Space') { clearTimeout(kbTimer); kbTimer = setTimeout(() => { kbTimer = null; kbSprint = true; }, 200); }
+  if (e.code === 'KeyC') toggleView();
   if (e.code === 'Escape' || e.code === 'KeyP') paused ? resume() : pause();
 });
 addEventListener('keyup', e => {
   keys[e.code] = false;
-  if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+  if (e.code === 'Space') {
     if (kbTimer) { clearTimeout(kbTimer); kbTimer = null; if (mode === 'race' && race && race.state === 'race') input.jumpBuf = 0.15; }
     kbSprint = false;
   }
@@ -510,7 +542,7 @@ function startRace(trackId, diffId) {
   music.hold();
   setTimeout(() => {
     if (race) { race.dispose(); race = null; }
-    race = new Race(renderer, { track: trackId, diff: diffId, player: { ...cat }, tuning, onEvent });
+    race = new Race(renderer, { track: trackId, diff: diffId, player: { ...cat }, tuning, view: settings.view, onEvent });
     race.resize(innerWidth, innerHeight);
     mode = 'race'; paused = false; lastRank = 0;
     useTilt = settings.control === 'tilt';
@@ -522,7 +554,7 @@ function startRace(trackId, diffId) {
     buildProgress();
     $('#hudCenter').innerHTML = '';
     $('#tipHint').style.opacity = 1;
-    $('#tipHint').textContent = (useTilt ? 'Tap = jump · Hold = sprint · Tilt to steer' : 'Tap = jump · Hold = sprint · Stick to steer') + ' · 🐟 refills · 🌿 catnip = bigger stamina';
+    $('#tipHint').textContent = (useTilt ? 'Tilt to steer' : '◀▶ steer · ▲ faster · ▼ brake') + ' · tap = jump · hold = sprint · chase the 🔴';
     hintT = 6;
     $('#loading').classList.remove('active');
     audio.windOn();
@@ -561,6 +593,8 @@ function onEvent(type, a, b) {
   }
   else if (type === 'catnip') { center(`🌿 Catnip! +${race.cfg.catnipBonus}% stamina`, 'msg', 1100); audio.catnip(); vibe([20, 30, 20]); }
   else if (type === 'nipEnd') center('Catnip wore off', 'msg', 900);
+  else if (type === 'ghost') { center(`👻 Ghost cat! ${race.cfg.ghostDuration}s through anything`, 'msg', 1200); audio.ghost(); vibe([30, 60, 30]); }
+  else if (type === 'ghostEnd') { center('Solid again', 'msg', 700); audio.unghost(); }
   else if (type === 'exhausted') { center('Exhausted! 💦', 'msg', 1200); audio.groan(); vibe(120); }
   else if (type === 'recovered') center('Got my breath back', 'msg', 700);
   else if (type === 'offtrack') center('Off track! Slow going', 'msg', 900);
@@ -670,6 +704,7 @@ function updateHud(dt) {
   $('#hudStam').classList.toggle('nip', p.nipT > 0);
   setText('#stamLbl', p.exhausted ? 'EXHAUSTED' : p.nipT > 0 ? `🌿 CATNIP ${Math.ceil(p.nipT)}s · STAMINA ${Math.round(p.stamina)}%` : `STAMINA ${Math.round(p.stamina)}%`);
   $('#hud').classList.toggle('tired', p.exhausted && race.state === 'race');
+  $('#hud').classList.toggle('ghost', p.ghostT > 0 && race.state === 'race');
   $('#vign').classList.toggle('on', p.sprint);
   if (p.exhausted && race.state === 'race') { pantT -= dt; if (pantT <= 0) { pantT = 0.38; audio.pant(pantN++); } }
   const dots = $('#hudProg').children;
@@ -689,6 +724,10 @@ function frame(now) {
       if (keys.ArrowLeft || keys.KeyA) st = -1;
       if (keys.ArrowRight || keys.KeyD) st = 1;
       input.steer = st;
+      let th = useTilt ? 0 : joyThrottle;
+      if (keys.ArrowUp || keys.KeyW) th = 1;
+      if (keys.ArrowDown || keys.KeyS) th = -1;
+      input.throttle = th;
       input.sprint = sprintHolds > 0 || kbSprint || !!keys.ShiftLeft || !!keys.ShiftRight;
       race.update(dt, input);
       input.jumpBuf = Math.max(0, input.jumpBuf - dt);
@@ -712,7 +751,7 @@ function tuneHelp() {
   const t = tuned();
   const sprintSecs = (100 / t.staminaDrain).toFixed(1), refill = t.staminaRegen ? (100 / t.staminaRegen).toFixed(0) : '∞';
   const rec = t.staminaRegen ? (t.recoverAt / t.staminaRegen).toFixed(1) : '∞';
-  $('#tuneSummary').innerHTML = `A full stamina bar gives <b>${sprintSecs}s</b> of sprint; refilling from empty takes <b>${refill}s</b>. Running dry leaves you at ${t.exhaustedKmh} km/h for <b>${rec}s</b>. Race of ${t.raceLength} m ≈ <b>${Math.round(t.raceLength / (t.nominalKmh * t.pace))}s</b> at cruise speed. ${t.fishCount} fish and ${t.catnipCount} catnip per track.`;
+  $('#tuneSummary').innerHTML = `A full stamina bar gives <b>${sprintSecs}s</b> of sprint; refilling from empty takes <b>${refill}s</b>. Running dry leaves you at ${t.exhaustedKmh} km/h for <b>${rec}s</b>. Race of ${t.raceLength} m ≈ <b>${Math.round(t.raceLength / (t.nominalKmh * t.pace))}s</b> at cruise speed. Per track: ${t.fishGroups} groups of ${t.fishPerGroup} fish, ${t.goldCount} golden fish, ${t.catnipCount} catnip, ${t.ghostCount} ghosts.`;
 }
 function renderTune() {
   const list = $('#tuneList'); list.innerHTML = '';

@@ -138,12 +138,20 @@
   .reslist.board .pts { font-weight: 900; font-size: 20px; color: #ffe27a; }
   .reslist.board .pts small { font-size: 11px; margin-left: 2px; opacity: 0.8; }
   .reslist.board li.empty { display: block; text-align: center; opacity: 0.7; background: none; }
+  #hud.ghost .vign { opacity: 1; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,225,255,0.55) 100%); animation: pulse 0.6s infinite alternate; }
+  .howbtn { background: rgba(79,209,255,0.15); border-color: rgba(79,209,255,0.5); }
+  .howto .diag { width: 100%; height: auto; display: block; margin: 4px 0; }
+  .howlist { margin: 4px 0 6px; padding-left: 4px; list-style: none; font-size: 14px; line-height: 1.45; }
+  .howlist li { margin: 5px 0; }
+  .seg.tabs { flex-wrap: wrap; }
+  .seg.tabs button { flex: 1 0 22%; }
   .tsum { background: rgba(255,255,255,0.07); border-radius: 12px; padding: 10px 12px; }
   .stamlbl { white-space: nowrap; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; opacity: 0.85; margin-top: 3px; }
-  .joy { position: fixed; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.35); pointer-events: none; transition: opacity 0.2s; }
-  .joy .knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #ffc46b); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  .joy { position: fixed; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.22); pointer-events: none; transition: opacity 0.2s; }
+  .joy .knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.75), rgba(255,196,107,0.6)); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
   .joy .arr { position: absolute; top: 50%; transform: translateY(-50%); font-size: 18px; opacity: 0.6; font-weight: 900; }
-  .joy.idle { opacity: 0.55; }
+  .joy.idle { opacity: 0.35; }
+  .joy .arr.v { left: 50%; top: auto; transform: translateX(-50%); font-size: 13px; }
   .center { position: fixed; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; }
   .big { font-size: clamp(60px, 16vmin, 120px); font-weight: 900; text-shadow: 0 4px 18px rgba(0,0,0,0.5); animation: pop 0.6s ease-out; }
   .msg { display: inline-block; font-size: clamp(22px, 6vmin, 36px); font-weight: 900; padding: 6px 18px; border-radius: 999px; background: rgba(0,0,0,0.4); animation: pop 0.4s ease-out; }
@@ -185,6 +193,7 @@
     <div class="tag">3D cat racing · 5 tracks · 5 rival cats</div>
     <div class="who"><span class="dot" id="whoDot"></span><span id="whoName">Your cat</span></div>
     <button class="btn primary" id="goRace">🏁 Race!</button>
+    <button class="btn howbtn" id="goHow">❓ How to play</button>
     <div class="row">
       <button class="btn" id="goCustom">🐾 My cat</button>
       <button class="btn" id="goSettings">⚙️ Settings</button>
@@ -235,6 +244,7 @@
     <button class="back" data-back>‹ Back</button>
     <h2>Settings</h2>
     <div class="toggle"><span>Steering</span><div class="seg" id="setControl"><button data-v="joystick">🕹️ Stick</button><button data-v="tilt">📱 Tilt</button></div></div>
+    <div class="toggle"><span>Camera</span><div class="seg" id="setView"><button data-v="first">Cat's eyes</button><button data-v="third">Behind</button></div></div>
     <div class="toggle"><span>Joystick side</span><div class="seg" id="setSide"><button data-v="left">Left</button><button data-v="right">Right</button></div></div>
     <div class="toggle"><span>Tilt sensitivity</span><input type="range" id="setSens" min="0.5" max="2" step="0.1"></div>
     <div class="toggle"><span>Invert tilt</span><div class="seg" id="setInvert"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
@@ -244,6 +254,75 @@
     <div class="toggle"><span>Vibration</span><div class="seg" id="setVibe"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
     <p class="hint">Tilt steering re-centres itself at the start of every race, so hold the phone the way you like before the countdown ends.</p>
     <button class="btn" id="resetBest">Clear leaderboard</button>
+  </div>
+</section>
+
+<!-- how to play -->
+<section class="screen" id="howto">
+  <div class="panel howto">
+    <button class="back" data-back>‹ Back</button>
+    <h2>❓ How to play</h2>
+    <p class="hint">Somebody is waving a laser pointer, and every cat in town wants that red dot. 🔴 First to the finish wins; fish make your score.</p>
+
+    <h3>📱 On the phone</h3>
+    <svg viewBox="0 0 340 170" class="diag" role="img" aria-label="Left thumb on the joystick, right thumb taps or holds">
+      <rect x="4" y="4" width="332" height="162" rx="22" fill="#1b1030" stroke="#fff" stroke-opacity=".5" stroke-width="3"/>
+      <circle cx="78" cy="98" r="46" fill="#fff" fill-opacity=".07" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>
+      <circle cx="78" cy="98" r="20" fill="#ffc46b"/>
+      <g fill="#fff" font-size="12" font-weight="800" text-anchor="middle" font-family="system-ui,sans-serif">
+        <text x="78" y="44">▲ faster</text><text x="78" y="160">▼ brake</text>
+        <text x="20" y="102">◀</text><text x="136" y="102">▶</text>
+        <text x="78" y="26" font-size="11" fill-opacity=".7">LEFT THUMB · steer</text>
+        <text x="252" y="26" font-size="11" fill-opacity=".7">RIGHT THUMB · anywhere</text>
+      </g>
+      <circle cx="222" cy="92" r="24" fill="none" stroke="#ff6a3d" stroke-width="4"/>
+      <circle cx="222" cy="92" r="9" fill="#ff6a3d"/>
+      <circle cx="292" cy="92" r="24" fill="none" stroke="#4fd1ff" stroke-width="4"/>
+      <circle cx="292" cy="92" r="30" fill="none" stroke="#4fd1ff" stroke-width="2" stroke-dasharray="4 5"/>
+      <circle cx="292" cy="92" r="9" fill="#4fd1ff"/>
+      <g fill="#fff" font-size="13" font-weight="900" text-anchor="middle" font-family="system-ui,sans-serif">
+        <text x="222" y="140">TAP</text><text x="222" y="156" font-size="11" font-weight="700">= jump</text>
+        <text x="292" y="140">HOLD</text><text x="292" y="156" font-size="11" font-weight="700">= sprint</text>
+      </g>
+    </svg>
+    <p class="hint">The stick appears wherever your left thumb lands. Prefer it on the right? Settings → Joystick side. Settings also has tilt steering.</p>
+
+    <h3>⌨️ On a computer</h3>
+    <svg viewBox="0 0 340 120" class="diag" role="img" aria-label="Arrow keys steer, accelerate and brake; space taps to jump and holds to sprint">
+      <g font-family="system-ui,sans-serif" font-weight="900" text-anchor="middle" fill="#fff">
+        <rect x="52" y="10" width="40" height="36" rx="7" fill="#2c1d4a" stroke="#fff" stroke-opacity=".5"/><text x="72" y="34">↑</text>
+        <rect x="8" y="52" width="40" height="36" rx="7" fill="#2c1d4a" stroke="#fff" stroke-opacity=".5"/><text x="28" y="76">←</text>
+        <rect x="52" y="52" width="40" height="36" rx="7" fill="#2c1d4a" stroke="#fff" stroke-opacity=".5"/><text x="72" y="76">↓</text>
+        <rect x="96" y="52" width="40" height="36" rx="7" fill="#2c1d4a" stroke="#fff" stroke-opacity=".5"/><text x="116" y="76">→</text>
+        <text x="72" y="108" font-size="11" font-weight="700" fill-opacity=".8">steer · ↑ faster · ↓ brake</text>
+        <rect x="160" y="52" width="172" height="36" rx="7" fill="#2c1d4a" stroke="#ffb22e" stroke-width="2"/><text x="246" y="76" font-size="13">SPACE</text>
+        <text x="246" y="108" font-size="11" font-weight="700" fill-opacity=".8">tap = jump · hold = sprint</text>
+        <text x="246" y="30" font-size="11" font-weight="700" fill-opacity=".7">C camera · P pause</text>
+      </g>
+    </svg>
+
+    <h3>⚡ Stamina</h3>
+    <ul class="howlist">
+      <li><b>Do nothing</b> and your cat runs at cruise speed.</li>
+      <li><b>Sprint</b> (hold) is fastest but empties the bar in about 3 seconds. <b>Faster</b> (stick up / ↑) drains it slowly.</li>
+      <li>Run the bar dry and your cat gets <b>exhausted</b> 💦 and crawls until it gets its breath back. <b>Braking</b> refills it quicker.</li>
+    </ul>
+
+    <h3>🎁 On the track</h3>
+    <ul class="howlist">
+      <li>🐟 <b>Fish</b> come in groups: +1 point each and a full stamina bar.</li>
+      <li>✨ <b>Golden fish</b> swim from side to side: +3 points.</li>
+      <li>🌿 <b>Catnip</b> makes your stamina bar bigger for a while.</li>
+      <li>👻 <b>Ghost</b>: your cat fades and runs straight through obstacles and other cats.</li>
+    </ul>
+
+    <h3>🚧 Watch out</h3>
+    <ul class="howlist">
+      <li><b>Jump</b> low things (logs, fences, rolled rugs). <b>Steer around</b> tall ones. Cats with a high Jump stat clear medium ones too.</li>
+      <li>Leaving the track is allowed, but it's slow going.</li>
+      <li>Bump another cat and you both hiss 😾 and lose speed.</li>
+    </ul>
+    <button class="btn primary" data-back>Got it, let's race!</button>
   </div>
 </section>
 
@@ -280,6 +359,7 @@
     <div><div class="pos" id="hudPos">6<small>th</small></div><div class="hscore" id="hudScore">0<small> pts</small></div></div>
     <div class="prog" id="hudProg"></div>
     <div class="time" id="hudTime">0:00.0</div>
+    <button class="pausebtn" id="viewBtn" aria-label="Switch camera">🎥</button>
     <button class="pausebtn mutebtn" aria-label="Mute">🔊</button>
     <button class="pausebtn" id="pauseBtn" aria-label="Pause">II</button>
   </div>
@@ -288,7 +368,7 @@
     <div class="stam" id="hudStam"><i></i></div>
     <div class="stamlbl" id="stamLbl">STAMINA</div>
   </div>
-  <div class="joy idle" id="joy"><span class="arr" style="left:8px">‹</span><span class="arr" style="right:8px">›</span><div class="knob"></div></div>
+  <div class="joy idle" id="joy"><span class="arr" style="left:8px">‹</span><span class="arr" style="right:8px">›</span><span class="arr v" style="top:2px">▲</span><span class="arr v" style="bottom:2px">▼</span><div class="knob"></div></div>
   <div class="center" id="hudCenter"></div>
   <div class="tiphint" id="tipHint">Tap = jump · Hold = sprint</div>
   <div class="flash" id="flash"></div>

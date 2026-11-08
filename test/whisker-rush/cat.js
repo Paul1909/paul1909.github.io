@@ -191,9 +191,15 @@ function buildCat(o) {
       body.position.y = Math.abs(Math.sin(phase)) * 0.06 * run;
       body.rotation.x = Math.sin(phase * 2) * 0.04 * run;
     }
-    segs[0].rotation.z = Math.sin(t * 3) * 0.25;
-    segs[1].rotation.z = Math.sin(t * 3 - 0.8) * 0.3;
-    segs[0].rotation.x = -0.4 - run * 0.7;
+    if (self.wag > 0) {   // happy wag: fast, wide, tail held up
+      segs[0].rotation.z = Math.sin(t * 13) * 0.55;
+      segs[1].rotation.z = Math.sin(t * 13 - 0.9) * 0.6;
+      segs[0].rotation.x = -0.15;
+    } else {
+      segs[0].rotation.z = Math.sin(t * 3) * 0.25;
+      segs[1].rotation.z = Math.sin(t * 3 - 0.8) * 0.3;
+      segs[0].rotation.x = -0.4 - run * 0.7;
+    }
     head.rotation.y = Math.sin(t * 0.7) * 0.08 * (1 - run);
   }
 
@@ -202,7 +208,12 @@ function buildCat(o) {
     mats.forEach(m => m.dispose());
   }
 
-  return { root, body, head, legs, update, dispose, furColor: fur.color, bellyColor: fur.belly };
+  // fade the whole cat (ghost power-up)
+  function setOpacity(a) {
+    for (const m of mats) { if (m.transparent !== a < 1) m.needsUpdate = true; m.transparent = a < 1; m.opacity = a; m.depthWrite = a >= 1; }
+  }
+  const self = { root, body, head, legs, update, dispose, setOpacity, wag: 0, furColor: fur.color, bellyColor: fur.belly };
+  return self;
 }
 
 window.WRCat = { FURS, EYES, PATTERNS, buildCat };

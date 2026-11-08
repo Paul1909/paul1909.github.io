@@ -7,16 +7,27 @@ Hidden test copy of Whisker Rush, not linked from the arcade page. It has the �
 - `three.min.js` – Three.js r160 (bundled so it works offline)
 - `cat.js` – cat model · `game.js` – tracks, obstacles, power-ups, bots, camera, and the `TUNING` list of mechanics with their defaults
 - `app.js` – menus, Tuning lab, sound, touch/tilt/keyboard input, main loop
+- `luna-purr.mp3`, `luna-auuu.mp3`: Luna's voice when you pet the cat
 - `music-menu.mp3` (Catnip Quest) and `music-race.mp3` (Paws Forward): 128 kbps, loudness-matched
 - `sw.js` – offline cache · `manifest.webmanifest` – install + fullscreen
 
 ## Controls
-Tap = jump, hold = sprint, stick or tilt to steer. Keyboard: ↑/W tap = jump, hold = sprint; Space = jump; ←/→ steer; P = pause.
+Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hold = sprint. Keyboard: arrows/WASD like the stick; Space tap = jump, hold = sprint; C = camera; P = pause.
 
 ## Versions and rollback
 To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### v3 (8 Nov 2026)
+- 3 new tracks: Space Station (low gravity), Alpine Meadow, House Chase (room to room).
+- Controls: left thumb stick steers, up = faster, down = brake; right thumb tap = jump, hold = sprint. Computer: arrows + Space (tap jump, hold sprint), C camera.
+- How to play page; shown once before the first race.
+- Petting the cat wags its tail and plays Luna's purr / "auuu" (alternating).
+- Ghost power-up: run through obstacles and cats. Fish now come in groups (7 × 4 by default) plus 4 golden fish.
+- Camera toggle: cat's eyes or behind the cat (Settings, 🎥 button, C key).
+- Laser pointer dot in front of the leading cat; the rival cats chase it.
+- Joystick more transparent.
 
 ### v2 (8 Nov 2026) · commit b04f27e
 - Score: fish +1, golden fish that swim side to side +3 (both tunable). Score shown in the race and on the results.
