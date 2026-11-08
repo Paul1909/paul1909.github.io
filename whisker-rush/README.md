@@ -47,7 +47,7 @@ Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
 
-### Live v1 (8 Nov 2026)
+### Live v1 (8 Nov 2026) · commit 79faff0
 - Published to the arcade from test v3. Tuning lab and TEST badge hidden (`TEST_BUILD = false`).
 
 ### v3 (8 Nov 2026) · commit 874623c
