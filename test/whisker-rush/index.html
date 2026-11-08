@@ -122,6 +122,22 @@
   .trow input[type=range] { width: 100%; height: 30px; }
   .tbar .btn { min-height: 44px; font-size: 15px; padding: 6px 8px; margin-top: 4px; }
   .tbar .btn.primary { flex: 1.4; box-shadow: none; }
+  .mutebtn.menumute { position: fixed; z-index: 5; top: calc(10px + var(--sat)); left: calc(10px + var(--sal)); width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.3); font-size: 20px; display: none; }
+  body.in-menu .mutebtn.menumute { display: block; }
+  .hudtop .mutebtn { font-size: 18px; }
+  .hscore { font-weight: 900; font-size: 18px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); margin-top: 2px; color: #ffe27a; }
+  .hscore small { font-size: 12px; opacity: 0.85; }
+  .resscore { font-size: 15px; margin: 6px 0 2px; }
+  .resscore b { font-size: 26px; color: #ffe27a; }
+  .resscore span { opacity: 0.8; }
+  .resscore em { display: block; font-style: normal; font-weight: 800; color: #ffb22e; margin-top: 2px; }
+  .seg.tabs button { font-size: 20px; min-height: 52px; line-height: 1.1; }
+  .seg.tabs button small { font-size: 10px; }
+  .reslist.board li { grid-template-columns: 34px 18px 1fr auto; padding: 8px 10px; background: rgba(255,255,255,0.05); margin-top: 6px; }
+  .reslist.board .nm small { display: block; font-size: 11px; font-weight: 600; opacity: 0.7; }
+  .reslist.board .pts { font-weight: 900; font-size: 20px; color: #ffe27a; }
+  .reslist.board .pts small { font-size: 11px; margin-left: 2px; opacity: 0.8; }
+  .reslist.board li.empty { display: block; text-align: center; opacity: 0.7; background: none; }
   .tsum { background: rgba(255,255,255,0.07); border-radius: 12px; padding: 10px 12px; }
   .stamlbl { white-space: nowrap; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; opacity: 0.85; margin-top: 3px; }
   .joy { position: fixed; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.35); pointer-events: none; transition: opacity 0.2s; }
@@ -152,19 +168,20 @@
   #results .card { width: min(420px, 92vw); padding: 14px 16px; }
   #results h2 { margin: 2px 0 0; }
   #results .btn { margin-top: 8px; min-height: 46px; font-size: 16px; }
-  @media (orientation: landscape) and (max-height: 500px) { #results .card { width: min(640px, 94vw); display: grid; grid-template-columns: 1fr 200px; gap: 4px 16px; align-items: center; } #results .card > .head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 12px; } #results .btns { display: flex; flex-direction: column; } #results .btns .row { flex-direction: column; gap: 0; } }
+  @media (orientation: landscape) and (max-height: 500px) { #results .card { width: min(640px, 94vw); display: grid; grid-template-columns: 1fr 200px; gap: 4px 16px; align-items: center; } #results .card > .resscore { grid-column: 1 / -1; margin: 0; } #results .card > .head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 12px; } #results .btns { display: flex; flex-direction: column; } #results .btns .row { flex-direction: column; gap: 0; } }
   .toast { position: fixed; left: 50%; top: calc(70px + var(--sat)); transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: rgba(0,0,0,0.7); font-weight: 700; display: none; z-index: 9; pointer-events: none; }
   .loading { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; background: rgba(10,5,25,0.85); z-index: 8; }
   .loading.active { display: flex; }
 </style>
 </head>
-<body>
+<body class="in-menu">
 <canvas id="c"></canvas>
+<button class="mutebtn menumute" aria-label="Mute">🔊</button>
 
 <!-- title -->
 <section class="screen active" id="title">
   <div class="panel">
-    <h1 class="logo">Whisker Rush</h1><span class="testbadge">TEST BUILD</span>
+    <h1 class="logo">Whisker Rush</h1><span class="testbadge" id="buildTag">TEST BUILD</span>
     <div class="tag">3D cat racing · 5 tracks · 5 rival cats</div>
     <div class="who"><span class="dot" id="whoDot"></span><span id="whoName">Your cat</span></div>
     <button class="btn primary" id="goRace">🏁 Race!</button>
@@ -172,8 +189,8 @@
       <button class="btn" id="goCustom">🐾 My cat</button>
       <button class="btn" id="goSettings">⚙️ Settings</button>
     </div>
-    <button class="btn" id="goTune">🛠 Tuning lab</button>
-    <p class="hint" style="margin-top:14px">Tap the screen to <b>jump</b>. Press and hold to <b>sprint</b>. Steer with the joystick or by tilting your phone. Grab 🐟 to refill your stamina and 🌿 catnip for a bigger stamina bar. Sprint until empty and your cat gets exhausted and slow.</p>
+    <div class="row"><button class="btn" id="goBoard">🏆 Leaderboard</button><button class="btn" id="goTune">🛠 Tuning lab</button></div>
+    <p class="hint" style="margin-top:14px">Tap your cat for some love. 🐟 = 1 point, ✨ golden fish that swim side to side = 3 points. Tap the screen to <b>jump</b>. Press and hold to <b>sprint</b>. Steer with the joystick or by tilting your phone. Grab 🐟 to refill your stamina and 🌿 catnip for a bigger stamina bar. Sprint until empty and your cat gets exhausted and slow.</p>
   </div>
 </section>
 
@@ -223,9 +240,22 @@
     <div class="toggle"><span>Invert tilt</span><div class="seg" id="setInvert"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
     <div class="toggle"><span>Sound effects</span><div class="seg" id="setSound"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
     <div class="toggle"><span>Music</span><div class="seg" id="setMusic"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
+    <div class="toggle"><span>Music volume</span><input type="range" id="setVol" min="0" max="100" step="5"></div>
     <div class="toggle"><span>Vibration</span><div class="seg" id="setVibe"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
     <p class="hint">Tilt steering re-centres itself at the start of every race, so hold the phone the way you like before the countdown ends.</p>
-    <button class="btn" id="resetBest">Reset best times</button>
+    <button class="btn" id="resetBest">Clear leaderboard</button>
+  </div>
+</section>
+
+<!-- leaderboard -->
+<section class="screen" id="board">
+  <div class="panel">
+    <button class="back" data-back>‹ Back</button>
+    <h2>🏆 Leaderboard</h2>
+    <p class="hint">Top 10 scores on this phone for each track and difficulty. Ties go to the better finishing place, then the faster time.</p>
+    <div class="seg tabs" id="boardTrack"></div>
+    <div class="seg" id="boardDiff" style="margin-top:6px"></div>
+    <ol class="reslist board" id="boardList"></ol>
   </div>
 </section>
 
@@ -247,9 +277,10 @@
 <section class="screen" id="hud">
   <div id="touch"></div>
   <div class="hudtop">
-    <div class="pos" id="hudPos">6<small>th</small></div>
+    <div><div class="pos" id="hudPos">6<small>th</small></div><div class="hscore" id="hudScore">0<small> pts</small></div></div>
     <div class="prog" id="hudProg"></div>
     <div class="time" id="hudTime">0:00.0</div>
+    <button class="pausebtn mutebtn" aria-label="Mute">🔊</button>
     <button class="pausebtn" id="pauseBtn" aria-label="Pause">II</button>
   </div>
   <div class="hudbot">
@@ -277,6 +308,7 @@
 <div class="overlay" id="results">
   <div class="card">
     <div class="head"><div class="medal" id="resMedal">🏆</div><div><h2 id="resTitle">You won!</h2><div class="hint" id="resSub"></div></div></div>
+    <div class="resscore" id="resScore"></div>
     <ol class="reslist" id="resList"></ol>
     <div class="btns">
       <button class="btn primary" id="resAgain">↻ Race again</button>

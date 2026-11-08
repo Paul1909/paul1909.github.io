@@ -29,6 +29,11 @@ const TUNING = [
   { group: 'Power-ups', k: 'catnipCount', label: 'Catnip per track', min: 0, max: 15, step: 1, def: 3, unit: '' },
   { group: 'Power-ups', k: 'catnipBonus', label: 'Catnip extra max stamina', min: 0, max: 200, step: 10, def: 60, unit: '%' },
   { group: 'Power-ups', k: 'catnipDuration', label: 'Catnip lasts', min: 2, max: 40, step: 1, def: 15, unit: 's' },
+  { group: 'Score', k: 'fishPoints', label: 'Points for a fish', min: 0, max: 10, step: 1, def: 1, unit: '' },
+  { group: 'Score', k: 'goldPoints', label: 'Points for a moving (golden) fish', min: 0, max: 20, step: 1, def: 3, unit: '' },
+  { group: 'Score', k: 'goldShare', label: 'Share of fish that move', min: 0, max: 100, step: 5, def: 35, unit: '%' },
+  { group: 'Score', k: 'goldSway', label: 'How far moving fish swing (each way)', min: 1, max: 6, step: 0.5, def: 3.5, unit: 'm' },
+  { group: 'Score', k: 'goldSpeed', label: 'How fast moving fish swing', min: 0.5, max: 4, step: 0.1, def: 1.6, unit: '×' },
   { group: 'Obstacles', k: 'obstacleGap', label: 'Average gap between obstacles', min: 8, max: 80, step: 1, def: 25, unit: 'm' },
   { group: 'Obstacles', k: 'wideShare', label: 'Share that are jump-only barriers', min: 0, max: 80, step: 5, def: 20, unit: '%' },
   { group: 'Obstacles', k: 'hitKeep', label: 'Speed kept after hitting one', min: 0, max: 100, step: 5, def: 30, unit: '%' },
@@ -437,6 +442,7 @@ class Race {
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 1600);
     this.scene.add(this.camera);
     this.tmp = new THREE.Vector3();
+    this.score = 0; this.fishCaught = 0; this.goldCaught = 0;
     this.finalStretch = false; this.shake = 0; this.orbit = 0; this.offMsgT = 0;
     this.build();
   }
@@ -627,14 +633,16 @@ class Race {
   // fish (stamina back to full) and catnip (bigger stamina bar for a while), spread evenly along the track
   buildPickups(R, world) {
     const tr = this.track, c = this.cfg, list = [];
-    const free = (s, x) => !this.obs.some(o => Math.abs(o.s - s) < o.d / 2 + 2 && Math.abs(o.x - x) < o.w / 2 + 1.2);
+    const free = (s, x, moving) => !this.obs.some(o => Math.abs(o.s - s) < o.d / 2 + 2 && (moving || Math.abs(o.x - x) < o.w / 2 + 1.2));
     const spread = (n, type, shift) => {
       for (let i = 0; i < n; i++) {
         const span = (LENGTH - 180) / n;
-        for (let tries = 0; tries < 30; tries++) {
-          const s = 90 + span * (i + 0.5) + (R() - 0.5) * span * 0.6 + shift, x = (R() - 0.5) * (W - 2.5);
-          if (s > LENGTH - 30 || !free(s, x) || list.some(p => Math.abs(p.s - s) < 4)) continue;
-          list.push({ type, s, x, taken: false }); break;
+        const gold = type === 'fish' && R() < c.goldShare / 100;
+        for (let tries = 0; tries < 40; tries++) {
+          const amp = gold ? Math.min(c.goldSway, W / 2 - 1.2) : 0;
+          const s = 90 + span * (i + 0.5) + (R() - 0.5) * span * 0.6 + shift, x = (R() - 0.5) * (W - 2.5 - amp * 2);
+          if (s > LENGTH - 30 || !free(s, x, gold) || list.some(p => Math.abs(p.s - s) < 4)) continue;
+          list.push({ type, s, x, x0: x, amp, gold, ph: R() * 6.28, taken: false }); break;
         }
       }
     };
@@ -646,6 +654,8 @@ class Race {
     const fbody = GEO.sphere(0.32, 10, 8); fbody.scale(1, 0.55, 0.32);
     const ftail = new THREE.ConeGeometry(0.22, 0.3, 4); ftail.rotateZ(Math.PI / 2); ftail.translate(-0.42, 0, 0);
     const fm = M('#5ec8ff', 'lambert', { emissive: '#1e6aa0' }), tm = M('#ffb02e', 'lambert', { emissive: '#7a4a00' });
+    const gm = M('#ffd23a', 'lambert', { emissive: '#8a5a00' }), gtm = M('#ff7a1a', 'lambert', { emissive: '#7a2a00' });
+    const goldGlow = new THREE.SpriteMaterial({ map: radialTex('rgba(255,220,80,0.85)', 'rgba(255,180,0,0)'), depthWrite: false, blending: THREE.AdditiveBlending });
     const eyeG = GEO.sphere(0.04, 6, 4), eyeM = M('#111', 'basic');
     const leaf = GEO.sphere(0.5, 8, 6); leaf.scale(0.22, 0.05, 0.42);
     const stem = new THREE.CylinderGeometry(0.025, 0.035, 0.8, 5); stem.translate(0, 0.4, 0);
@@ -654,7 +664,8 @@ class Race {
     for (const p of list) {
       const g = new THREE.Group();
       if (p.type === 'fish') {
-        g.add(new THREE.Mesh(fbody, fm)); g.add(new THREE.Mesh(ftail, tm));
+        g.add(new THREE.Mesh(fbody, p.gold ? gm : fm)); g.add(new THREE.Mesh(ftail, p.gold ? gtm : tm));
+        if (p.gold) { const gl = new THREE.Sprite(goldGlow); gl.scale.setScalar(1.6); g.add(gl); g.scale.setScalar(1.15); }
         const eye = new THREE.Mesh(eyeG, eyeM); eye.position.set(0.18, 0.05, 0.1); g.add(eye);
       } else {
         const sprig = new THREE.Group(); sprig.position.y = -0.45; g.add(sprig);
@@ -761,6 +772,8 @@ class Race {
     if (a.finished !== b.finished) return a.finished;
     return a.s > b.s;
   }
+
+  pickX(p) { return p.amp ? p.x0 + Math.sin(this.clock * this.cfg.goldSpeed + p.ph) * p.amp : p.x; }
 
   obsX(o) { return o.move ? o.x + Math.sin(this.clock * 1.4 + o.ph) * o.move : o.x; }
 
@@ -886,11 +899,13 @@ class Race {
     // power-ups (player only)
     if (this.state === 'race') {
       for (const p of this.pickups) {
-        if (p.taken || Math.abs(p.s - pl.s) > 1.3 || Math.abs(p.x - pl.x) > 1.1 || pl.y > 2.2) continue;
+        if (p.taken || Math.abs(p.s - pl.s) > 1.3 || Math.abs(this.pickX(p) - pl.x) > 1.1 || pl.y > 2.2) continue;
         p.taken = true; p.mesh.visible = false;
         if (p.type === 'fish') {
           pl.stamina = pl.maxSt; pl.exhausted = false;
-          this.events('fish');
+          const pts = p.gold ? c.goldPoints : c.fishPoints;
+          this.score += pts; this.fishCaught++; if (p.gold) this.goldCaught++;
+          this.events('fish', pts, p.gold);
         } else {
           pl.nipT = c.catnipDuration; pl.maxSt = 100 + c.catnipBonus;
           pl.stamina = Math.min(pl.maxSt, pl.stamina + c.catnipBonus);
@@ -1011,7 +1026,11 @@ class Race {
       tr.world(o.s, this.obsX(o), 0, o.mesh.position);
       o.mesh.rotation.z += dt * 3; o.mesh.rotation.y = tr.at(o.s).h;
     }
-    for (const p of this.pickups) if (!p.taken && Math.abs(p.s - pl.s) < 120) { p.mesh.rotation.y += dt * 3; p.mesh.position.y = 1.0 + Math.sin(this.clock * 4 + p.s) * 0.15; }
+    for (const p of this.pickups) if (!p.taken && Math.abs(p.s - pl.s) < 120) {
+      if (p.amp) { tr.world(p.s, this.pickX(p), 1.0, p.mesh.position); p.mesh.rotation.y = tr.at(p.s).h + (Math.cos(this.clock * this.cfg.goldSpeed + p.ph) > 0 ? Math.PI : 0); }
+      else p.mesh.rotation.y += dt * 3;
+      p.mesh.position.y = 1.0 + Math.sin(this.clock * 4 + p.s) * 0.15;
+    }
     if (this.lavaTex) this.lavaTex.offset.y -= dt * 0.15;
 
     // camera

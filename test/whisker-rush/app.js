@@ -3,6 +3,7 @@
 const { buildCat, FURS, EYES, PATTERNS } = window.WRCat;
 const { Race, TRACKS, DIFFS, TUNING, DEFAULTS } = window.WRGame;
 const TEST_BUILD = true;   // shows the Tuning lab; the test copy also keeps its own saves
+const BUILD = 'v2';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -21,12 +22,13 @@ const $$ = s => [...document.querySelectorAll(s)];
 // ---------- state ----------
 const defaultCat = { name: 'Whiskers', gender: 'male', fur: 'ginger', pattern: 'tabby', eyes: 'green', speed: 5, jump: 5 };
 let cat = { ...defaultCat, ...store.get('cat', {}) };
-let settings = { control: 'joystick', side: 'left', sens: 1, invert: false, sound: true, music: true, vibe: true, ...store.get('settings', {}) };
+let settings = { control: 'joystick', side: 'left', sens: 1, invert: false, sound: true, music: true, musicVol: 35, muted: false, vibe: true, ...store.get('settings', {}) };
 let pick = { track: 'desert', diff: 'jaguar', ...store.get('pick', {}) };
-let best = store.get('best', {});
+let board = store.get('board', {});   // leaderboard: 'track:difficulty' -> top 10 entries
 let tuning = store.get('tuning', {});   // only the values changed from the defaults
 const tuned = () => ({ ...DEFAULTS, ...tuning });
 
+let curScreen = 'title';
 let race = null, paused = false, wakeLock = null, lastRank = 0, centerT = 0, hintT = 0, mode = 'menu';
 const saveCat = () => store.set('cat', cat);
 const saveSettings = () => store.set('settings', settings);
@@ -66,6 +68,52 @@ const preview = {
     if (this.hop > 0) { this.hop -= dt; const k = 1 - Math.abs(this.hop - 0.275) / 0.275; this.cat.root.position.y = Math.max(0, k) * 0.6; }
     else this.cat.root.position.y = 0;
     this.cat.update(dt, 0, this.hop > 0);
+    this.updateHearts(dt);
+  },
+  // tapping the cat: it purrs and shows you some love
+  hearts: [], loveT: 0, ray: new THREE.Raycaster(),
+  tap(e) {
+    if (!this.cat || (curScreen !== 'custom' && curScreen !== 'title')) return;
+    this.ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), this.camera);
+    if (this.ray.intersectObject(this.cat.root, true).length) this.love();
+  },
+  love() {
+    audio.init(); audio.purr(); vibe([25, 35, 25, 35, 25, 35, 25, 35, 25]);
+    this.loveT = 1.8;
+    if (!this.heartGeo) {
+      const sh = new THREE.Shape();
+      sh.moveTo(0, -0.38);
+      sh.bezierCurveTo(-0.08, -0.3, -0.5, -0.05, -0.5, 0.2);
+      sh.bezierCurveTo(-0.5, 0.48, -0.18, 0.56, 0, 0.32);
+      sh.bezierCurveTo(0.18, 0.56, 0.5, 0.48, 0.5, 0.2);
+      sh.bezierCurveTo(0.5, -0.05, 0.08, -0.3, 0, -0.38);
+      this.heartGeo = new THREE.ExtrudeGeometry(sh, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.06, bevelSegments: 4, curveSegments: 18 });
+      this.heartGeo.center();
+    }
+    const add = (x, y, size, vy, delay, color) => {
+      const m = new THREE.Mesh(this.heartGeo, new THREE.MeshLambertMaterial({ color, emissive: '#5a0018', transparent: true }));
+      m.position.set(x, y, 0.3); m.scale.setScalar(0.001);
+      this.scene.add(m);
+      this.hearts.push({ m, t: -delay, life: 1.9, size, vy, spin: (Math.random() - 0.5) * 2 });
+    };
+    add(0, 1.5, 0.6, 0.28, 0, '#ff2d63');
+    for (let i = 0; i < 5; i++) add((Math.random() - 0.5) * 1.6, 1.0 + Math.random() * 0.4, 0.2 + Math.random() * 0.12, 0.4 + Math.random() * 0.3, 0.1 + i * 0.12, ['#ff5c8a', '#ff86a8', '#ff3d6e'][i % 3]);
+  },
+  updateHearts(dt) {
+    for (const h of this.hearts) {
+      h.t += dt; if (h.t < 0) continue;
+      const p = h.t / h.life;
+      const pop = p < 0.18 ? 1 + 1.7 * Math.pow(p / 0.18 - 1, 3) + 0.7 * Math.pow(p / 0.18 - 1, 2) : 1;
+      h.m.scale.setScalar(Math.max(0.001, h.size * pop));
+      h.m.position.y += h.vy * dt;
+      h.m.rotation.y = Math.sin(h.t * 3 + h.spin) * 0.6;
+      h.m.material.opacity = 1 - Math.max(0, (p - 0.6) / 0.4);
+    }
+    this.hearts = this.hearts.filter(h => { if (h.t < h.life) return true; this.scene.remove(h.m); h.m.material.dispose(); return false; });
+    if (this.cat) {
+      if (this.loveT > 0) { this.loveT -= dt; this.cat.head.rotation.z = Math.sin(this.loveT * 9) * 0.22; this.cat.head.rotation.x = -0.15; }
+      else { this.cat.head.rotation.z = 0; this.cat.head.rotation.x = 0; }
+    }
   },
   render() {
     const w = innerWidth, h = innerHeight, portrait = h > w;
@@ -81,9 +129,12 @@ const preview = {
 preview.init();
 preview.setCat(cat);
 
-canvas.addEventListener('pointerdown', e => { if (mode === 'menu') preview.drag = { x: e.clientX }; });
+canvas.addEventListener('pointerdown', e => { if (mode === 'menu') preview.drag = { x: e.clientX, x0: e.clientX, y0: e.clientY, t: performance.now() }; });
 addEventListener('pointermove', e => { if (preview.drag) { preview.holder.rotation.y += (e.clientX - preview.drag.x) * 0.012; preview.drag.x = e.clientX; } });
-addEventListener('pointerup', () => { preview.drag = null; });
+addEventListener('pointerup', e => {
+  const d = preview.drag; preview.drag = null;
+  if (d && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 12 && performance.now() - d.t < 450) preview.tap(e);
+});
 
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
@@ -100,7 +151,7 @@ const audio = {
     try {
       const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
       const c = this.ctx = new C();
-      this.master = c.createGain(); this.master.connect(c.destination);
+      this.master = c.createGain(); this.master.gain.value = settings.muted ? 0 : 1; this.master.connect(c.destination);
       this.sfx = c.createGain(); this.sfx.gain.value = 0.8; this.sfx.connect(this.master);
       this.mus = c.createGain(); this.mus.gain.value = 0.16; this.mus.connect(this.master);
       const len = c.sampleRate * 1.5, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
@@ -174,44 +225,72 @@ const audio = {
   },
   setWind(v) { if (this.wind) { const t = this.ctx.currentTime; this.wind.g.gain.setTargetAtTime(settings.sound ? v * 0.12 : 0, t, 0.15); this.wind.f.frequency.setTargetAtTime(400 + v * 900, t, 0.2); } },
   windOff() { if (this.wind) { try { this.wind.s.stop(); } catch {} this.wind = null; } },
-  // little procedural racing loop, one key per track
-  music: null,
-  startMusic(trackId) {
-    this.stopMusic();
-    if (!this.ctx || !settings.music) return;
-    const keys = { desert: [50, 'phr'], jungle: [55, 'maj'], city: [57, 'min'], volcano: [52, 'min'], ice: [60, 'maj'] };
-    const [root, q] = keys[trackId] || [57, 'min'];
-    const prog = q === 'maj' ? [0, 7, 9, 5] : q === 'phr' ? [0, 1, 0, -2] : [0, -4, -2, -5];
-    const third = q === 'maj' ? 4 : 3;
-    const step = 60 / 132 / 4;
-    const midi = n => 440 * Math.pow(2, (n - 69) / 12);
-    let next = this.ctx.currentTime + 0.05, i = 0;
-    const tick = () => {
-      while (next < this.ctx.currentTime + 0.2) {
-        const bar = Math.floor(i / 16) % 4, st = i % 16, r = root + prog[bar], when = next - this.ctx.currentTime;
-        if (st % 8 === 0) this.tone(130, 42, 0.18, 'sine', 0.9, when, this.mus);
-        if (st % 4 === 2) this.noise(0.05, 0.25, 7000, 'highpass', when, this.mus);
-        if ([0, 3, 6, 8, 11, 14].includes(st)) this.tone(midi(r - 12), midi(r - 12) * 0.99, step * 1.6, 'triangle', 0.55, when, this.mus);
-        if (st % 2 === 0) { const arp = [0, third, 7, 12, 7, third, 12, 7][(st / 2) | 0]; this.tone(midi(r + 12 + arp), midi(r + 12 + arp), step * 1.4, 'square', 0.07, when, this.mus); }
-        next += step; i++;
-      }
-    };
-    tick();
-    this.music = setInterval(tick, 50);
+  purr() {
+    if (!this.ctx || !settings.sound) return;
+    const c = this.ctx, t = c.currentTime, src = c.createBufferSource(), lp = c.createBiquadFilter(), am = c.createGain(), out = c.createGain();
+    const lfo = c.createOscillator(), depth = c.createGain(), hum = c.createOscillator(), humG = c.createGain();
+    src.buffer = this.noiseBuf; src.loop = true; lp.type = 'lowpass'; lp.frequency.value = 420;
+    lfo.type = 'square'; lfo.frequency.setValueAtTime(23, t); lfo.frequency.setValueAtTime(26, t + 1.0);
+    depth.gain.value = 0.5; am.gain.value = 0.5; lfo.connect(depth); depth.connect(am.gain);
+    hum.type = 'sine'; hum.frequency.value = 58; humG.gain.value = 0.5; hum.connect(humG); humG.connect(am);
+    src.connect(lp); lp.connect(am); am.connect(out); out.connect(this.sfx);
+    const g = out.gain;
+    g.setValueAtTime(0.0001, t); g.exponentialRampToValueAtTime(0.9, t + 0.15); g.setValueAtTime(0.8, t + 0.75); g.exponentialRampToValueAtTime(0.15, t + 0.92);
+    g.exponentialRampToValueAtTime(0.75, t + 1.1); g.setValueAtTime(0.65, t + 1.6); g.exponentialRampToValueAtTime(0.0001, t + 2.0);
+    [src, lfo, hum].forEach(n => { n.start(t); n.stop(t + 2.05); });
   },
-  stopMusic() { if (this.music) { clearInterval(this.music); this.music = null; } },
+  goldFish() { this.fish(); [1568, 2093, 2637].forEach((f, i) => this.tone(f, f, 0.12, 'sine', 0.12, 0.22 + i * 0.07)); },
+  setMute(m) { if (this.master) this.master.gain.value = m ? 0 : 1; },
 };
+// ---------- music: Catnip Quest in the menus, Paws Forward from the start of each race ----------
+const music = {
+  menu: null, race: null, want: null,
+  init() {
+    if (this.menu) return;
+    const el = src => { const a = new Audio(src); a.loop = true; a.preload = 'auto'; return a; };
+    this.menu = el('music-menu.mp3'); this.race = el('music-race.mp3');
+    this.apply();
+  },
+  off() { return settings.muted || !settings.music; },
+  apply() {
+    if (!this.menu) return;
+    for (const a of [this.menu, this.race]) { a.volume = Math.min(1, settings.musicVol / 100); a.muted = this.off(); }
+    if (this.off()) { this.menu.pause(); this.race.pause(); } else if (this.want) this[this.want].play().catch(() => {});
+  },
+  play(which, fromStart) {
+    this.init(); this.want = which;
+    (which === 'menu' ? this.race : this.menu).pause();
+    const a = this[which];
+    if (fromStart) a.currentTime = 0;
+    if (!this.off()) a.play().catch(() => {});
+  },
+  stop() { this.want = null; if (this.menu) { this.menu.pause(); this.race.pause(); } },
+  hold() { if (this.menu) { this.menu.pause(); this.race.pause(); } },
+};
+// phones only allow sound after a tap, so the menu music starts on the first one
+document.addEventListener('pointerdown', () => { audio.init(); if (mode === 'menu' && (!music.menu || music.menu.paused)) music.play('menu'); }, true);
+function setMuted(m, user = true) {
+  settings.muted = m; saveSettings();
+  if (user) { audio.init(); audio.setMute(m); music.apply(); }
+  $$('.mutebtn').forEach(b => { b.textContent = m ? '🔇' : '🔊'; b.setAttribute('aria-label', m ? 'Sound on' : 'Mute'); });
+}
+$$('.mutebtn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setMuted(!settings.muted); }));
+setMuted(settings.muted, false);
+
 const vibe = p => { if (settings.vibe) navigator.vibrate?.(p); };
 
 // ---------- screens ----------
 let screenStack = ['title'];
 function show(id) {
+  curScreen = id;
+  document.body.classList.toggle('in-menu', id !== 'hud');
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
   if (id === 'tracks') renderTracks();
   if (id === 'custom') renderCustom();
   if (id === 'settings') renderSettings();
   if (id === 'title') renderTitle();
   if (id === 'tune') renderTune();
+  if (id === 'board') renderBoard();
 }
 function go(id) { screenStack.push(id); show(id); }
 function back() { screenStack.pop(); show(screenStack[screenStack.length - 1] || 'title'); }
@@ -220,10 +299,12 @@ $('#goRace').onclick = () => go('tracks');
 $('#goCustom').onclick = () => go('custom');
 $('#goSettings').onclick = () => go('settings');
 $('#goTune').onclick = () => go('tune');
+$('#goBoard').onclick = () => go('board');
 if (!TEST_BUILD) $('#goTune').style.display = 'none';
 
 function renderTitle() {
   $('#whoName').textContent = cat.name || 'Your cat';
+  $('#buildTag').textContent = 'TEST BUILD ' + BUILD;
   $('#whoDot').style.background = (FURS.find(f => f.id === cat.fur) || FURS[0]).color;
 }
 
@@ -291,10 +372,10 @@ const medalOf = p => ['', '🥇', '🥈', '🥉'][p] || '';
 function renderTracks() {
   const list = $('#trackList'); list.innerHTML = '';
   for (const t of TRACKS) {
-    const b = best[t.id + ':' + pick.diff];
+    const b = (board[t.id + ':' + pick.diff] || [])[0];
     const el = document.createElement('button');
     el.className = `track t-${t.id}` + (t.id === pick.track ? ' on' : '');
-    el.innerHTML = `<div class="em">${t.emoji}</div><div class="nm">${t.name}</div><div class="best">${b ? `${medalOf(b.pos)} ${ord(b.pos)} · ${fmt(b.time)}` : t.blurb}</div>`;
+    el.innerHTML = `<div class="em">${t.emoji}</div><div class="nm">${t.name}</div><div class="best">${b ? `🏆 ${b.score} pts · ${medalOf(b.pos)}${ord(b.pos)} · ${fmt(b.time)}` : t.blurb}</div>`;
     el.onclick = () => { pick.track = t.id; store.set('pick', pick); renderTracks(); };
     list.appendChild(el);
   }
@@ -313,12 +394,14 @@ function renderSettings() {
   seg($('#setSide'), [{ v: 'left', html: 'Left' }, { v: 'right', html: 'Right' }], settings.side, v => { settings.side = v; saveSettings(); });
   seg($('#setInvert'), bool, settings.invert, v => { settings.invert = v; saveSettings(); });
   seg($('#setSound'), bool, settings.sound, v => { settings.sound = v; saveSettings(); audio.init(); if (v) audio.fish(); });
-  seg($('#setMusic'), bool, settings.music, v => { settings.music = v; saveSettings(); });
+  seg($('#setMusic'), bool, settings.music, v => { settings.music = v; saveSettings(); music.apply(); });
+  $('#setVol').value = settings.musicVol;
   seg($('#setVibe'), bool, settings.vibe, v => { settings.vibe = v; saveSettings(); vibe(40); });
   $('#setSens').value = settings.sens;
 }
 $('#setSens').addEventListener('input', e => { settings.sens = +e.target.value; saveSettings(); });
-$('#resetBest').onclick = () => { best = {}; store.set('best', best); toast('Best times cleared'); };
+$('#setVol').addEventListener('input', e => { settings.musicVol = +e.target.value; saveSettings(); music.apply(); });
+$('#resetBest').onclick = () => { if (confirm('Clear the whole leaderboard?')) { board = {}; store.set('board', board); toast('Leaderboard cleared'); } };
 
 function toast(t, ms = 1800) {
   const el = $('#toast'); el.textContent = t; el.style.display = 'block';
@@ -424,6 +507,7 @@ function startRace(trackId, diffId) {
   $('#loading').classList.add('active');
   $('#results').classList.remove('active');
   $('#pause').classList.remove('active');
+  music.hold();
   setTimeout(() => {
     if (race) { race.dispose(); race = null; }
     race = new Race(renderer, { track: trackId, diff: diffId, player: { ...cat }, tuning, onEvent });
@@ -463,7 +547,7 @@ function center(html, cls = 'msg', ms = 900) {
 
 function onEvent(type, a, b) {
   if (type === 'count') { center(a, 'big', 900); audio.count(false); tiltNeutral = tiltAngle ?? tiltNeutral; }
-  else if (type === 'go') { center('GO!', 'big', 800); audio.count(true); audio.startMusic(race.theme.id); vibe(30); }
+  else if (type === 'go') { center('GO!', 'big', 800); audio.count(true); music.play('race', true); vibe(30); }
   else if (type === 'jump') audio.jump();
   else if (type === 'land') audio.land();
   else if (type === 'hit') {
@@ -471,7 +555,10 @@ function onEvent(type, a, b) {
     flash(''); audio.hit(); audio.angryMeow(); vibe([60, 40, 60]);
   }
   else if (type === 'bump') { center(`Hiss! 😾 ${escapeHtml(a)}`, 'msg', 800); flash('bump'); audio.hiss(); vibe(40); }
-  else if (type === 'fish') { center('🐟 Stamina full!', 'msg', 700); audio.fish(); vibe(15); }
+  else if (type === 'fish') {
+    if (b) { center(`✨ Golden fish! +${a}`, 'msg', 900); audio.goldFish(); vibe([15, 30, 15]); }
+    else { center(`🐟 +${a} · stamina full`, 'msg', 700); audio.fish(); vibe(15); }
+  }
   else if (type === 'catnip') { center(`🌿 Catnip! +${race.cfg.catnipBonus}% stamina`, 'msg', 1100); audio.catnip(); vibe([20, 30, 20]); }
   else if (type === 'nipEnd') center('Catnip wore off', 'msg', 900);
   else if (type === 'exhausted') { center('Exhausted! 💦', 'msg', 1200); audio.groan(); vibe(120); }
@@ -480,7 +567,7 @@ function onEvent(type, a, b) {
   else if (type === 'msg') center(a, 'msg', 1200);
   else if (type === 'finish') {
     center(`FINISH!<br><span style="font-size:0.5em">${ord(a)} place</span>`, 'big', 3000);
-    audio.stopMusic(); audio.setWind(0);
+    audio.setWind(0);
     audio.meow(a === 1 ? 1.1 : 0.9); if (a === 1) setTimeout(() => audio.meow(1.25), 450);
     vibe(a === 1 ? [80, 60, 80, 60, 200] : 120);
   }
@@ -491,12 +578,14 @@ function showResults(list) {
   const me = list.findIndex(r => r.isPlayer) + 1;
   const key = pick.track + ':' + pick.diff;
   const myTime = list[me - 1].time;
-  const prev = best[key];
-  let sub = `${race.theme.name} · ${DIFFS.find(d => d.id === pick.diff).name} · ${fmt(myTime)}`;
-  if (!prev || me < prev.pos || (me === prev.pos && myTime < prev.time)) {
-    best[key] = { pos: me, time: myTime }; store.set('best', best);
-    if (prev) sub += ' · New best!';
-  }
+  const sub = `${race.theme.name} · ${DIFFS.find(d => d.id === pick.diff).name} · ${fmt(myTime)}`;
+  const entry = { name: cat.name || 'Whiskers', color: (FURS.find(f => f.id === cat.fur) || FURS[0]).color, score: race.score, fish: race.fishCaught, gold: race.goldCaught, pos: me, time: myTime, date: Date.now() };
+  const list0 = board[key] || [];
+  const list1 = [...list0, entry].sort(byScore);
+  const place = list1.indexOf(entry) + 1;
+  board[key] = list1.slice(0, 10); store.set('board', board);
+  const lb = place === 1 && list0.length ? '🏆 New high score!' : place === 1 ? '🏆 First score on this leaderboard' : place <= 10 ? `#${place} on the leaderboard` : '';
+  $('#resScore').innerHTML = `<b>${race.score}</b> pts <span>· 🐟 ${race.fishCaught - race.goldCaught} + ✨ ${race.goldCaught} golden</span>${lb ? `<em>${lb}</em>` : ''}`;
   $('#resMedal').textContent = ['🏆', '🥈', '🥉', '😺', '😼', '🙀'][me - 1];
   $('#resTitle').textContent = me === 1 ? `${cat.name} wins!` : `${ord(me)} place`;
   $('#resSub').textContent = sub;
@@ -505,6 +594,23 @@ function showResults(list) {
   $('#results').classList.add('active');
   releaseAwake();
 }
+const byScore = (a, b) => b.score - a.score || a.pos - b.pos || a.time - b.time;
+
+// ---------- leaderboard ----------
+let boardPick = null;
+function renderBoard() {
+  boardPick ||= { track: pick.track, diff: pick.diff };
+  seg($('#boardTrack'), TRACKS.map(t => ({ v: t.id, html: `${t.emoji}<small>${t.name.split(' ')[0]}</small>` })), boardPick.track, v => { boardPick.track = v; renderBoardList(); });
+  seg($('#boardDiff'), DIFFS.map(d => ({ v: d.id, html: `${d.emoji} ${d.name}` })), boardPick.diff, v => { boardPick.diff = v; renderBoardList(); });
+  renderBoardList();
+}
+function renderBoardList() {
+  const list = board[boardPick.track + ':' + boardPick.diff] || [];
+  const day = t => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  $('#boardList').innerHTML = list.length ? list.map((r, i) => `<li><span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="dt" style="background:${r.color}"></span><span class="nm">${escapeHtml(r.name)}<small>${day(r.date)} · ${ord(r.pos)} place · ${fmt(r.time)}</small></span><span class="pts">${r.score}<small>pts</small></span></li>`).join('')
+    : '<li class="empty">No races here yet. Go set the first score!</li>';
+}
+
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 $('#resAgain').onclick = () => startRace(pick.track, pick.diff);
@@ -515,15 +621,16 @@ function pause() {
   if (!race || paused || mode !== 'race' || $('#results').classList.contains('active')) return;
   paused = true; clearTouches();
   $('#pause').classList.add('active');
-  audio.stopMusic(); audio.setWind(0);
+  music.hold(); audio.setWind(0);
 }
 function resume() {
   if (!paused) return;
   paused = false; $('#pause').classList.remove('active');
-  if (race && race.state === 'race') audio.startMusic(race.theme.id);
+  if (race && music.want === 'race' && !music.off()) music.race.play().catch(() => {});
 }
 function quitRace() {
-  audio.stopMusic(); audio.windOff(); releaseAwake();
+  audio.windOff(); releaseAwake();
+  music.play('menu');
   if (race) { race.dispose(); race = null; }
   paused = false; mode = 'menu';
   $('#pause').classList.remove('active'); $('#results').classList.remove('active');
@@ -541,8 +648,8 @@ addEventListener('popstate', () => {
   } else if (screenStack.length > 1) { back(); }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { pause(); audio.ctx?.suspend?.(); }
-  else { audio.ctx?.resume?.(); if (mode === 'race') keepAwake(); }
+  if (document.hidden) { pause(); music.hold(); audio.ctx?.suspend?.(); }
+  else { audio.ctx?.resume?.(); if (mode === 'race') keepAwake(); else if (music.want === 'menu') music.play('menu'); }
 });
 
 async function keepAwake() { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
@@ -556,6 +663,7 @@ function updateHud(dt) {
   const rank = race.rank(p);
   if (rank !== lastRank) { lastRank = rank; setText('#hudPos', `${rank}<small>${['th', 'st', 'nd', 'rd'][rank] || 'th'}</small>`); }
   setText('#hudTime', fmt(race.state === 'countdown' ? 0 : p.finished ? p.finishTime : race.time));
+  setText('#hudScore', `${race.score}<small> pts</small>`);
   setText('#hudSpeed', `${Math.round(race.kmh(p))} <small>km/h</small>`);
   $('#hudStam i').style.width = (p.stamina / p.maxSt * 100).toFixed(1) + '%';
   $('#hudStam').classList.toggle('tired', p.exhausted);
