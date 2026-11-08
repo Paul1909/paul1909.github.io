@@ -28,8 +28,10 @@
   }
   #app { height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; }
 
-  header { display: flex; align-items: center; gap: 8px; max-width: 640px; width: 100%; margin: 0 auto; }
-  #title { flex: 1; text-align: center; min-width: 0; }
+  header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; max-width: 640px; width: 100%; margin: 0 auto; }
+  #title { display: contents; }
+  #name { grid-column: 2; grid-row: 1; text-align: center; }
+  #formula { grid-column: 1 / -1; grid-row: 2; text-align: center; margin-top: 1px; }
   #name { font-size: clamp(26px, 4.6vh, 40px); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #name small { font-size: .72em; }
   #formula { font-size: 13px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
@@ -53,6 +55,9 @@
   #rare { display: flex; flex-direction: column; gap: 5px; }
   #rare[hidden] { display: none; }
   .oct { width: var(--bh); height: var(--bh); font-style: italic; font-size: 15px; flex: none; }
+  #octDown { margin-right: -3px; }
+  .ico { width: 82%; height: 82%; }
+  button:disabled { opacity: .3; }
 
   #blocks { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .block { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; }
@@ -74,7 +79,6 @@
   .t { fill: var(--tone); } .r { fill: var(--root); }
   .kb.on .t { fill: var(--tone-on); } .kb.on .r { fill: var(--root-on); }
   .kl { font-family: var(--serif); text-anchor: middle; fill: var(--paper); }
-  .kla { fill: var(--paper); }
   /* engraved accidentals inside text */
   .ac { display: inline-block; fill: currentColor; margin: 0 .05em 0 .06em; }
   #name .ac { margin: 0 .07em 0 .08em; }
@@ -109,8 +113,9 @@
 <main id="app">
   <div id="controls">
   <header>
-    <button class="oct" id="octDown" title="Octave down">8vb</button>
+    <button class="oct" id="staffBtn" title="Show / hide the staff"></button>
     <div id="title"><div id="name"></div><div id="formula"></div></div>
+    <button class="oct" id="octDown" title="Octave down">8vb</button>
     <button class="oct" id="octUp" title="Octave up">8va</button>
   </header>
   <div class="row" id="notes"></div>

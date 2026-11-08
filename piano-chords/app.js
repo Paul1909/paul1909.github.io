@@ -54,7 +54,7 @@ const MODS = [
   { id: 'b13', g: 'alt', row: 'rare2', name: 'flat 13th', f: '♭13 for 13', what: 'Adds ♭13 (replaces 13).', key: 'Same key as the ♯5, an octave up.' },
 ];
 
-const DEF = { root: 0, acc: 0, triad: null, sev: null, ext: null, add: [], alt: [], oct: 4, rare: matchMedia('(min-width: 900px)').matches };
+const DEF = { root: 0, acc: 0, triad: null, sev: null, ext: null, add: [], alt: [], oct: 4, staff: true, rare: matchMedia('(min-width: 900px)').matches };
 const S = Object.assign({}, DEF, store.get('state', {}));
 
 function isOn(m) {
@@ -240,23 +240,21 @@ function kbRange(chords) {
   return { lo, hi, whites };
 }
 
-const CAPW = { C: .68, D: .74, E: .63, F: .58, G: .74, A: .72, B: .66 };   // serif capital widths (em)
-function keyLabel(name, cx, y, fs, bold) {
-  const L = name[0], accs = [...name.slice(1)], sc = fs / 800;
-  const lw = CAPW[L] * fs * (bold ? 1.06 : 1);
-  const aw = accs.reduce((w, a) => w + (a === '♭' ? 226 : 249) * sc + fs * 0.03, 0);
-  let x = cx - (lw + aw) / 2;
-  let out = `<text class="kl" x="${f1(x + lw / 2)}" y="${f1(y)}" font-size="${fs}"${bold ? ' font-weight="bold"' : ''}>${L}</text>`;
-  x += lw + fs * 0.04;
-  for (const a of accs) {
-    const flat = a === '♭', oy = flat ? y - 175 * sc : y + fs * 0.1 - 348 * sc;
-    out += `<path class="kla" transform="translate(${f1(x)} ${f1(oy)}) scale(${f1(sc * 1e4) / 1e4} ${-f1(sc * 1e4) / 1e4})" d="${GLYPH[flat ? 'flat' : 'sharp']}"/>`;
-    x += (flat ? 226 : 249) * sc + fs * 0.03;
+// Staff off: a fixed 2.5-octave window (18 white keys) that only moves when a chord would not fit.
+function fixedRange(chords) {
+  const ms = chords.flat().map(n => n.midi), lo = Math.min(...ms), hi = Math.max(...ms), home = 12 * (S.oct + 1);
+  const starts = [];
+  for (let k = -2; k <= 2; k++) starts.push(home + 12 * k, home + 12 * k + 5);   // windows start on a C or an F
+  starts.sort((a, b) => Math.abs(a - home) - Math.abs(b - home));
+  for (const st of starts) {
+    let end = st, w = 1;
+    while (w < 18) { end++; if (!isBlack(end)) w++; }
+    if (st <= lo && end >= hi) return { lo: st, hi: end, whites: 18 };
   }
-  return out;
+  return kbRange(chords);
 }
 
-function keyboard(notes, R, hU, labels) {
+function keyboard(notes, R, hU, fs) {
   const on = new Map(notes.map(n => [n.midi, n]));
   const W = 20, bw = 12.4, bh = hU * 0.62;
   let wk = '', bk = '', i = 0; const pos = {};
@@ -266,12 +264,10 @@ function keyboard(notes, R, hU, labels) {
     if (!isBlack(m)) {
       const x = pos[m] * W;
       wk += `<rect class="w${cls}" x="${x}" y="0" width="${W}" height="${f1(hU)}" rx="1.5"/>`;
-      if (labels && n) wk += keyLabel(n.name, x + W / 2, hU - 7, 9, n.root);
-      else if (labels && m % 12 === 0) wk += `<text class="kc" x="${x + W / 2}" y="${f1(hU - 7)}" font-size="7">C${m / 12 - 1}</text>`;
+      if (m % 12 === 0) wk += `<text class="${n ? 'kl' : 'kc'}" x="${x + W / 2}" y="${f1(hU - fs * 0.7)}" font-size="${f1(fs)}">C${m / 12 - 1}</text>`;
     } else {
       const x = (pos[m - 1] + 1) * W - bw / 2 + BOFF[m % 12] * W;
       bk += `<rect class="b${cls}" x="${f1(x)}" y="0" width="${bw}" height="${f1(bh)}" rx="1"/>`;
-      if (labels && n) bk += keyLabel(n.name, x + bw / 2, bh - 6, n.name.length > 2 ? 5.6 : 7, n.root);
     }
   }
   return wk + bk;
@@ -363,6 +359,9 @@ MODS.forEach(m => {
 const more = mkBtn('⋯', 'sep'); more.id = 'more'; more.title = 'More modifiers'; $('common').append(more);
 more.onclick = () => { S.rare = !S.rare; update(); };
 
+const staffBtn = $('staffBtn');
+staffBtn.innerHTML = `<svg class="ico" viewBox="0 0 40 40" aria-hidden="true"><g stroke="currentColor" stroke-width="1.5">${[10, 15, 20, 25, 30].map(y => `<line x1="5" x2="35" y1="${y}" y2="${y}"/>`).join('')}</g><path fill="currentColor" transform="translate(9 25) scale(.02 -.02)" d="${GLYPH.gClef}"/></svg>`;
+staffBtn.onclick = () => { S.staff = !S.staff; update(); };
 $('octDown').onclick = () => { S.oct = Math.max(2, S.oct - 1); update(); };
 $('octUp').onclick = () => { S.oct = Math.min(6, S.oct + 1); update(); };
 
@@ -394,6 +393,7 @@ function update() {
   $('rare').hidden = !S.rare;
   more.classList.toggle('open', S.rare);
   more.classList.toggle('has', !S.rare && MODS.some(m => m.row !== 'common' && isOn(m)));
+  staffBtn.classList.toggle('on', S.staff);
   $('octDown').disabled = S.oct <= 2; $('octUp').disabled = S.oct >= 6;
 
   const c = build();
@@ -406,22 +406,25 @@ function update() {
 
 function draw() {
   if (!current) return;
-  const eng = engraveAll(current.inv), R = kbRange(current.inv);
+  const staff = S.staff, eng = staff ? engraveAll(current.inv) : null, R = staff ? kbRange(current.inv) : fixedRange(current.inv);
   const W = blocks[0].clientWidth, H = blocks[0].clientHeight - 26;  // 13px each side: room for the inversion label
   if (W < 10 || H < 10) return;
-  const [vx, vy, vw, vh] = eng.vb;
-  let sh = H, sw = sh * vw / vh;
-  if (sw > W * 0.34) { sw = W * 0.34; sh = sw * vh / vw; }
-  const aw = W - sw - 8;
+  let sh = 0, sw = 0;
+  if (staff) {
+    const [, , vw, vh] = eng.vb;
+    sh = H; sw = sh * vw / vh;
+    if (sw > W * 0.34) { sw = W * 0.34; sh = sw * vh / vw; }
+  }
+  const aw = staff ? W - sw - 8 : W;
   let wpx = aw / R.whites, kh = Math.min(H, wpx * 6.2);
   if (H < wpx * 4) { wpx = H / 4; kh = H; }
-  const hU = 20 * kh / wpx, labels = wpx >= 19;
+  const hU = 20 * kh / wpx, fs = Math.min(12, Math.max(8, wpx * 0.42)) * 20 / wpx;   // octave labels 8–12 px
   blocks.forEach((bl, i) => {
     const [st, kb] = bl.querySelectorAll('svg');
-    st.setAttribute('viewBox', eng.vb.join(' ')); st.setAttribute('width', f1(sw)); st.setAttribute('height', f1(sh));
-    st.innerHTML = eng.svgs[i];
+    st.style.display = staff ? '' : 'none';
+    if (staff) { st.setAttribute('viewBox', eng.vb.join(' ')); st.setAttribute('width', f1(sw)); st.setAttribute('height', f1(sh)); st.innerHTML = eng.svgs[i]; }
     kb.setAttribute('viewBox', `-0.5 -0.5 ${R.whites * 20 + 1} ${f1(hU + 1)}`); kb.setAttribute('width', f1(wpx * R.whites)); kb.setAttribute('height', f1(kh));
-    kb.innerHTML = keyboard(current.inv[i], R, hU, labels);
+    kb.innerHTML = keyboard(current.inv[i], R, hU, fs);
   });
 }
 
