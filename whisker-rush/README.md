@@ -1,6 +1,6 @@
-# Whisker Rush (test build)
+# Whisker Rush
 
-Hidden test copy of Whisker Rush, not linked from the arcade page. It has the 🛠 Tuning lab on the title screen and keeps its own saves and offline cache (`whisker-rush-test`), separate from the live game.
+First-person 3D cat racing for phones, part of Paolo's Arcade: https://paul1909.github.io/whisker-rush/
 
 ## Files
 - `index.html` – screens, HUD and styles
@@ -17,18 +17,18 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 ## Handover notes (for continuing in a new chat)
 
 **Where things are**
-- Repo `Paul1909/paul1909.github.io` (GitHub Pages, branch `main`). The test build lives in `test/whisker-rush/` and is not linked from the arcade page. Test URL: https://paul1909.github.io/test/whisker-rush/
-- No live version yet. When publishing: copy the folder to `whisker-rush/`, set `TEST_BUILD = false` in `app.js`, set `APP = 'whisker-rush'` in `sw.js` and the manifest names to "Whisker Rush", and add a card to the arcade `index.html`.
+- Repo `Paul1909/paul1909.github.io` (GitHub Pages, branch `main`). Live game: `whisker-rush/` → https://paul1909.github.io/whisker-rush/, listed in the arcade `index.html`.
+- For a new test round: copy this folder to `test/whisker-rush/` and there set `TEST_BUILD = true` (shows the Tuning lab and the TEST badge, uses its own `whisker-rush-test:` saves), `APP = 'whisker-rush-test'` in `sw.js`, and names "Whisker Rush (test)" / "WR Test" in the manifest and `<title>`. Once Paolo approves, copy it back with the live values and empty `test/` again.
 - Plain scripts, no build step: `three.min.js` (r160, global `THREE`) → `cat.js` (`window.WRCat`) → `game.js` (`window.WRGame`) → `app.js`. It also runs by double-clicking `index.html`.
 
 **Release routine (every change)**
-1. Bump `VERSION` in `sw.js` (`whisker-rush-test-vN`) and `BUILD` in `app.js` (shown on the title badge).
+1. Bump `VERSION` in `sw.js` (`whisker-rush-vN` live, `whisker-rush-test-vN` in test) and `BUILD` in `app.js`.
 2. Every file in the folder (except `sw.js` and `README.md`) must be listed in `sw.js` `FILES`, or it will be missing offline.
 3. Add a `### vN` entry below, push, then write the commit ID into it.
-4. Roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
+4. Roll back: `git checkout <commit> -- whisker-rush`, commit, push.
 
 **Rules that matter**
-- Several games share the `paul1909.github.io` origin, so `localStorage` keys are prefixed `whisker-rush-test:` and the service worker only deletes its own caches (`APP + '-v'`).
+- Several games share the `paul1909.github.io` origin, so `localStorage` keys are prefixed `whisker-rush:` (test: `whisker-rush-test:`) and the service worker only deletes its own caches (`APP + '-v'`).
 - Relative paths only, no CDN or remote files, and fullscreen comes from the manifest.
 - Paolo tests on Android (landscape). He wants to try each round on the test URL before anything goes live.
 
@@ -43,9 +43,12 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 - The leaderboard is per phone (top 10 per track and difficulty). An online one would need an outside service.
 
 ## Versions and rollback
-To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
+Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### Live v1 (8 Nov 2026)
+- Published to the arcade from test v3. Tuning lab and TEST badge hidden (`TEST_BUILD = false`).
 
 ### v3 (8 Nov 2026) · commit 874623c
 - 3 new tracks: Space Station (low gravity), Alpine Meadow, House Chase (room to room).

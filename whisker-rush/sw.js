@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
-const APP = 'whisker-rush-test';   // test copy: its own cache, separate from the live game
-const VERSION = APP + '-v3';
+const APP = 'whisker-rush';
+const VERSION = APP + '-v1';
 const FILES = [
   './',
   './index.html',

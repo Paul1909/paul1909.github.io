@@ -1,6 +1,6 @@
 {
-  "name": "Whisker Rush (test)",
-  "short_name": "WR Test",
+  "name": "Whisker Rush",
+  "short_name": "Whisker Rush",
   "description": "First-person 3D cat racing: jump, sprint and dodge across five wild tracks.",
   "id": "./",
   "start_url": "./",

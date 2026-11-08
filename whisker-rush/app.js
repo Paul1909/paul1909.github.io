@@ -2,8 +2,8 @@
 (() => {
 const { buildCat, FURS, EYES, PATTERNS } = window.WRCat;
 const { Race, TRACKS, DIFFS, TUNING, DEFAULTS } = window.WRGame;
-const TEST_BUILD = true;   // shows the Tuning lab; the test copy also keeps its own saves
-const BUILD = 'v3';
+const TEST_BUILD = false;  // true = test copy: shows the Tuning lab and the TEST badge, keeps its own saves
+const BUILD = 'v1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -329,6 +329,7 @@ if (!TEST_BUILD) $('#goTune').style.display = 'none';
 function renderTitle() {
   $('#whoName').textContent = cat.name || 'Your cat';
   $('#buildTag').textContent = 'TEST BUILD ' + BUILD;
+  $('#buildTag').style.display = TEST_BUILD ? '' : 'none';
   $('#whoDot').style.background = (FURS.find(f => f.id === cat.fur) || FURS[0]).color;
 }
 
