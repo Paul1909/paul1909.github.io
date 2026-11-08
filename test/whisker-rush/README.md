@@ -14,7 +14,19 @@ Hidden test copy of Whisker Rush, not linked from the arcade page. It has the �
 Tap = jump, hold = sprint, stick or tilt to steer. Keyboard: ↑/W tap = jump, hold = sprint; Space = jump; ←/→ steer; P = pause.
 
 ## Versions and rollback
-See `CHANGELOG.md`, which lists the commit of every version. To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
+To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
+
+Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### v2 (8 Nov 2026) · commit b04f27e
+- Score: fish +1, golden fish that swim side to side +3 (both tunable). Score shown in the race and on the results.
+- Leaderboard: top 10 per track and difficulty, saved on the phone.
+- Tap your cat on the title or customise screen: it purrs and shows 3D hearts.
+- Soundtrack: "Catnip Quest" in the menus, "Paws Forward" from GO. Music volume setting, mute button on menus and in the race.
+- Tuning lab: new Score section (points, share of moving fish, swing width and speed).
+
+### v1 (8 Nov 2026) · commit 17273ab
+- First test build: 5 tracks, cat customiser, 3 difficulties, stamina/exhaustion, off-track slowdown, fish and catnip, hiss and angry meow, Tuning lab.
 
 ## Updating
 Change the files, bump `VERSION` in `sw.js`, push. To bake tuned values in, change the `def` values in `TUNING` (game.js).
