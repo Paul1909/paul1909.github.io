@@ -14,6 +14,34 @@ Hidden test copy of Whisker Rush, not linked from the arcade page. It has the �
 ## Controls
 Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hold = sprint. Keyboard: arrows/WASD like the stick; Space tap = jump, hold = sprint; C = camera; P = pause.
 
+## Handover notes (for continuing in a new chat)
+
+**Where things are**
+- Repo `Paul1909/paul1909.github.io` (GitHub Pages, branch `main`). The test build lives in `test/whisker-rush/` and is not linked from the arcade page. Test URL: https://paul1909.github.io/test/whisker-rush/
+- No live version yet. When publishing: copy the folder to `whisker-rush/`, set `TEST_BUILD = false` in `app.js`, set `APP = 'whisker-rush'` in `sw.js` and the manifest names to "Whisker Rush", and add a card to the arcade `index.html`.
+- Plain scripts, no build step: `three.min.js` (r160, global `THREE`) → `cat.js` (`window.WRCat`) → `game.js` (`window.WRGame`) → `app.js`. It also runs by double-clicking `index.html`.
+
+**Release routine (every change)**
+1. Bump `VERSION` in `sw.js` (`whisker-rush-test-vN`) and `BUILD` in `app.js` (shown on the title badge).
+2. Every file in the folder (except `sw.js` and `README.md`) must be listed in `sw.js` `FILES`, or it will be missing offline.
+3. Add a `### vN` entry below, push, then write the commit ID into it.
+4. Roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
+
+**Rules that matter**
+- Several games share the `paul1909.github.io` origin, so `localStorage` keys are prefixed `whisker-rush-test:` and the service worker only deletes its own caches (`APP + '-v'`).
+- Relative paths only, no CDN or remote files, and fullscreen comes from the manifest.
+- Paolo tests on Android (landscape). He wants to try each round on the test URL before anything goes live.
+
+**Game design (current)**
+- Speeds are in km/h and converted by `pace`: cruise 30, faster +6 (stick up / ↑, drains 12%/s), sprint 44 (hold, drains 35%/s), cap 48, brake 10 (refills 1.5× faster). An empty bar means exhausted at 12 km/h until it is back to 35%.
+- Off-track: 6 m each side at 45% speed. Obstacles: `block` (jump if low enough, else steer), `wide` (jump-only), `move` (swings side to side). Pits were removed on purpose.
+- Power-ups: fish in groups of ≥3 (+1, full stamina), golden fish single and moving (+3), catnip (bigger bar for a while), ghost (pass through obstacles and cats).
+- Every number is in the `TUNING` list in `game.js`, which also builds the Tuning lab sliders. To bake in Paolo's tuned values, change the `def` fields.
+- Rival cats: speed and dodge skill per difficulty, a gentle rubber band, and they steer towards the laser dot ahead of the leader.
+- Tracks: `TRACKS` in `game.js` (theme, scenery, obstacle sets, landmarks). Special flags: `space` (low gravity, no ground), `indoor` (house rooms from `ROOMS`, walls and ceiling).
+- Music: `music-menu.mp3` (Catnip Quest) in the menus and `music-race.mp3` (Paws Forward) from GO. Pet sounds: `luna-purr.mp3` and `luna-auuu.mp3`, alternating.
+- The leaderboard is per phone (top 10 per track and difficulty). An online one would need an outside service.
+
 ## Versions and rollback
 To roll back: `git checkout <commit> -- test/whisker-rush`, commit, push.
 
