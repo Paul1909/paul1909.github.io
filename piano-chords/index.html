@@ -45,9 +45,9 @@
   button.dim { opacity: .35; }
   #notes button { flex: 1; aspect-ratio: 1; max-width: 58px; font-size: clamp(17px, 2.8vh, 24px); }
   #notes .sep { margin-left: 10px; }
-  .mods button { flex: 1; height: var(--bh); font-size: clamp(14px, 2.2vh, 18px); }
+  .mods button { flex: 1 1 auto; min-width: 1.9em; height: var(--bh); padding: 0 .35em; white-space: nowrap; font-size: clamp(14px, 2.2vh, 18px); }
   .mods .sep { margin-left: 8px; }
-  #more { position: relative; flex: .7; font-size: 20px; border-style: dashed; }
+  #more { position: relative; flex: 0 1 auto; padding: 0 .3em; font-size: 18px; border-style: dashed; }
   #more.open { border-style: solid; }
   #more.has::after { content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--root); }
   #rare { display: flex; flex-direction: column; gap: 5px; }

@@ -288,6 +288,15 @@ function pianoNote(midi, t, vel) {
   });
   voices.push({ out, end });
 }
+function stopSound() {
+  if (!ac || !voices.length) return;
+  const t = ac.currentTime;
+  voices.forEach(v => { if (v.end > t) { v.out.gain.cancelScheduledValues(t); v.out.gain.setTargetAtTime(0, t, 0.04); } });
+  voices = [];
+}
+// tapping anywhere except a keyboard or staff silences the chord
+document.addEventListener('pointerdown', e => { if (!e.target.closest('.block svg')) stopSound(); });
+
 function playChord(notes) {
   audio();
   const t = ac.currentTime + 0.01;
