@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fbf8f1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chords">
+<meta name="description" content="Build any piano chord and see it in root position and both inversions.">
+<title>Piano Chords</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --paper: #fbf8f1; --ink: #1c1b19; --grey: #8a857b; --line: #cfc8b9;
+    --tone: #34567a; --root: #a8322d; --tone-on: #5d8bbd; --root-on: #dc5148;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, "Noto Serif", Georgia, serif;
+    --bh: clamp(34px, 5.4vh, 50px);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font-family: var(--serif); overflow: hidden; }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  #app { height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; }
+
+  header { display: flex; align-items: center; gap: 8px; max-width: 640px; width: 100%; margin: 0 auto; }
+  #title { flex: 1; text-align: center; min-width: 0; }
+  #name { font-size: clamp(26px, 4.6vh, 40px); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #name small { font-size: .72em; }
+  #formula { font-size: 13px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
+  #formula b { font-weight: normal; color: var(--ink); }
+
+  .row { display: flex; gap: 5px; max-width: 640px; width: 100%; margin: 0 auto; }
+  button {
+    font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--ink); border-radius: 3px;
+    padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 0;
+    touch-action: manipulation; -webkit-touch-callout: none;
+  }
+  button.on { background: var(--ink); color: var(--paper); }
+  button.dim { opacity: .35; }
+  #notes button { flex: 1; aspect-ratio: 1; max-width: 58px; font-size: clamp(17px, 2.8vh, 24px); }
+  #notes .sep { margin-left: 10px; }
+  .mods button { flex: 1; height: var(--bh); font-size: clamp(14px, 2.2vh, 18px); }
+  .mods .sep { margin-left: 8px; }
+  #more { position: relative; flex: .7; font-size: 20px; border-style: dashed; }
+  #more.open { border-style: solid; }
+  #more.has::after { content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--root); }
+  #rare { display: flex; flex-direction: column; gap: 5px; }
+  #rare[hidden] { display: none; }
+  .oct { width: var(--bh); height: var(--bh); font-style: italic; font-size: 15px; flex: none; }
+
+  #blocks { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+  .block { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; }
+  .lbl { position: absolute; left: 0; top: 2px; font-size: 11px; font-style: italic; color: var(--grey); pointer-events: none; }
+  .block svg { display: block; cursor: pointer; flex: none; overflow: visible; }
+  .block svg.staff { align-self: flex-end; }
+
+  /* staff */
+  .sl { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .ld { stroke: var(--ink); stroke-width: 1.6; }
+  .stem { stroke: var(--ink); stroke-width: 1.2; }
+  .staff path { fill: var(--ink); }
+  .staff path.r { fill: var(--root); }
+  .staff.on path.nh { fill: var(--tone-on); }
+  .staff.on path.r { fill: var(--root-on); }
+
+  /* keyboard */
+  .w { fill: #fffdf8; stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .b { fill: var(--ink); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .t { fill: var(--tone); } .r { fill: var(--root); }
+  .kb.on .t { fill: var(--tone-on); } .kb.on .r { fill: var(--root-on); }
+  .kl { font-family: var(--serif); text-anchor: middle; fill: var(--paper); }
+  .kc { font-family: var(--serif); text-anchor: middle; fill: var(--grey); }
+
+  #controls { display: flex; flex-direction: column; gap: 6px; flex: none; }
+  @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+    #app { flex-direction: row; gap: 24px; padding: 16px 20px; }
+    #controls { width: clamp(380px, 33vw, 560px); justify-content: center; gap: 9px; }
+    #blocks { border-top: none; border-left: 1px solid var(--line); padding: 0 0 0 20px; }
+    #name { font-size: 46px; }
+    #formula { font-size: 15px; }
+  }
+  #tip {
+    position: fixed; z-index: 10; max-width: min(320px, calc(100vw - 20px)); padding: 9px 12px 10px;
+    background: var(--paper); border: 1px solid var(--ink); border-radius: 3px; box-shadow: 0 6px 22px rgba(0,0,0,.14);
+    font-size: 14px; line-height: 1.35; pointer-events: none;
+  }
+  #tip[hidden] { display: none; }
+  #tip .h { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; margin-bottom: 3px; }
+  #tip .h b { font-size: 17px; }
+  #tip .h i { color: var(--grey); }
+  #tip .f { color: var(--tone); white-space: nowrap; }
+  #tip p { margin: 2px 0 0; }
+  #tip p.k { font-style: italic; color: var(--root); }
+</style>
+</head>
+<body>
+<main id="app">
+  <div id="controls">
+  <header>
+    <button class="oct" id="octDown" title="Octave down">8vb</button>
+    <div id="title"><div id="name"></div><div id="formula"></div></div>
+    <button class="oct" id="octUp" title="Octave up">8va</button>
+  </header>
+  <div class="row" id="notes"></div>
+  <div class="row mods" id="common"></div>
+  <div id="rare" hidden><div class="row mods" id="rare1"></div><div class="row mods" id="rare2"></div></div>
+  </div>
+  <section id="blocks">
+    <div class="block"><span class="lbl">root</span><svg class="staff"></svg><svg class="kb"></svg></div>
+    <div class="block"><span class="lbl">1st inv.</span><svg class="staff"></svg><svg class="kb"></svg></div>
+    <div class="block"><span class="lbl">2nd inv.</span><svg class="staff"></svg><svg class="kb"></svg></div>
+  </section>
+</main>
+<div id="tip" hidden></div>
+<script src="glyphs.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
