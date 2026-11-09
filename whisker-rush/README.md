@@ -47,7 +47,7 @@ Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
 
-### Live v3 (9 Nov 2026) · commit PENDING
+### Live v3 (9 Nov 2026) · commit a3b35b5
 - Tuning lab button moved to Settings (now available in the live game).
 - Track tiles: Space Station black, Alpine Meadow green, House Chase pink.
 
