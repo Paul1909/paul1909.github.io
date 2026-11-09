@@ -48,7 +48,7 @@ Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
 
-### Live v4 (9 Nov 2026) · commit PENDING
+### Live v4 (9 Nov 2026) · commit 026588e
 - Moving obstacles no longer sink into the ground: they roll around their own centre (the cheese wheel used to be half underground).
 - They now cross the track in one direction (left→right or right→left) instead of swinging back and forth. The space probe and robot vacuum glide facing where they go.
 - Tuning lab: new "Moving obstacles: speed across the track" (3.5 m/s).
