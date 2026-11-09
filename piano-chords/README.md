@@ -7,6 +7,7 @@ Tap a keyboard or staff to hear that inversion. Long-press (or hover) a modifier
 - `index.html` – layout and styles
 - `app.js` – chord theory, engraving, keyboards, sound, service worker registration
 - `glyphs.js` – music symbols from the Bravura font (SIL Open Font License)
+- `piano/` – piano samples: *Splendid Grand Piano* by Akai (a Steinway, public domain), mezzo-forte layer, trimmed to 5 s
 - `sw.js` – offline cache
 - `manifest.webmanifest`, `icon*.png`, `icon.svg`, `apple-touch-icon.png` – install + icons
 

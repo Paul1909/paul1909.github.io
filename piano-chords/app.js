@@ -274,55 +274,88 @@ function keyboard(notes, R, hU, fs) {
 }
 
 /* ---------- sound ---------- */
-let ac = null, master = null, voices = [];
+// Sampled Steinway grand: "Splendid Grand Piano" by Akai (public domain), mezzo-forte layer.
+const SAMPLES = [31, 33, 35, 37, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 56, 57, 58, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 80, 81, 82, 83, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108];
+const nearest = m => SAMPLES.reduce((a, b) => (Math.abs(b - m) < Math.abs(a - m) ? b : a));
+const buffers = new Map();
+let ac = null, master = null, voices = [], playId = 0;
+
 function audio() {
   if (!ac) {
     ac = new (window.AudioContext || window.webkitAudioContext)();
-    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-    master = ac.createGain(); master.gain.value = 0.7; master.connect(comp); comp.connect(ac.destination);
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 3;
+    master = ac.createGain(); master.gain.value = 0.85;
+    // a soft hall: generated impulse response, so nothing extra to download
+    const rev = ac.createConvolver(), len = Math.floor(ac.sampleRate * 2.4), ir = ac.createBuffer(2, len, ac.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c); let lp = 0;
+      for (let i = 0; i < len; i++) { lp += 0.22 * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.pow(1 - i / len, 3.2); }
+    }
+    rev.buffer = ir;
+    const wet = ac.createGain(); wet.gain.value = 0.32;
+    master.connect(comp); master.connect(rev); rev.connect(wet); wet.connect(comp); comp.connect(ac.destination);
   }
   if (ac.state === 'suspended') ac.resume();
   return ac;
 }
-const PARTIALS = [1, 0.55, 0.3, 0.18, 0.1, 0.06, 0.035];
-function pianoNote(midi, t, vel) {
-  const f = 440 * Math.pow(2, (midi - 69) / 12);
-  const out = ac.createGain(); out.gain.value = vel;
-  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.4;
-  lp.frequency.setValueAtTime(Math.min(16000, f * 9), t);
-  lp.frequency.exponentialRampToValueAtTime(Math.max(500, f * 2.5), t + 1.2);
-  out.connect(lp); lp.connect(master);
-  const sustain = Math.min(5, Math.max(0.7, 3.2 * Math.sqrt(261.6 / f)));
-  const end = t + sustain * 2.2;
-  PARTIALS.forEach((a, i) => {
-    const h = i + 1, fr = f * h * Math.sqrt(1 + 0.0004 * h * h);
-    if (fr > 18000) return;
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.frequency.value = fr; o.detune.value = (i % 2 ? 1 : -1) * 1.5;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(a, t + 0.004);
-    g.gain.setTargetAtTime(a * 0.4, t + 0.006, 0.09);
-    g.gain.setTargetAtTime(0, t + 0.25, sustain / (0.6 + h * 0.5));
-    o.connect(g); g.connect(out); o.start(t); o.stop(end);
-  });
-  voices.push({ out, end });
+
+function sample(m) {
+  if (!buffers.has(m)) {
+    const p = fetch(`piano/p${m}.m4a`)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)));
+    p.catch(() => buffers.delete(m));
+    buffers.set(m, p);
+  }
+  return buffers.get(m);
 }
-function stopSound() {
-  if (!ac || !voices.length) return;
-  const t = ac.currentTime;
-  voices.forEach(v => { if (v.end > t) { v.out.gain.cancelScheduledValues(t); v.out.gain.setTargetAtTime(0, t, 0.04); } });
+function preload(notes) { if (ac) new Set(notes.map(n => nearest(n.midi))).forEach(m => sample(m).catch(() => {})); }
+
+function fadeOut(t, tc) {
+  voices.forEach(v => { v.g.gain.cancelScheduledValues(t); v.g.gain.setTargetAtTime(0, t, tc); try { v.src.stop(t + tc * 8); } catch {} });
   voices = [];
 }
-// tapping anywhere except a keyboard or staff silences the chord
-document.addEventListener('pointerdown', e => { if (!e.target.closest('.block svg')) stopSound(); });
+function stopSound() { playId++; if (ac) fadeOut(ac.currentTime, 0.05); }
+// tapping anywhere except a keyboard or staff silences the chord (and wakes up audio on the first tap)
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.block svg')) stopSound();
+  if (!ac) { audio(); if (current) preload(current.inv.flat()); }
+});
+
+// Fallback if samples can't load: a simple additive synth.
+const PARTIALS = [1, 0.55, 0.3, 0.18, 0.1, 0.06, 0.035];
+function synthNote(midi, t, vel) {
+  const f = 440 * Math.pow(2, (midi - 69) / 12), g = ac.createGain(); g.gain.value = vel * 0.6; g.connect(master);
+  const sustain = Math.min(5, Math.max(0.7, 3.2 * Math.sqrt(261.6 / f)));
+  PARTIALS.forEach((a, i) => {
+    const h = i + 1, o = ac.createOscillator(), og = ac.createGain();
+    o.frequency.value = f * h * Math.sqrt(1 + 0.0004 * h * h);
+    og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(a, t + 0.004);
+    og.gain.setTargetAtTime(0, t + 0.2, sustain / (0.6 + h * 0.5));
+    o.connect(og); og.connect(g); o.start(t); o.stop(t + sustain * 2);
+  });
+  voices.push({ g, src: { stop() {} } });
+}
 
 function playChord(notes) {
   audio();
-  const t = ac.currentTime + 0.01;
-  voices.forEach(v => { if (v.end > t) { v.out.gain.cancelScheduledValues(t); v.out.gain.setTargetAtTime(0, t, 0.05); } });
-  voices = [];
-  const vel = 0.32 / Math.sqrt(notes.length);
-  notes.forEach((n, i) => pianoNote(n.midi, t + i * 0.012, vel));
+  fadeOut(ac.currentTime, 0.06);
+  const id = ++playId, vel = 0.55 / Math.sqrt(notes.length);
+  Promise.all(notes.map(n => sample(nearest(n.midi)))).then(bufs => {
+    if (id !== playId) return;
+    const t = ac.currentTime + 0.005;
+    notes.forEach((n, i) => {
+      const s = nearest(n.midi), src = ac.createBufferSource(), g = ac.createGain();
+      src.buffer = bufs[i]; src.playbackRate.value = Math.pow(2, (n.midi - s) / 12);
+      g.gain.value = vel; src.connect(g); g.connect(master);
+      src.start(t + i * 0.008);
+      voices.push({ g, src });
+    });
+  }).catch(() => {
+    if (id !== playId) return;
+    const t = ac.currentTime + 0.01;
+    notes.forEach((n, i) => synthNote(n.midi, t + i * 0.012, vel));
+  });
 }
 
 /* ---------- UI ---------- */
@@ -399,6 +432,7 @@ function update() {
   const c = build();
   c.inv = [c.notes, invert(c.notes, 1), invert(c.notes, 2)];
   current = c;
+  preload(c.inv.flat());
   $('name').innerHTML = typo(c.label) + (c.suffix ? `<small>${typo(c.suffix)}</small>` : '');
   $('formula').innerHTML = typo(c.notes.map(n => sym(n.k)).join('&ensp;') + '&emsp;·&emsp;<b>' + c.notes.map(n => n.name).join('&ensp;') + '</b>');
   draw();
