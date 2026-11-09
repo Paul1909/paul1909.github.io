@@ -3,7 +3,7 @@
 const { buildCat, FURS, EYES, PATTERNS } = window.WRCat;
 const { Race, TRACKS, DIFFS, TUNING, DEFAULTS } = window.WRGame;
 const TEST_BUILD = false;  // true = test copy: shows the Tuning lab and the TEST badge, keeps its own saves
-const BUILD = 'v1';
+const BUILD = 'v2';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -200,6 +200,13 @@ const audio = {
     }
     lfo.start(t); lfo.stop(t + 0.78);
     this.noise(0.12, 0.35, 700);
+  },
+  // Luna's real hiss for cat bumps (falls back to the generated hiss if the clip can't play)
+  lunaHiss() {
+    if (!settings.sound || settings.muted) return;
+    const a = (this.hissClip ||= new Audio('luna-hiss.mp3'));
+    a.currentTime = 0; a.volume = 1;
+    a.play().catch(() => this.hiss());
   },
   hiss() {
     if (!this.ctx || !settings.sound) return;
@@ -541,6 +548,7 @@ function startRace(trackId, diffId) {
   $('#results').classList.remove('active');
   $('#pause').classList.remove('active');
   music.hold();
+  if (!audio.hissClip) { audio.hissClip = new Audio('luna-hiss.mp3'); audio.hissClip.preload = 'auto'; }
   setTimeout(() => {
     if (race) { race.dispose(); race = null; }
     race = new Race(renderer, { track: trackId, diff: diffId, player: { ...cat }, tuning, view: settings.view, onEvent });
@@ -587,7 +595,7 @@ function onEvent(type, a, b) {
     center(['Mrraow!', 'Ouch!', 'Hey!', 'Grrr!'][(Math.random() * 4) | 0], 'msg', 800);
     flash(''); audio.hit(); audio.angryMeow(); vibe([60, 40, 60]);
   }
-  else if (type === 'bump') { center(`Hiss! 😾 ${escapeHtml(a)}`, 'msg', 800); flash('bump'); audio.hiss(); vibe(40); }
+  else if (type === 'bump') { center(`Hiss! 😾 ${escapeHtml(a)}`, 'msg', 800); flash('bump'); audio.lunaHiss(); vibe(40); }
   else if (type === 'fish') {
     if (b) { center(`✨ Golden fish! +${a}`, 'msg', 900); audio.goldFish(); vibe([15, 30, 15]); }
     else { center(`🐟 +${a} · stamina full`, 'msg', 700); audio.fish(); vibe(15); }

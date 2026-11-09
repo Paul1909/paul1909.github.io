@@ -7,7 +7,7 @@ First-person 3D cat racing for phones, part of Paolo's Arcade: https://paul1909.
 - `three.min.js` – Three.js r160 (bundled so it works offline)
 - `cat.js` – cat model · `game.js` – tracks, obstacles, power-ups, bots, camera, and the `TUNING` list of mechanics with their defaults
 - `app.js` – menus, Tuning lab, sound, touch/tilt/keyboard input, main loop
-- `luna-purr.mp3`, `luna-auuu.mp3`: Luna's voice when you pet the cat
+- `luna-purr.mp3`, `luna-auuu.mp3`: Luna's voice when you pet the cat; `luna-hiss.mp3`: when cats bump in a race
 - `music-menu.mp3` (Catnip Quest) and `music-race.mp3` (Paws Forward): 128 kbps, loudness-matched
 - `sw.js` – offline cache · `manifest.webmanifest` – install + fullscreen
 
@@ -46,6 +46,9 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### Live v2 (9 Nov 2026)
+- Cat bumps play Luna's real hiss (`luna-hiss.mp3`) instead of the generated one.
 
 ### Live v1 (8 Nov 2026) · commit 79faff0
 - Published to the arcade from test v3. Tuning lab and TEST badge hidden (`TEST_BUILD = false`).
