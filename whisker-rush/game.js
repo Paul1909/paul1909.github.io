@@ -44,6 +44,7 @@ const TUNING = [
   { group: 'Score', k: 'goldSpeed', label: 'How fast moving fish swing', min: 0.5, max: 4, step: 0.1, def: 1.6, unit: '×' },
   { group: 'Obstacles', k: 'obstacleGap', label: 'Average gap between obstacles', min: 8, max: 80, step: 1, def: 25, unit: 'm' },
   { group: 'Obstacles', k: 'wideShare', label: 'Share that are jump-only barriers', min: 0, max: 80, step: 5, def: 20, unit: '%' },
+  { group: 'Obstacles', k: 'moverSpeed', label: 'Moving obstacles: speed across the track', min: 0.5, max: 10, step: 0.5, def: 3.5, unit: 'm/s' },
   { group: 'Obstacles', k: 'hitKeep', label: 'Speed kept after hitting one', min: 0, max: 100, step: 5, def: 30, unit: '%' },
   { group: 'Obstacles', k: 'stumbleTime', label: 'Stumble time after a hit', min: 0.2, max: 3, step: 0.1, def: 0.9, unit: 's' },
   { group: 'Obstacles', k: 'bumpKeep', label: 'Speed kept after a cat bump', min: 30, max: 100, step: 5, def: 85, unit: '%' },
@@ -279,7 +280,7 @@ const OBS = {
   rock: { h: 1.3, w: 2.2, d: 1.8, kind: 'block', parts: () => [P(GEO.dodeca(1), M('#9c7650'), 0, 0.35, 0, 0.3, 0.5, 0, 1.1, 0.95, 0.9)] },
   grayrock: { h: 1.3, w: 2.2, d: 1.8, kind: 'block', parts: () => [P(GEO.dodeca(1), M('#7d7d78'), 0, 0.35, 0, 0.3, 0.5, 0, 1.1, 0.95, 0.9)] },
   fence: { h: 0.75, d: 0.4, kind: 'wide', parts: () => [P(GEO.box(1, 0.16, 0.16), M('#8a5a2e'), 0, 0.25, 0), P(GEO.box(1, 0.16, 0.16), M('#a06a38'), 0, 0.58, 0)] },
-  tumbleweed: { h: 1.1, w: 1.3, d: 1.3, kind: 'block', move: 3.5, parts: () => [P(GEO.ico(0.65, 1), new THREE.MeshLambertMaterial({ color: '#9c7a45', wireframe: true }), 0, 0.65, 0)] },
+  tumbleweed: { h: 1.1, w: 1.3, d: 1.3, kind: 'block', move: true, roll: { c: 0.65, r: 0.65 }, parts: () => [P(GEO.ico(0.65, 1), new THREE.MeshLambertMaterial({ color: '#9c7a45', wireframe: true }), 0, 0.65, 0)] },
   log: { h: 0.66, d: 0.7, kind: 'wide', parts: () => [P(new THREE.CylinderGeometry(0.33, 0.33, 1, 9), M('#6b4423'), 0, 0.33, 0, 0, 0, Math.PI / 2)] },
   stump: { h: 1.0, w: 1.4, d: 1.4, kind: 'block', parts: () => [P(GEO.cyl(0.62, 0.72, 1.0, 9), M('#6b4423')), P(GEO.cyl(0.58, 0.58, 0.02, 9), M('#c49a64'), 0, 1.0, 0)] },
   cone: { h: 0.95, w: 0.9, d: 0.9, kind: 'block', parts: () => [P(GEO.box(0.9, 0.08, 0.9), M('#ff6a1a')), P(GEO.cone(0.38, 0.9, 12), M('#ff7a22')), P(new THREE.CylinderGeometry(0.22, 0.27, 0.16, 12), M('#ffffff'), 0, 0.45, 0)] },
@@ -302,18 +303,18 @@ const OBS = {
   antenna: { h: 3.0, w: 1.1, d: 1.1, kind: 'block', parts: () => { const dish = new THREE.ConeGeometry(0.7, 0.4, 14, 1, true); return [P(GEO.cyl(0.5, 0.55, 0.4), M('#5a6378')), P(GEO.cyl(0.08, 0.08, 2.6), M('#aab3c6')), P(dish, new THREE.MeshLambertMaterial({ color: '#d9dee8', side: THREE.DoubleSide }), 0, 2.2, 0, 2.2, 0, 0), P(GEO.sphere(0.13), M('#ff3040', 'basic'), 0, 2.95, 0)]; } },
   spacecrate: { h: 1.3, w: 1.4, d: 1.4, kind: 'block', parts: () => [P(GEO.box(1.4, 1.3, 1.4), M('#9aa4b8')), P(GEO.box(1.44, 0.22, 1.44), M('#ffc22e', 'basic'), 0, 0.5, 0), P(GEO.box(0.5, 0.5, 0.05), M('#46e0ff', 'basic'), 0, 0.3, 0.72)] },
   energybar: { h: 0.7, d: 0.4, kind: 'wide', parts: () => [P(GEO.box(1, 0.16, 0.16), M('#ff3060', 'basic'), 0, 0.48, 0), P(GEO.box(1, 0.06, 0.06), M('#ffc0d0', 'basic'), 0, 0.53, 0), P(GEO.box(1, 0.1, 0.4), M('#3a4050'), 0, 0, 0)] },
-  probe: { h: 1.25, w: 1.3, d: 1.3, kind: 'block', move: 3.5, parts: () => [P(GEO.sphere(0.6, 14, 10), M('#c8ced8'), 0, 0.65, 0), P(new THREE.TorusGeometry(0.62, 0.06, 6, 20), M('#46e0ff', 'basic'), 0, 0.65, 0, Math.PI / 2, 0, 0), P(GEO.cyl(0.03, 0.03, 0.9), M('#888'), 0, 1.1, 0), P(GEO.cyl(0.03, 0.03, 0.9), M('#888'), 0.4, 0.9, 0, 0, 0, -0.8)] },
+  probe: { h: 1.25, w: 1.3, d: 1.3, kind: 'block', move: true, parts: () => [P(GEO.sphere(0.6, 14, 10), M('#c8ced8'), 0, 0.65, 0), P(new THREE.TorusGeometry(0.62, 0.06, 6, 20), M('#46e0ff', 'basic'), 0, 0.65, 0, Math.PI / 2, 0, 0), P(GEO.cyl(0.03, 0.03, 0.9), M('#888'), 0, 1.1, 0), P(GEO.cyl(0.03, 0.03, 0.9), M('#888'), 0.4, 0.9, 0, 0, 0, -0.8)] },
   // mountains
   haybale: { h: 1.3, w: 1.7, d: 1.3, kind: 'block', parts: () => [P(new THREE.CylinderGeometry(0.65, 0.65, 1.7, 14), M('#d9b54a'), 0, 0.65, 0, 0, 0, Math.PI / 2), P(new THREE.TorusGeometry(0.66, 0.04, 4, 16), M('#b8902a'), 0.4, 0.65, 0, 0, Math.PI / 2, 0), P(new THREE.TorusGeometry(0.66, 0.04, 4, 16), M('#b8902a'), -0.4, 0.65, 0, 0, Math.PI / 2, 0)] },
   cowO: { h: 2.35, w: 3.3, d: 1.1, kind: 'block', parts: () => cowParts().map(p => (p.m.premultiply(mat4(-0.35, 0, 0)), p)) },
-  cheese: { h: 1.35, w: 0.8, d: 1.35, kind: 'block', move: 3.5, parts: () => [P(new THREE.CylinderGeometry(0.66, 0.66, 0.5, 18), M('#f2c94c'), 0, 0, 0, Math.PI / 2, 0, 0), P(new THREE.TorusGeometry(0.62, 0.06, 6, 18), M('#d9a530'), 0, 0, 0.25), P(new THREE.TorusGeometry(0.62, 0.06, 6, 18), M('#d9a530'), 0, 0, -0.25)] },
+  cheese: { h: 1.35, w: 0.8, d: 1.35, kind: 'block', move: true, roll: { c: 0, r: 0.68 }, parts: () => [P(new THREE.CylinderGeometry(0.66, 0.66, 0.5, 18), M('#f2c94c'), 0, 0, 0, Math.PI / 2, 0, 0), P(new THREE.TorusGeometry(0.62, 0.06, 6, 18), M('#d9a530'), 0, 0, 0.25), P(new THREE.TorusGeometry(0.62, 0.06, 6, 18), M('#d9a530'), 0, 0, -0.25)] },
   // house
   toyball: { h: 1.1, w: 1.1, d: 1.1, kind: 'block', parts: () => [P(GEO.sphere(0.55, 14, 10), M('#e8423a'), 0, 0.55, 0), P(new THREE.TorusGeometry(0.555, 0.09, 6, 20), M('#ffffff'), 0, 0.55, 0, 0, 0.6, 0), P(new THREE.TorusGeometry(0.555, 0.09, 6, 20), M('#2a7ae8'), 0, 0.55, 0, Math.PI / 2, 0, 0)] },
   plantpot: { h: 2.7, w: 1.4, d: 1.4, kind: 'block', parts: () => [P(GEO.cyl(0.62, 0.45, 1.1, 12), M('#c4683a')), P(GEO.ico(0.8, 0), M('#3c8a3a'), 0, 1.75, 0, 0, 0, 0, 1, 1.3, 1), P(GEO.ico(0.5, 0), M('#4aa048'), 0.3, 2.3, 0.2)] },
   basket: { h: 1.35, w: 1.6, d: 1.4, kind: 'block', parts: () => [P(GEO.cyl(0.8, 0.65, 1.2, 14), M('#c9a066')), P(GEO.sphere(0.5), M('#7aa8e8'), -0.2, 1.15, 0, 0, 0, 0, 1, 0.5, 1), P(GEO.sphere(0.45), M('#f28aa8'), 0.3, 1.2, 0.1, 0, 0, 0, 1, 0.45, 1)] },
   books: { h: 0.85, w: 1.5, d: 1.1, kind: 'block', parts: () => [P(GEO.box(1.5, 0.3, 1.1), M('#3a6ab8')), P(GEO.box(1.35, 0.28, 1.0), M('#c84a3a'), 0.05, 0.3, 0, 0, 0.15, 0), P(GEO.box(1.2, 0.27, 0.95), M('#e8b83a'), -0.05, 0.58, 0, 0, -0.1, 0)] },
   rug: { h: 0.64, d: 0.7, kind: 'wide', parts: () => [P(new THREE.CylinderGeometry(0.32, 0.32, 1, 12), M('#b8433a'), 0, 0.32, 0, 0, 0, Math.PI / 2), P(new THREE.CylinderGeometry(0.2, 0.2, 1.01, 12), M('#e8c46a'), 0, 0.32, 0, 0, 0, Math.PI / 2)] },
-  roomba: { h: 0.45, w: 1.5, d: 1.5, kind: 'block', move: 3.5, parts: () => [P(GEO.cyl(0.75, 0.75, 0.3, 24), M('#2e2f36')), P(GEO.cyl(0.55, 0.55, 0.05, 24), M('#4a4b55'), 0, 0.3, 0), P(GEO.sphere(0.07), M('#3aff6a', 'basic'), 0, 0.36, 0.4)] },
+  roomba: { h: 0.45, w: 1.5, d: 1.5, kind: 'block', move: true, parts: () => [P(GEO.cyl(0.75, 0.75, 0.3, 24), M('#2e2f36')), P(GEO.cyl(0.55, 0.55, 0.05, 24), M('#4a4b55'), 0, 0.3, 0), P(GEO.sphere(0.07), M('#3aff6a', 'basic'), 0, 0.36, 0.4)] },
 };
 
 // ---------- themes ----------
@@ -844,7 +845,8 @@ class Race {
     let id = 0;
     const place = (type, x, s, wOverride) => {
       const def = OBS[type];
-      const o = { id: id++, type, s, x, h: def.h, w: wOverride || def.w, d: def.d, kind: def.kind, move: def.move || 0, ph: R() * 6.28 };
+      const o = { id: id++, type, s, x, h: def.h, w: wOverride || def.w, d: def.d, kind: def.kind, move: def.move ? 1 : 0, ph: R() * 6.28 };
+      if (o.move) o.dir = o.ph < 3.14 ? 1 : -1;   // half cross left→right, half right→left (no extra R(), so layouts stay the same)
       obs.push(o); return o;
     };
     let s = 75;
@@ -881,9 +883,12 @@ class Race {
       const def = OBS[o.type], h = tr.at(o.s).h;
       const p = tr.world(o.s, o.x, 0, new THREE.Vector3());
       if (o.move) {
-        const g = new THREE.Group();
-        def.parts().forEach(pt => { const m = new THREE.Mesh(pt.geo, pt.mat); m.applyMatrix4(pt.m); g.add(m); });
-        world.add(g); o.mesh = g; this.movers.push(o);
+        // outer group: position on the track + heading; spin group sits at the rolling centre, so the
+        // object turns around its own middle and always stays on top of the ground
+        const g = new THREE.Group(), spin = new THREE.Group(), roll = def.roll;
+        spin.position.y = roll ? roll.r : 0;
+        def.parts().forEach(pt => { const m = new THREE.Mesh(pt.geo, pt.mat); m.applyMatrix4(pt.m); if (roll) m.position.y -= roll.c; spin.add(m); });
+        g.add(spin); world.add(g); o.mesh = g; o.spin = spin; o.roll = roll ? roll.r : 0; this.movers.push(o);
         continue;
       }
       const b = (batches[o.type] ||= new Batch(def.parts()));
@@ -1093,7 +1098,14 @@ class Race {
 
   pickX(p) { return p.amp ? p.x0 + Math.sin(this.clock * this.cfg.goldSpeed + p.ph) * p.amp : p.x; }
 
-  obsX(o) { return o.move ? o.x + Math.sin(this.clock * 1.4 + o.ph) * o.move : o.x; }
+  // moving obstacles cross the whole width in one direction (o.dir) and come back in from the other side
+  moverEdge() { return W / 2 + this.OFF + 2; }
+  obsX(o) {
+    if (!o.move) return o.x;
+    const E = this.moverEdge(), span = 2 * E;
+    let u = (o.x + E + o.dir * this.clock * this.cfg.moverSpeed) % span; if (u < 0) u += span;
+    return u - E;
+  }
 
   firstObs(s) {
     const a = this.obs; let lo = 0, hi = a.length;
@@ -1360,8 +1372,12 @@ class Race {
       }
     }
     for (const o of this.movers) {
-      tr.world(o.s, this.obsX(o), 0, o.mesh.position);
-      o.mesh.rotation.z += dt * 3; o.mesh.rotation.y = tr.at(o.s).h;
+      const x = this.obsX(o), E = this.moverEdge();
+      tr.world(o.s, x, 0, o.mesh.position);
+      const h = tr.at(o.s).h;
+      if (o.roll) { o.mesh.rotation.y = h; o.spin.rotation.z = x / o.roll; }   // rolls without sliding, matching its direction
+      else o.mesh.rotation.y = h - o.dir * Math.PI / 2;                       // slides (robot vacuum), facing where it goes
+      o.mesh.scale.setScalar(Math.max(0.001, Math.min(1, (E - Math.abs(x)) / 1.5)));  // shrinks away at the far edge, grows back in
     }
     for (const p of this.pickups) if (!p.taken && Math.abs(p.s - pl.s) < 120) {
       if (p.ghost) { tr.world(p.s, p.x + Math.sin(this.clock * 1.7 + p.ph) * 0.4, 1.0, p.mesh.position); p.mesh.rotation.y = tr.at(p.s).h + Math.PI + Math.sin(this.clock * 2) * 0.5; p.mesh.position.y = 1.1 + Math.sin(this.clock * 3 + p.s) * 0.2; continue; }

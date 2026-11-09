@@ -35,6 +35,7 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 **Game design (current)**
 - Speeds are in km/h and converted by `pace`: cruise 30, faster +6 (stick up / ↑, drains 12%/s), sprint 44 (hold, drains 35%/s), cap 48, brake 10 (refills 1.5× faster). An empty bar means exhausted at 12 km/h until it is back to 35%.
 - Off-track: 6 m each side at 45% speed. Obstacles: `block` (jump if low enough, else steer), `wide` (jump-only), `move` (swings side to side). Pits were removed on purpose.
+- Moving obstacles (tumbleweed, cheese wheel, space probe, robot vacuum) cross the whole width in one direction (half left→right, half right→left), shrink away beyond the off-track strip and grow back in on the other side. Rolling ones turn around their own centre (`roll: { c, r }` in `OBS`), so they never sink into the ground. Speed: `moverSpeed` in `TUNING`.
 - Power-ups: fish in groups of ≥3 (+1, full stamina), golden fish single and moving (+3), catnip (bigger bar for a while), ghost (pass through obstacles and cats).
 - Every number is in the `TUNING` list in `game.js`, which also builds the Tuning lab sliders. To bake in Paolo's tuned values, change the `def` fields.
 - Rival cats: speed and dodge skill per difficulty, a gentle rubber band, and they steer towards the laser dot ahead of the leader.
@@ -46,6 +47,11 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### Live v4 (9 Nov 2026) · commit PENDING
+- Moving obstacles no longer sink into the ground: they roll around their own centre (the cheese wheel used to be half underground).
+- They now cross the track in one direction (left→right or right→left) instead of swinging back and forth. The space probe and robot vacuum glide facing where they go.
+- Tuning lab: new "Moving obstacles: speed across the track" (3.5 m/s).
 
 ### Live v3 (9 Nov 2026) · commit a3b35b5
 - Tuning lab button moved to Settings (now available in the live game).

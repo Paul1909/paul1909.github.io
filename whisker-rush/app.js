@@ -3,7 +3,7 @@
 const { buildCat, FURS, EYES, PATTERNS } = window.WRCat;
 const { Race, TRACKS, DIFFS, TUNING, DEFAULTS } = window.WRGame;
 const TEST_BUILD = false;  // true = test copy: shows the Tuning lab and the TEST badge, keeps its own saves
-const BUILD = 'v3';
+const BUILD = 'v4';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
