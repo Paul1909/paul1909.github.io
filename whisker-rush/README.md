@@ -47,7 +47,7 @@ Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
 
-### Live v2 (9 Nov 2026)
+### Live v2 (9 Nov 2026) · commit f779c11
 - Cat bumps play Luna's real hiss (`luna-hiss.mp3`) instead of the generated one.
 
 ### Live v1 (8 Nov 2026) · commit 79faff0
