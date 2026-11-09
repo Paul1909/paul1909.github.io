@@ -18,7 +18,7 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 
 **Where things are**
 - Repo `Paul1909/paul1909.github.io` (GitHub Pages, branch `main`). Live game: `whisker-rush/` → https://paul1909.github.io/whisker-rush/, listed in the arcade `index.html`.
-- **All changes go straight to live** in `whisker-rush/` (Paolo's decision, 9 Nov 2026: few users, simpler). No test folder; roll back with git if something breaks. To show the Tuning lab for a tuning session, temporarily set `TEST_BUILD = true` in `app.js` (note: it also switches saves to `whisker-rush-test:` keys).
+- **All changes go straight to live** in `whisker-rush/` (Paolo's decision, 9 Nov 2026: few users, simpler). No test folder; roll back with git if something breaks. The Tuning lab is reachable from Settings (since live v3). `TEST_BUILD` stays `false`.
 - Plain scripts, no build step: `three.min.js` (r160, global `THREE`) → `cat.js` (`window.WRCat`) → `game.js` (`window.WRGame`) → `app.js`. It also runs by double-clicking `index.html`.
 
 **Release routine (every change)**
@@ -46,6 +46,10 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### Live v3 (9 Nov 2026) · commit PENDING
+- Tuning lab button moved to Settings (now available in the live game).
+- Track tiles: Space Station black, Alpine Meadow green, House Chase pink.
 
 ### Live v2 (9 Nov 2026) · commit f779c11
 - Cat bumps play Luna's real hiss (`luna-hiss.mp3`) instead of the generated one.

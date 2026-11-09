@@ -73,6 +73,9 @@
   .t-city { background: linear-gradient(135deg, #5a3fc0, #1a1745); }
   .t-volcano { background: linear-gradient(135deg, #e2421c, #3a1010); }
   .t-ice { background: linear-gradient(135deg, #9ad8ff, #3a7bbd); }
+  .t-space { background: linear-gradient(135deg, #2c2c3c, #050508); }
+  .t-mountains { background: linear-gradient(135deg, #7fd36b, #2f7d3a); }
+  .t-house { background: linear-gradient(135deg, #ff9fd0, #d13d8c); }
   .toggle { display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 6px 4px; border-bottom: 1px solid var(--line); font-weight: 700; }
   .toggle .seg { width: 170px; }
   input[type=range] { width: 170px; accent-color: var(--accent); }
@@ -198,7 +201,7 @@
       <button class="btn" id="goCustom">🐾 My cat</button>
       <button class="btn" id="goSettings">⚙️ Settings</button>
     </div>
-    <div class="row"><button class="btn" id="goBoard">🏆 Leaderboard</button><button class="btn" id="goTune">🛠 Tuning lab</button></div>
+    <button class="btn" id="goBoard">🏆 Leaderboard</button>
     <p class="hint" style="margin-top:14px">Tap your cat for some love. 🐟 = 1 point, ✨ golden fish that swim side to side = 3 points. Tap the screen to <b>jump</b>. Press and hold to <b>sprint</b>. Steer with the joystick or by tilting your phone. Grab 🐟 to refill your stamina and 🌿 catnip for a bigger stamina bar. Sprint until empty and your cat gets exhausted and slow.</p>
   </div>
 </section>
@@ -253,6 +256,7 @@
     <div class="toggle"><span>Music volume</span><input type="range" id="setVol" min="0" max="100" step="5"></div>
     <div class="toggle"><span>Vibration</span><div class="seg" id="setVibe"><button data-v="false">Off</button><button data-v="true">On</button></div></div>
     <p class="hint">Tilt steering re-centres itself at the start of every race, so hold the phone the way you like before the countdown ends.</p>
+    <button class="btn" id="goTune">🛠 Tuning lab</button>
     <button class="btn" id="resetBest">Clear leaderboard</button>
   </div>
 </section>
