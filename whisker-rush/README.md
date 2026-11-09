@@ -18,11 +18,11 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 
 **Where things are**
 - Repo `Paul1909/paul1909.github.io` (GitHub Pages, branch `main`). Live game: `whisker-rush/` → https://paul1909.github.io/whisker-rush/, listed in the arcade `index.html`.
-- For a new test round: copy this folder to `test/whisker-rush/` and there set `TEST_BUILD = true` (shows the Tuning lab and the TEST badge, uses its own `whisker-rush-test:` saves), `APP = 'whisker-rush-test'` in `sw.js`, and names "Whisker Rush (test)" / "WR Test" in the manifest and `<title>`. Once Paolo approves, copy it back with the live values and empty `test/` again.
+- **All changes go straight to live** in `whisker-rush/` (Paolo's decision, 9 Nov 2026: few users, simpler). No test folder; roll back with git if something breaks. To show the Tuning lab for a tuning session, temporarily set `TEST_BUILD = true` in `app.js` (note: it also switches saves to `whisker-rush-test:` keys).
 - Plain scripts, no build step: `three.min.js` (r160, global `THREE`) → `cat.js` (`window.WRCat`) → `game.js` (`window.WRGame`) → `app.js`. It also runs by double-clicking `index.html`.
 
 **Release routine (every change)**
-1. Bump `VERSION` in `sw.js` (`whisker-rush-vN` live, `whisker-rush-test-vN` in test) and `BUILD` in `app.js`.
+1. Bump `VERSION` in `sw.js` (`whisker-rush-vN`) and `BUILD` in `app.js`.
 2. Every file in the folder (except `sw.js` and `README.md`) must be listed in `sw.js` `FILES`, or it will be missing offline.
 3. Add a `### vN` entry below, push, then write the commit ID into it.
 4. Roll back: `git checkout <commit> -- whisker-rush`, commit, push.
@@ -30,7 +30,7 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 **Rules that matter**
 - Several games share the `paul1909.github.io` origin, so `localStorage` keys are prefixed `whisker-rush:` (test: `whisker-rush-test:`) and the service worker only deletes its own caches (`APP + '-v'`).
 - Relative paths only, no CDN or remote files, and fullscreen comes from the manifest.
-- Paolo tests on Android (landscape). He wants to try each round on the test URL before anything goes live.
+- Paolo tests on Android (landscape), directly on the live URL.
 
 **Game design (current)**
 - Speeds are in km/h and converted by `pace`: cruise 30, faster +6 (stick up / ↑, drains 12%/s), sprint 44 (hold, drains 35%/s), cap 48, brake 10 (refills 1.5× faster). An empty bar means exhausted at 12 km/h until it is back to 35%.
