@@ -49,7 +49,7 @@ Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
 
-### Live v5 (9 Nov 2026) · commit PENDING
+### Live v5 (9 Nov 2026) · commit b997abe
 - Hitting an obstacle plays one of Cupi's two real annoyed meows (random) instead of the generated angry meow.
 
 ### Live v4 (9 Nov 2026) · commit 026588e
