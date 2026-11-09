@@ -3,7 +3,7 @@
 const { buildCat, FURS, EYES, PATTERNS } = window.WRCat;
 const { Race, TRACKS, DIFFS, TUNING, DEFAULTS } = window.WRGame;
 const TEST_BUILD = false;  // true = test copy: shows the Tuning lab and the TEST badge, keeps its own saves
-const BUILD = 'v4';
+const BUILD = 'v5';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -207,6 +207,15 @@ const audio = {
     const a = (this.hissClip ||= new Audio('luna-hiss.mp3'));
     a.currentTime = 0; a.volume = 1;
     a.play().catch(() => this.hiss());
+  },
+  // Cupi's real annoyed meows when the cat runs into an obstacle: one or the other at random
+  // (falls back to the generated angry meow if the clip can't play)
+  cupiMeow() {
+    if (!settings.sound || settings.muted) return;
+    const clips = (this.meowClips ||= ['cupi-miao-1.mp3', 'cupi-miao-2.mp3'].map(f => new Audio(f)));
+    const a = clips[(Math.random() * clips.length) | 0];
+    a.currentTime = 0; a.volume = 1;
+    a.play().catch(() => this.angryMeow());
   },
   hiss() {
     if (!this.ctx || !settings.sound) return;
@@ -548,6 +557,7 @@ function startRace(trackId, diffId) {
   $('#pause').classList.remove('active');
   music.hold();
   if (!audio.hissClip) { audio.hissClip = new Audio('luna-hiss.mp3'); audio.hissClip.preload = 'auto'; }
+  if (!audio.meowClips) { audio.meowClips = ['cupi-miao-1.mp3', 'cupi-miao-2.mp3'].map(f => { const a = new Audio(f); a.preload = 'auto'; return a; }); }
   setTimeout(() => {
     if (race) { race.dispose(); race = null; }
     race = new Race(renderer, { track: trackId, diff: diffId, player: { ...cat }, tuning, view: settings.view, onEvent });
@@ -592,7 +602,7 @@ function onEvent(type, a, b) {
   else if (type === 'land') audio.land();
   else if (type === 'hit') {
     center(['Mrraow!', 'Ouch!', 'Hey!', 'Grrr!'][(Math.random() * 4) | 0], 'msg', 800);
-    flash(''); audio.hit(); audio.angryMeow(); vibe([60, 40, 60]);
+    flash(''); audio.hit(); audio.cupiMeow(); vibe([60, 40, 60]);
   }
   else if (type === 'bump') { center(`Hiss! 😾 ${escapeHtml(a)}`, 'msg', 800); flash('bump'); audio.lunaHiss(); vibe(40); }
   else if (type === 'fish') {

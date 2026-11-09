@@ -8,6 +8,7 @@ First-person 3D cat racing for phones, part of Paolo's Arcade: https://paul1909.
 - `cat.js` – cat model · `game.js` – tracks, obstacles, power-ups, bots, camera, and the `TUNING` list of mechanics with their defaults
 - `app.js` – menus, Tuning lab, sound, touch/tilt/keyboard input, main loop
 - `luna-purr.mp3`, `luna-auuu.mp3`: Luna's voice when you pet the cat; `luna-hiss.mp3`: when cats bump in a race
+- `cupi-miao-1.mp3`, `cupi-miao-2.mp3`: Cupi's annoyed meows when the cat hits an obstacle (one at random; mono 96 kbps, -17 LUFS)
 - `music-menu.mp3` (Catnip Quest) and `music-race.mp3` (Paws Forward): 128 kbps, loudness-matched
 - `sw.js` – offline cache · `manifest.webmanifest` – install + fullscreen
 
@@ -47,6 +48,9 @@ Left thumb stick: steer, up = faster, down = brake. Right thumb: tap = jump, hol
 Live release 1 = test build v3. Test history (folder was `test/whisker-rush/`):
 
 Each version is one commit in the repo; the commit ID next to each version is what to restore for a rollback.
+
+### Live v5 (9 Nov 2026) · commit PENDING
+- Hitting an obstacle plays one of Cupi's two real annoyed meows (random) instead of the generated angry meow.
 
 ### Live v4 (9 Nov 2026) · commit 026588e
 - Moving obstacles no longer sink into the ground: they roll around their own centre (the cheese wheel used to be half underground).

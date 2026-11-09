@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'whisker-rush';
-const VERSION = APP + '-v4';
+const VERSION = APP + '-v5';
 const FILES = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const FILES = [
   './luna-purr.mp3',
   './luna-auuu.mp3',
   './luna-hiss.mp3',
+  './cupi-miao-1.mp3',
+  './cupi-miao-2.mp3',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',
