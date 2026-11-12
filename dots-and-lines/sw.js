@@ -1,46 +1,48 @@
-// Dots and Lines – service worker
-// Network first (so updates you upload show up automatically),
-// falling back to the cached copy when the phone is offline.
-const CACHE = 'dots-and-lines-v4';
-const ASSETS = [
+// Offline cache. Change VERSION whenever any file changes, so installed copies update.
+const APP = 'dots-and-lines';
+const VERSION = APP + '-v5';
+const FILES = [
   './',
   './index.html',
   './game.js',
+  './bot.js',
   './manifest.webmanifest',
   './favicon.svg',
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
-  './apple-touch-icon.png'
+  './apple-touch-icon.png',
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
-  self.skipWaiting();
+self.addEventListener('install', e => {
+  // cache: 'reload' skips the browser's HTTP cache, so a fresh install gets the new files.
+  e.waitUntil(
+    caches.open(VERSION)
+      .then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener('activate', e => {
+  // Delete only this app's old caches; the other games on this origin keep theirs.
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter(k => k.startsWith('dots-and-lines-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(APP + '-') && k !== VERSION).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', (e) => {
+// Network first, so updates arrive when online; cache as fallback, so it works offline.
+self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
+    fetch(req, { cache: 'no-cache' })
+      .then(res => {
+        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); }
         return res;
       })
-      .catch(() =>
-        caches.open(CACHE).then(c => c.match(req, { ignoreSearch: true }).then(hit => hit || c.match('./index.html')))
-      )
+      .catch(() => caches.match(req, { ignoreSearch: true, cacheName: VERSION })
+        .then(hit => hit || caches.match('./index.html', { cacheName: VERSION })))
   );
 });

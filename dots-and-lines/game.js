@@ -13,11 +13,20 @@ const COLORS = { 1: '#00d2ff', 2: '#ff2e63', dot: '#f2f2ff' };
    ============================================================= */
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+// Every game in the arcade shares one localStorage, so keys carry the app's prefix.
+const APP = 'dots-and-lines';
 const store = {
-  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
-  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  get(k) { try { return localStorage.getItem(APP + ':' + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(APP + ':' + k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(APP + ':' + k); } catch (e) {} }
 };
+// one-time move of the old unprefixed keys (dl-lang, dl-muted, dl-save)
+try {
+  [['dl-lang', 'lang'], ['dl-muted', 'muted'], ['dl-save', 'save']].forEach(([o, n]) => {
+    const v = localStorage.getItem(o);
+    if (v !== null) { if (store.get(n) === null) store.set(n, v); localStorage.removeItem(o); }
+  });
+} catch (e) {}
 const grid = (r, c) => Array.from({ length: r }, () => Array(c).fill(0));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
@@ -34,8 +43,6 @@ const ICONS = {
   home:   ICON('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'),
   sound:  ICON('<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>'),
   mute:   ICON('<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/>'),
-  fsOn:   ICON('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
-  fsOff:  ICON('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>'),
   undo:   ICON('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
   newG:   ICON('<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>')
 };
@@ -56,7 +63,14 @@ const I18N = {
     undo: 'Annulla', newGame: 'Nuova', sure: 'Sicuro?',
     again: 'Gioca ancora', menu: 'Menu',
     winP1: '🏆 Vince il Giocatore 1!', winP2: '🏆 Vince il Giocatore 2!', draw: '🤝 Pareggio!',
-    sound: 'Audio', fullscreen: 'Schermo intero'
+    youWin: '🏆 Hai vinto!', botWins: '🤖 Vince il bot', you: 'Tu', bot: 'Bot',
+    modeBot: 'Contro il bot', mode2p: '2 giocatori', starts: 'Inizia',
+    lv1: 'Facile', lv2: 'Medio', lv3: 'Difficile', lv4: 'Esperto',
+    note1: 'Si distrae spesso e regala quadrati.',
+    note2: 'Non perde un quadrato, ma non ha strategia.',
+    note3: 'Gioca il finale alla perfezione.',
+    note4: 'Pianifica le catene fin dall’inizio.',
+    sound: 'Audio'
   },
   en: {
     title: 'Dots and Lines',
@@ -70,10 +84,17 @@ const I18N = {
     undo: 'Undo', newGame: 'New game', sure: 'Sure?',
     again: 'Play again', menu: 'Menu',
     winP1: '🏆 Player 1 wins!', winP2: '🏆 Player 2 wins!', draw: '🤝 It\'s a draw!',
-    sound: 'Sound', fullscreen: 'Fullscreen'
+    youWin: '🏆 You win!', botWins: '🤖 The bot wins', you: 'You', bot: 'Bot',
+    modeBot: 'Vs bot', mode2p: '2 players', starts: 'First move',
+    lv1: 'Easy', lv2: 'Medium', lv3: 'Hard', lv4: 'Expert',
+    note1: 'Easily distracted, gives boxes away.',
+    note2: 'Never misses a box, but has no plan.',
+    note3: 'Plays the endgame perfectly.',
+    note4: 'Plans the chains from the opening on.',
+    sound: 'Sound'
   }
 };
-let lang = store.get('dl-lang') || ((navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en');
+let lang = store.get('lang') || ((navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en');
 const t = (k) => I18N[lang][k];
 
 /* =============================================================
@@ -81,7 +102,7 @@ const t = (k) => I18N[lang][k];
    ============================================================= */
 const Sound = (() => {
   let ac = null, out = null;
-  let muted = store.get('dl-muted') === '1';
+  let muted = store.get('muted') === '1';
   const SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.51, 1567.98, 1760.0];
 
   function ctx() {
@@ -133,7 +154,7 @@ const Sound = (() => {
 
   return {
     get muted() { return muted; },
-    toggle() { muted = !muted; store.set('dl-muted', muted ? '1' : '0'); if (!muted) this.ui(); return muted; },
+    toggle() { muted = !muted; store.set('muted', muted ? '1' : '0'); if (!muted) this.ui(); return muted; },
     unlock() { if (!muted) ctx(); },
     // soft tick while dragging over a new line
     tick() { tone(2200, { dur: 0.03, vol: 0.035 }); },
@@ -179,8 +200,19 @@ const state = {
   player: 1,
   scores: { 1: 0, 2: 0 },
   over: false,
-  streak: 0
+  streak: 0,
+  mode: '2p',                  // '2p' | 'bot' (bot always plays as player 2)
+  level: 3,                    // 1..4
+  first: 1                     // who opens the game
 };
+// choices on the start screen, remembered between visits
+const settings = {
+  mode: store.get('mode') === '2p' ? '2p' : 'bot',
+  level: clamp(parseInt(store.get('level'), 10) || 2, 1, 4),
+  first: store.get('first') === '2' ? 2 : 1
+};
+const LEVEL_COLORS = { 1: '#7CF29A', 2: '#ffd166', 3: '#ff9f43', 4: '#ff2e63' };
+const botTurn = () => state.mode === 'bot' && !state.over && state.player === 2;
 const anim = { lines: new Map(), boxes: new Map() };   // key -> start time
 const lineKey = (m) => `${m.type}${m.r},${m.c}`;
 
@@ -189,7 +221,7 @@ function resetState() {
   state.v = grid(ROWS - 1, COLS);
   state.boxes = grid(ROWS - 1, COLS - 1);
   state.history = [];
-  state.player = 1;
+  state.player = state.first;
   state.scores = { 1: 0, 2: 0 };
   state.over = false;
   state.streak = 0;
@@ -247,10 +279,29 @@ function playMove(m) {
   updateHUD();
   requestDraw();
   if (state.over) setTimeout(() => showResult(true), 550);
+  else maybeBotTurn();
 }
 
+function canUndo() {
+  if (state.mode !== 'bot') return state.history.length > 0;
+  return state.history.some((m) => m.player === 1);
+}
 function undo() {
-  if (!state.history.length) return;
+  if (!canUndo()) return;
+  cancelBot();
+  if (state.mode === 'bot') {
+    while (state.history.length && state.history[state.history.length - 1].player === 2) undoOne();
+  }
+  undoOne();
+  hideResult();
+  Sound.undo();
+  vibrate(15);
+  save();
+  updateHUD();
+  requestDraw();
+  maybeBotTurn();
+}
+function undoOne() {
   const last = state.history.pop();
   (last.type === 'h' ? state.h : state.v)[last.r][last.c] = 0;
   last.closed.forEach(([r, c]) => {
@@ -262,37 +313,42 @@ function undo() {
   state.player = last.player;
   state.over = false;
   state.streak = 0;
-  hideResult();
-  Sound.undo();
-  vibrate(15);
-  save();
-  updateHUD();
-  requestDraw();
 }
 
-function newGame(withSound = true) {
+function newGame(withSound = true, fresh = false) {
+  cancelBot();
+  if (fresh) { state.mode = settings.mode; state.level = settings.level; state.first = settings.mode === 'bot' ? settings.first : 1; }
   resetState();
   disarmNew();
   hideResult();
-  store.del('dl-save');
+  store.del('save');
   if (withSound) Sound.newGame();
   updateHUD();
   requestDraw();
+  maybeBotTurn();
 }
 
 /* ---------- autosave: survives closing the app ---------- */
 function save() {
-  if (!state.history.length || state.over) { store.del('dl-save'); return; }
-  store.set('dl-save', JSON.stringify(state.history.map((m) => [m.type, m.r, m.c])));
+  if (!state.history.length || state.over) { store.del('save'); return; }
+  store.set('save', JSON.stringify({
+    mode: state.mode, level: state.level, first: state.first,
+    moves: state.history.map((m) => [m.type, m.r, m.c])
+  }));
 }
 function restore() {
+  let data;
+  try { data = JSON.parse(store.get('save') || '[]'); } catch (e) { data = []; }
+  if (Array.isArray(data)) data = { mode: '2p', level: settings.level, first: 1, moves: data };   // old format
+  state.mode = data.mode === 'bot' ? 'bot' : '2p';
+  state.level = clamp(parseInt(data.level, 10) || 2, 1, 4);
+  state.first = data.first === 2 ? 2 : 1;
   resetState();
-  let moves;
-  try { moves = JSON.parse(store.get('dl-save') || '[]'); } catch (e) { moves = []; }
+  const moves = Array.isArray(data.moves) ? data.moves : [];
   for (const [type, r, c] of moves) {
     const ok = (type === 'h' || type === 'v') && Number.isInteger(r) && Number.isInteger(c) &&
       r >= 0 && c >= 0 && r < (type === 'h' ? ROWS : ROWS - 1) && c < (type === 'h' ? COLS - 1 : COLS);
-    if (!ok || applyMove({ type, r, c }) === null) { resetState(); store.del('dl-save'); return; }
+    if (!ok || applyMove({ type, r, c }) === null) { resetState(); store.del('save'); return; }
   }
 }
 const gameInProgress = () => state.history.length > 0 && !state.over;
@@ -484,7 +540,7 @@ function setPreview(m) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (state.over || drag) return;
+  if (state.over || drag || botTurn()) return;
   Sound.unlock();
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   const p = localPoint(e);
@@ -506,7 +562,7 @@ function endPointer(e, commit) {
   drag = null;
   const m = preview;
   preview = null;
-  if (commit && m) playMove(m);
+  if (commit && m && !botTurn()) playMove(m);
   requestDraw();
 }
 canvas.addEventListener('pointerup', (e) => endPointer(e, true));
@@ -521,7 +577,14 @@ function updateHUD() {
   $('#score-2').textContent = state.scores[2];
   $('#panel-1').classList.toggle('active', !state.over && state.player === 1);
   $('#panel-2').classList.toggle('active', !state.over && state.player === 2);
-  $('#btn-undo').disabled = state.history.length === 0;
+  $('#btn-undo').disabled = !canUndo();
+  if (state.mode === 'bot') {
+    $('#label-1').textContent = t('you');
+    $('#label-2').textContent = `${t('bot')} · ${t('lv' + state.level)}`;
+  } else {
+    $('#label-1').textContent = t('p1');
+    $('#label-2').textContent = t('p2');
+  }
 }
 
 function bumpScore(p) {
@@ -535,7 +598,8 @@ function showResult(withSound) {
   const a = state.scores[1], b = state.scores[2];
   const winner = a > b ? 1 : b > a ? 2 : 0;
   const card = $('#result-card');
-  $('#result-title').textContent = winner === 1 ? t('winP1') : winner === 2 ? t('winP2') : t('draw');
+  const bot = state.mode === 'bot';
+  $('#result-title').textContent = winner === 1 ? t(bot ? 'youWin' : 'winP1') : winner === 2 ? t(bot ? 'botWins' : 'winP2') : t('draw');
   card.style.color = winner ? COLORS[winner] : '#ffffff';
   $('#result-score').textContent = `${a}  –  ${b}`;
   $('#result').hidden = false;
@@ -570,11 +634,14 @@ function showGameScreen() {
   if (!history.state || history.state.screen !== 'game') history.pushState({ screen: 'game' }, '');
   layout();
   if (state.over) showResult(false); else hideResult();
+  updateHUD();
   keepAwake(true);
+  maybeBotTurn();
 }
 function showStartScreen() {
   $('#game').hidden = true;
   $('#start').hidden = false;
+  cancelBot();
   disarmNew();
   updateMenu();
   keepAwake(false);
@@ -595,14 +662,13 @@ function updateMenu() {
 
 $('#btn-play').addEventListener('click', () => {
   Sound.unlock();
-  autoFullscreen();
-  newGame(true);
+  $('#game').hidden = false;          // so the bot's first move isn't blocked by the hidden check
+  newGame(true, true);
   showGameScreen();
 });
 $('#btn-continue').addEventListener('click', () => {
   Sound.unlock();
   Sound.ui();
-  autoFullscreen();
   showGameScreen();
 });
 $('#btn-home').addEventListener('click', goToMenu);
@@ -617,12 +683,14 @@ function applyLanguage() {
   $$('[data-i18n-label]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nLabel)));
   $('#btn-lang').textContent = lang === 'it' ? 'IT · en' : 'EN · it';
   updateMenu();
+  paintSetup();
+  updateHUD();
   disarmNew();
   if (!$('#result').hidden) showResult(false);
 }
 $('#btn-lang').addEventListener('click', () => {
   lang = lang === 'it' ? 'en' : 'it';
-  store.set('dl-lang', lang);
+  store.set('lang', lang);
   Sound.ui();
   applyLanguage();
 });
@@ -637,47 +705,82 @@ function paintSoundButtons() {
 $$('.js-sound').forEach((b) => b.addEventListener('click', () => { Sound.toggle(); paintSoundButtons(); }));
 
 /* =============================================================
-   FULLSCREEN
+   COMPUTER OPPONENT – runs in a worker so the board keeps animating
    ============================================================= */
-const fsSupported = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
-const isInstalled = () =>
-  matchMedia('(display-mode: fullscreen)').matches ||
-  matchMedia('(display-mode: standalone)').matches ||
-  window.navigator.standalone === true;
-const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+let worker = null, botToken = 0, botBusy = false;
+try {
+  worker = new Worker('bot.js');
+  worker.onerror = () => { worker = null; };
+} catch (e) { worker = null; }
 
-function enterFullscreen() {
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!req) return;
-  try {
-    Promise.resolve(req.call(el, { navigationUI: 'hide' }))
-      .then(() => { try { screen.orientation.lock('portrait').catch(() => {}); } catch (e) {} })
-      .catch(() => {});
-  } catch (e) {}
-}
-function exitFullscreen() {
-  const fn = document.exitFullscreen || document.webkitExitFullscreen;
-  if (!fn) return;
-  try { const r = fn.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {}
-}
-// On a phone browser (not the installed app) jump to fullscreen when a game starts
-function autoFullscreen() {
-  if (fsSupported && !isInstalled() && !isFullscreen() && matchMedia('(pointer: coarse)').matches) enterFullscreen();
-}
-function paintFsButtons() {
-  const show = fsSupported && !isInstalled();
-  $$('.js-fs').forEach((b) => {
-    b.hidden = !show;
-    b.innerHTML = isFullscreen() ? ICONS.fsOff : ICONS.fsOn;
+function askBot(h, v, level) {
+  return new Promise((resolve) => {
+    const fallback = () => {
+      try { resolve(window.DotsBot ? window.DotsBot.choose(h, v, level) : null); } catch (e) { resolve(null); }
+    };
+    if (!worker) { setTimeout(fallback, 0); return; }
+    const w = worker, id = Math.random();
+    let done = false;
+    const finish = (move) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      w.removeEventListener('message', onMsg);
+      if (move === undefined) fallback(); else resolve(move);
+    };
+    const onMsg = (ev) => { if (ev.data && ev.data.id === id) finish(ev.data.move); };
+    // if the worker dies or hangs, think on the page instead
+    const timer = setTimeout(() => { worker = null; finish(undefined); }, 6000);
+    w.addEventListener('message', onMsg);
+    try { w.postMessage({ id, h, v, level }); } catch (e) { finish(undefined); }
   });
 }
-$$('.js-fs').forEach((b) => b.addEventListener('click', () => {
-  Sound.ui();
-  isFullscreen() ? exitFullscreen() : enterFullscreen();
-}));
-document.addEventListener('fullscreenchange', paintFsButtons);
-document.addEventListener('webkitfullscreenchange', paintFsButtons);
+
+function cancelBot() {
+  botToken++;
+  botBusy = false;
+  showThinking(false);
+}
+function showThinking(on) { const el = $('#think'); if (el) el.hidden = !on; }
+
+async function maybeBotTurn() {
+  if (botBusy || !botTurn() || $('#game').hidden) return;
+  botBusy = true;
+  const token = ++botToken;
+  const started = performance.now();
+  // a short pause before the turn starts, quicker steps while it eats a chain
+  const pause = state.streak > 0 ? 330 : 520;
+  showThinking(true);
+  const m = await askBot(state.h.map((r) => r.slice()), state.v.map((r) => r.slice()), state.level);
+  const wait = Math.max(0, pause - (performance.now() - started));
+  if (wait) await new Promise((r) => setTimeout(r, wait));
+  if (token !== botToken) return;            // undo / new game / menu happened meanwhile
+  botBusy = false;
+  showThinking(false);
+  if (!m || !botTurn() || $('#game').hidden || isSet(m)) return;
+  playMove(m);
+}
+
+/* ---------- start-screen pickers ---------- */
+function paintSetup() {
+  $$('#seg-mode button').forEach((b) => b.classList.toggle('on', b.dataset.mode === settings.mode));
+  $$('#seg-level button').forEach((b) => b.classList.toggle('on', +b.dataset.level === settings.level));
+  $$('#seg-first button').forEach((b) => b.classList.toggle('on', +b.dataset.first === settings.first));
+  $('#seg-level').style.setProperty('--lvl', LEVEL_COLORS[settings.level]);
+  $('#bot-opts').hidden = settings.mode !== 'bot';
+  $('#level-note').textContent = t('note' + settings.level);
+}
+function bindSeg(sel, attr, keyName, parse) {
+  $$(sel + ' button').forEach((b) => b.addEventListener('click', () => {
+    settings[keyName] = parse(b.dataset[attr]);
+    store.set(keyName, String(settings[keyName]));
+    Sound.unlock(); Sound.ui();
+    paintSetup();
+  }));
+}
+bindSeg('#seg-mode', 'mode', 'mode', (x) => x);
+bindSeg('#seg-level', 'level', 'level', (x) => +x);
+bindSeg('#seg-first', 'first', 'first', (x) => +x);
 
 /* ---------- keep the screen on while playing ---------- */
 let wakeLock = null, wantAwake = false;
@@ -706,7 +809,7 @@ $('.ic-new').outerHTML = ICONS.newG;
 restore();
 applyLanguage();
 paintSoundButtons();
-paintFsButtons();
+paintSetup();
 updateHUD();
 new ResizeObserver(layout).observe($('#board-wrap'));
 window.addEventListener('orientationchange', () => setTimeout(layout, 200));
