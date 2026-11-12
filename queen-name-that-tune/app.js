@@ -135,7 +135,7 @@ function paintHome() {
     const best = bestOf(id);
     return `<button class="lvl" data-level="${id}" style="--c:${LEVEL_UI[id][1]}">
       <span class="crowns">${LEVEL_UI[id][0]}</span>
-      <span><span class="a">${esc(L.answer)}</span><span class="b">${esc(L.blurb)}</span></span>
+      <span class="a">${esc(L.answer)}</span>
       <span class="lv">${esc(L.name)}${best ? `<small>best ${best}</small>` : ''}</span>
     </button>`;
   }).join('');
