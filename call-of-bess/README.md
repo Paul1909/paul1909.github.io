@@ -11,7 +11,7 @@ Built with Claude Fable 5.2. Based on the game Saltline: same weapons and moveme
 
 ## Updating
 
-Do not edit `game.js` by hand: it is generated. Change the sources, run `node join.js` in the source folder,
-then upload the regenerated files from `upload/call-of-bess/` over the ones here.
+Do not edit `game.js` by hand: it is generated. Change the sources, run `node join.js --web <this folder>` in the
+source folder, and push the regenerated files.
 
 Desktop browser with mouse and keyboard recommended. Needs an internet connection for the fonts only.
