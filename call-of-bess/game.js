@@ -5234,16 +5234,12 @@ function bessPcs(n, e = {}) {
   t.box(green, 1.15, 0.06, 1.35, tx, 1.7, 0, { r: 0 });
   for (let s of [-1, 1]) for (let k = 0; k < 9; k++) t.box(green, 0.025, 1.1, 0.24, tx - 0.44 + k * 0.11, 0.95, s * 0.74, { r: 0 });
   for (let k = 0; k < 8; k++) t.box(green, 0.2, 1.1, 0.025, tx + 0.62, 0.95, -0.5 + k * 0.143, { r: 0 });
+  // three slim porcelain bushings with bare terminal studs (the MV cables come up from the trench, not over the top)
+  let porc = t.M("paint_red", { color: 7023138 });
   for (let k = -1; k <= 1; k++) {
-    t.cyl(dark, 0.05, 0.08, 0.3, tx + k * 0.3, 1.88, -0.25, { seg: 8 });
-    t.cyl(galv, 0.03, 0.03, 0.12, tx + k * 0.3, 2.06, -0.25, { seg: 6 });
+    bessInsulator(t, porc, galv, [tx + k * 0.3, 1.73, -0.25], [tx + k * 0.3, 1.98, -0.25], 0.035, 4, 1.9);
+    t.cyl(galv, 0.014, 0.014, 0.07, tx + k * 0.3, 2.02, -0.25, { seg: 6 });
   }
-  t.tube(t.M("rubber"), [
-    [tx - 0.3, 1.8, 0.3],
-    [tx - 0.5, 2.05, 0.3],
-    [ix + 0.6, 2.36, 0.3],
-    [ix + 0.3, 2.3, 0.3],
-  ], 0.05, { seg: 6 });
   return $i(t.group(), "bess_pcs", Yi.bess_pcs.slice(0, 3), [
     { min: [-1.6, 0, -1.15], max: [1.6, 0.2, 1.15], surface: "concrete" },
     { min: [-1.52, 0.2, -1], max: [0.08, 2.3, 1], surface: "metal" },
@@ -6270,12 +6266,18 @@ function a1(n, e, t, i, s = "x-", o = 3.2) {
   (n.cyl("steel_galv", 0.045, o, e, o / 2, t, { seg: 8 }), n.box("steel_dark", 0.3, 0.02, 0.3, e, 0.01, t));
   let a = 1.1,
     l = 0.62,
-    c = 0.03;
-  n.box("paint_yellow", r ? c : a, l, r ? a : c, e, o - l / 2 - 0.05, t, { bevel: 0.01 });
-  let u = s[1] === "+" ? 1 : -1,
-    f = r ? e + u * (c / 2 + 0.003) : e,
-    h = r ? t : t + u * (c / 2 + 0.003);
-  (n.label(i, 0.4, f, o - l / 2 - 0.05, h, s, { color: "black", font: "stencil", distress: 0.35 }),
+    c = 0.03,
+    u = s[1] === "+" ? 1 : -1,
+    // the board hangs in front of the pole (on the side it faces), clear of it, on two clamp brackets
+    g = 0.045 + 0.05 + c / 2,
+    bx = r ? e + u * g : e,
+    bz = r ? t : t + u * g,
+    by = o - l / 2 - 0.05;
+  n.box("paint_yellow", r ? c : a, l, r ? a : c, bx, by, bz, { bevel: 0.01 });
+  for (let k of [-0.2, 0.2]) n.box("steel_galv", r ? g : 0.05, 0.05, r ? 0.05 : g, r ? e + (u * g) / 2 : e, by + k, r ? t : t + (u * g) / 2);
+  let f = r ? bx + u * (c / 2 + 0.003) : bx,
+    h = r ? bz : bz + u * (c / 2 + 0.003);
+  (n.label(i, 0.4, f, by, h, s, { color: "black", font: "stencil", distress: 0.35 }),
     n.col(e - 0.06, 0, t - 0.06, e + 0.06, o, t + 0.06, "metal", { noNav: !0 }));
 }
 function Sv(n, e, t, i = 2, s = !0, o = 0.02) {
@@ -6615,6 +6617,197 @@ function bessImageTexture(src) {
   img.src = src;
   return tex;
 }
+// indicative site plan for the office wall, drawn from the BESS layout (north up, east right)
+function bessSiteMapTexture() {
+  let B = BESS,
+    W = 1200,
+    H = 800,
+    cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  let g = cv.getContext("2d"),
+    X0 = -40,
+    Z0 = -32,
+    sc = 9.6,
+    ox = 34,
+    oy = 118,
+    px = (x) => ox + (x - X0) * sc,
+    pz = (z) => oy + (z - Z0) * sc,
+    rect = (x0, z0, x1, z1, fill, stroke, lw = 2) => {
+      let a = px(Math.min(x0, x1)), b = pz(Math.min(z0, z1)), w = Math.abs(x1 - x0) * sc, h = Math.abs(z1 - z0) * sc;
+      fill && ((g.fillStyle = fill), g.fillRect(a, b, w, h));
+      stroke && ((g.strokeStyle = stroke), (g.lineWidth = lw), g.strokeRect(a, b, w, h));
+    },
+    box = (x, z, sx, sz, fill, stroke, lw) => rect(x - sx / 2, z - sz / 2, x + sx / 2, z + sz / 2, fill, stroke, lw),
+    text = (t, x, y, size = 18, color = "#1d2226", align = "center", weight = "bold") => {
+      g.font = weight + " " + size + "px Arial, Helvetica, sans-serif";
+      g.fillStyle = color;
+      g.textAlign = align;
+      g.textBaseline = "middle";
+      g.fillText(t, x, y);
+    },
+    pin = (x, z, n, col = "#c62828") => {
+      g.beginPath();
+      g.arc(px(x), pz(z), 15, 0, Math.PI * 2);
+      g.fillStyle = col;
+      g.fill();
+      g.lineWidth = 3;
+      g.strokeStyle = "#fff";
+      g.stroke();
+      text(String(n), px(x), pz(z) + 1, 18, "#fff");
+    };
+  // paper and title block
+  g.fillStyle = "#f5f3ec";
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = "#1d2226";
+  g.lineWidth = 6;
+  g.strokeRect(10, 10, W - 20, H - 20);
+  g.fillStyle = "#1f4e79";
+  g.fillRect(10, 10, W - 20, 82);
+  text("LAGEPLAN  BESS NORDFELD", 40, 52, 46, "#fff", "left");
+  text("\u00dcbersicht \u00b7 unma\u00dfst\u00e4blich", W - 40, 52, 22, "#d5e3f0", "right", "normal");
+  // site ground, roads, fence
+  rect(B.FX0, B.FZ0, B.FX1, B.FZ1, "#e4e8d8");
+  rect(B.ROAD.x0, B.FZ0 + 1, B.ROAD.x1, B.FZ1, "#c7c9c6");
+  rect(B.GATE.x0, B.FZ1, B.GATE.x1, B.OUT_ROAD.z0, "#c7c9c6");
+  rect(X0, B.OUT_ROAD.z0, B.FX1 + 2, Z0 + 66, "#b9bbb8");
+  text("ZUFAHRT", px(14), pz(B.OUT_ROAD.z0 + 2.2), 16, "#555");
+  g.setLineDash([12, 7]);
+  rect(B.FX0, B.FZ0, B.FX1, B.FZ1, null, "#333", 3);
+  g.setLineDash([]);
+  // the gate
+  g.fillStyle = "#f5f3ec";
+  g.fillRect(px(B.GATE.x0), pz(B.FZ1) - 3, (B.GATE.x1 - B.GATE.x0) * sc, 6);
+  g.strokeStyle = "#c62828";
+  g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(px(B.GATE.x0), pz(B.FZ1));
+  g.lineTo(px(B.GATE.x1), pz(B.FZ1));
+  g.stroke();
+  text("TOR", px((B.GATE.x0 + B.GATE.x1) / 2), pz(B.FZ1) - 14, 15, "#c62828");
+  // substation
+  rect(B.SUB.x0, B.SUB.z0, B.SUB.x1, B.SUB.z1, "#d9d6cc", "#7a7466", 2);
+  g.save();
+  g.beginPath();
+  g.rect(px(B.SUB.x0), pz(B.SUB.z0), (B.SUB.x1 - B.SUB.x0) * sc, (B.SUB.z1 - B.SUB.z0) * sc);
+  g.clip();
+  g.strokeStyle = "rgba(120,110,95,0.25)";
+  g.lineWidth = 2;
+  for (let k = -300; k < 400; k += 14) {
+    g.beginPath();
+    g.moveTo(px(B.SUB.x0) + k, pz(B.SUB.z0));
+    g.lineTo(px(B.SUB.x0) + k + 200, pz(B.SUB.z1));
+    g.stroke();
+  }
+  g.restore();
+  box(B.TRAFO.x, B.TRAFO.z, 7.4, 5.4, "#6d7378", "#2b2f33", 2);
+  for (let x of [-34.5, -30.5, -26.5]) box(x, B.TRAFO.z, 2.2, 5.4, "#9aa0a4", "#555", 1);
+  text("UMSPANNWERK 110 kV", px((B.SUB.x0 + B.SUB.x1) / 2), pz(B.SUB.z0) + 22, 19);
+  // control area: SCADA cabin, site office, stores
+  box(B.SCADA.x, B.SCADA.z, 6.06, 2.44, "#ffffff", "#1d2226", 2);
+  text("LEITSTAND", px(B.SCADA.x), pz(B.SCADA.z) - 26, 15);
+  box(-21, 3, 6.4, 3.8, "#cfe0f1", "#1f4e79", 3);
+  text("B\u00dcRO", px(-21), pz(3) + 34, 15, "#1f4e79");
+  for (let [x, z] of [[-30.2, -3.6], [-22, -3.9], [-32.5, 22.4], [-32.3, 16.2], [19.6, 27.6]]) box(x, z, 6.06, 2.44, "#b8b2a4", "#6f6a5e", 1);
+  text("P", px(-27), pz(19.5), 30, "#1f4e79");
+  text("LAGER", px(-27), pz(24.5), 13, "#555");
+  // battery field: noise walls, containers, PCS skids, row numbers
+  let Wl = B.WALL;
+  for (let z of [Wl.zN, Wl.zS]) rect(Wl.x0, z - 0.25, Wl.x1, z + 0.25, "#3e8e41");
+  for (let b = 0; b < B.BLOCKS.length; b++) {
+    let zc = B.BLOCKS[b];
+    for (let x0 of B.SLOTS) {
+      box(x0 + 3.03, zc + B.ROW, 6.06, 2.44, "#ffffff", "#2f3a44", 1.5);
+      box(x0 + 3.55, zc - B.ROW, 6.06, 2.44, "#ffffff", "#2f3a44", 1.5);
+    }
+    for (let x of B.PCS) box(x, zc, 3.2, 2.3, "#7fae86", "#2e5e33", 1.5);
+    text("R" + (b + 1), px(B.FIELD.x0) - 18, pz(zc), 16, "#1d2226");
+  }
+  text("BATTERIEFELD", px((B.FIELD.x0 + B.FIELD.x1) / 2), pz(Wl.zN) - 16, 19);
+  // security cabin and dog docks on the east strip
+  box(B.SECURITY.x, B.SECURITY.z, 2.44, 6.06, "#a5c9a0", "#2e5e33", 2);
+  text("WACHE", px(B.SECURITY.x) - 6, pz(B.SECURITY.z) - 44, 14);
+  // mission points and "you are here"
+  pin(B.TRAFO.x + 4.6, B.TRAFO.z, 1);
+  pin(B.SCADA.x, B.SCADA.z + 3.6, 2);
+  pin(B.SECURITY.x - 2.2, B.SECURITY.z + 5.4, 3);
+  g.beginPath();
+  g.arc(px(-22.1), pz(1.6), 8, 0, Math.PI * 2);
+  g.fillStyle = "#e53935";
+  g.fill();
+  g.lineWidth = 2;
+  g.strokeStyle = "#fff";
+  g.stroke();
+  // north arrow and scale bar, top right of the map
+  let nx = px(B.FX1) - 12, ny = pz(B.FZ0) - 2;
+  g.fillStyle = "#1d2226";
+  g.beginPath();
+  g.moveTo(nx, ny - 22);
+  g.lineTo(nx + 9, ny + 6);
+  g.lineTo(nx, ny);
+  g.lineTo(nx - 9, ny + 6);
+  g.closePath();
+  g.fill();
+  text("N", nx - 22, ny - 8, 18);
+  // legend panel
+  let lx = px(B.FX1) + 34, ly = 130, lw = W - 30 - lx;
+  g.fillStyle = "#fff";
+  g.fillRect(lx, ly, lw, H - ly - 30);
+  g.strokeStyle = "#1d2226";
+  g.lineWidth = 2;
+  g.strokeRect(lx, ly, lw, H - ly - 30);
+  text("LEGENDE", lx + 18, ly + 28, 22, "#1d2226", "left");
+  let row = ly + 70,
+    item = (draw, label) => {
+      draw(lx + 20, row);
+      text(label, lx + 70, row, 16, "#1d2226", "left", "normal");
+      row += 40;
+    },
+    sw = (fill, stroke) => (x, y) => {
+      g.fillStyle = fill;
+      g.fillRect(x, y - 10, 36, 20);
+      g.strokeStyle = stroke;
+      g.lineWidth = 2;
+      g.strokeRect(x, y - 10, 36, 20);
+    };
+  item(sw("#ffffff", "#2f3a44"), "Batteriecontainer");
+  item(sw("#7fae86", "#2e5e33"), "Wechselrichter / Trafo");
+  item(sw("#6d7378", "#2b2f33"), "Leistungstrafo 110 kV");
+  item(sw("#c7c9c6", "#8a8c89"), "Werksstra\u00dfe");
+  item((x, y) => ((g.fillStyle = "#3e8e41"), g.fillRect(x, y - 4, 36, 8)), "L\u00e4rmschutzwand");
+  item((x, y) => {
+    g.setLineDash([8, 5]);
+    g.strokeStyle = "#333";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + 36, y);
+    g.stroke();
+    g.setLineDash([]);
+  }, "Zaun");
+  item((x, y) => {
+    g.beginPath();
+    g.arc(x + 18, y, 8, 0, Math.PI * 2);
+    g.fillStyle = "#e53935";
+    g.fill();
+  }, "Sie sind hier");
+  row += 8;
+  text("AUFTRAG", lx + 18, row, 18, "#1d2226", "left");
+  row += 34;
+  for (let [k, t] of [[1, "HV-Schalter"], [2, "SCADA"], [3, "Security"]]) {
+    g.beginPath();
+    g.arc(lx + 38, row, 13, 0, Math.PI * 2);
+    g.fillStyle = "#c62828";
+    g.fill();
+    text(String(k), lx + 38, row + 1, 16, "#fff");
+    text(t, lx + 70, row, 16, "#1d2226", "left", "normal");
+    row += 36;
+  }
+  let tex = new ut.CanvasTexture(cv);
+  tex.colorSpace = In;
+  tex.anisotropy = 8;
+  return tex;
+}
 // plain, clean painted surfaces for the office (no weathering), cached by colour
 var bessPlainMats = new Map();
 function bessPlain(color, rough = 0.8) {
@@ -6734,10 +6927,14 @@ function bessOffice(n, cx, cz) {
   n.box(bessPlain(7368816, 0.5), 0.5, 1.3, 0.6, x0 + t + 0.3, F + 0.65, z0 + t + 0.35, { bevel: 0.012 });
   for (let k = 0; k < 4; k++) n.box("steel_galv", 0.2, 0.02, 0.02, x0 + t + 0.3, F + 0.22 + k * 0.31, z0 + t + 0.66);
   solid(x0 + t, F, z0 + t, x0 + t + 0.56, F + 1.3, z0 + t + 0.66, "metal", { noNav: !0 });
-  n.box(bessPlain(16316664, 0.7), 1.5, 1.0, 0.02, cx - 1.1, F + 1.5, z0 + t + 0.012);
-  n.label("LAGEPLAN  BESS NORDFELD", 0.09, cx - 1.75, F + 1.9, z0 + t + 0.025, "z+", { color: "black", font: "sans", distress: 0.05 });
-  for (let k = 0; k < 5; k++) n.box("paint_grey", 1.3 - k * 0.12, 0.012, 0.004, cx - 1.1, F + 1.7 - k * 0.14, z0 + t + 0.024);
-  n.box("paint_green", 0.5, 0.36, 0.02, cx - 1.1, F + 1.25, z0 + t + 0.026);
+  // the site plan: a printed map in a thin dark frame
+  n.box(dark, 1.56, 1.04, 0.02, cx - 1.1, F + 1.5, z0 + t + 0.01);
+  try {
+    let tex = bessSiteMapTexture();
+    n.quad(new L0({ map: tex, emissiveMap: tex, emissive: new Qe(0.18, 0.18, 0.18), roughness: 0.8, metalness: 0 }), 1.5, 1.0, cx - 1.1, F + 1.5, z0 + t + 0.022, "z+");
+  } catch (err) {
+    console.warn("[level] site map skipped: " + (err && err.message));
+  }
   // framed print on the east wall: productivity with and without coffee
   n.box(dark, 0.025, 1.0, 1.0, x1 - t - 0.0125, F + 1.45, cz);
   try {
@@ -8272,6 +8469,192 @@ var fE={KeyW:"forward",KeyS:"back",KeyA:"left",KeyD:"right",Space:"jump",ShiftLe
 var Nt={walk:3.8,sprint:6.4,crouch:1.9,ads:2.4,accelGround:34,decelGround:26,accelAir:9,gravity:21,jumpApex:1,coyote:.12,jumpBuffer:.13,standHeight:zi.height,crouchHeight:1.15,eyeRate:11,stride:{walk:1.55,sprint:2.1,crouch:1.05},bobY:.024,bobX:.013,bobSprint:1.9,bobAds:.22,rollStrafe:.02,landDip:.36,landDipMax:.2,fovSprint:6,fovAds:52,adsLook:.6,regenDelay:4,regenRate:25,recoilKeep:.35,recoilApply:34,recoilRecover:6.5,recoilHold:.09,shakeDecay:1.7,shakePitch:.03,shakeYaw:.03,shakeRoll:.045,pitchLimit:1.5},Pz=Math.sqrt(2*Nt.gravity*Nt.jumpApex);function xE(n){let e=n.camera,t=()=>n.render&&n.render.post||i,i={},s=zi.eye,o=Nt.standHeight,r=0,a=0,l=!0,c=0,u=0,f=0,h=0,p=0,d=0,m=0,x={x:0,v:0},v=0,y=0,b=0,g=0,E=0,M=0,_=0,T=99,w=0,S=0,R=0,z=zi.fov,I=0,L="concrete",U=new K,k=new _0(0,0,0,"YXZ"),C=new K,A={pos:new K,eye:new K,vel:new K,forward:new K(0,0,-1),yaw:0,pitch:0,health:100,maxHealth:100,alive:!0,onGround:!0,sprinting:!1,crouching:!1,ads:0,speed:0,enabled:!0,invulnerable:!1,baseFov:zi.fov,hurtPulse:0,lookScale:1,lastSafe:C,tuning:Nt,reset(J){let G=J||n.level&&n.level.playerStart||{pos:new K,yaw:0};A.pos.copy(G.pos),A.yaw=G.yaw||0,A.pitch=0,A.vel.set(0,0,0),A.health=A.maxHealth,A.alive=!0,A.onGround=!0,A.sprinting=!1,A.crouching=!1,A.invulnerable=!1,A.speed=0,s=zi.eye,o=Nt.standHeight,r=0,a=0,l=!0,c=0,u=0,f=0,h=0,p=d=0,m=0,x.x=x.v=0,v=y=b=g=0,E=0,M=0,T=99,w=0,S=0,R=0,A.hurtPulse=0,C.copy(A.pos);let te=t();te.damage=0,te.lowHealth=0,te.ads=0,Q(0)},damage(J,G){!A.alive||A.invulnerable||!(J>0)||(A.health=Math.max(0,A.health-J),T=0,w=Math.min(1,w+.35+J/40),A.addShake(.22+J/70),n.events.emit("player:hit",{amount:J,fromPos:G}),A.health<=0&&(A.alive=!1,R=0,A.sprinting=!1,n.events.emit("player:dead",{})))},heal(J){A.alive&&(A.health=Math.min(A.maxHealth,A.health+J))},addRecoil(J=0,G=0){let te=Nt.recoilKeep;A.pitch=Hn(A.pitch+J*te,-Nt.pitchLimit,Nt.pitchLimit),A.yaw+=G*te,v+=J*(1-te),y+=G*(1-te),v=Hn(v,-.3,.3),y=Hn(y,-.2,.2),E=Nt.recoilHold},addShake(J=.3){M=Math.min(1,M+J)},setFov(J){A.baseFov=Hn(+J||zi.fov,55,100)},update:N};n.events.on("explosion",J=>{if(!J||!J.pos)return;let G=A.eye.distanceTo(J.pos),te=J.size||1,oe=Is(1-G/(14+te*10))*(.35+.35*te);oe>.01&&A.addShake(oe)});function F(){let J=n.physics&&n.physics.boxes;if(!J)return!0;let G=zi.radius*.9,te=A.pos.y+Nt.crouchHeight-.05,oe=A.pos.y+Nt.standHeight;for(let ee=0;ee<J.length;ee++){let le=J[ee];if(!le.bulletOnly&&!(A.pos.x+G<le.min.x||A.pos.x-G>le.max.x||A.pos.z+G<le.min.z||A.pos.z-G>le.max.z)&&le.min.y<oe&&le.max.y>te)return!1}return!0}function H(){let J=A.pos.x,G=A.pos.z;try{if(n.ground&&n.ground.isPuddle&&A.pos.y<.05&&n.ground.isPuddle(J,G))return"water"}catch{}if(L&&L!=="concrete")return L;try{return n.level&&n.level.groundSurfaceAt&&n.level.groundSurfaceAt(J,G)||L||"concrete"}catch{return L||"concrete"}}function N(J){let G=n.input,te=n.weapon||{};if(te.stub||typeof te.ads!="number"?(I=j0(I,A.enabled&&G.ads?1:0,14,J),A.ads=I):A.ads=Is(te.ads),!A.alive){R+=J,Z(J),Q(J),W(J);return}let oe=A.enabled;A.lookScale=u0(1,Nt.adsLook,A.ads),oe&&(A.yaw-=G.look.dx*A.lookScale,A.pitch=Hn(A.pitch-G.look.dy*A.lookScale,-Nt.pitchLimit,Nt.pitchLimit),(A.yaw>Math.PI*4||A.yaw<-Math.PI*4)&&(A.yaw=A.yaw%(Math.PI*2))),oe&&G.crouch?A.crouching=!0:A.crouching&&F()&&(A.crouching=!1),o=A.crouching?Nt.crouchHeight:Nt.standHeight;let le=oe?G.move.x:0,xe=oe?G.move.y:0,j=le*le+xe*xe>.01,O=oe&&G.sprint&&xe>.55&&Math.abs(le)<.6&&!A.crouching&&A.ads<.35&&!G.fire;A.sprinting=O&&A.onGround&&A.speed>Nt.walk*.6||O&&!A.onGround&&A.sprinting;let q=Nt.walk;A.crouching?q=Nt.crouch:O&&(q=Nt.sprint),q=u0(q,Math.min(q,Nt.ads),A.ads),xe<0&&(q*=u0(1,.82,-xe));let ue=Math.sin(A.yaw),de=Math.cos(A.yaw);U.set(le*de-xe*ue,0,-le*ue-xe*de).multiplyScalar(q);let $=A.onGround?j?Nt.accelGround:Nt.decelGround:j?Nt.accelAir:.6,se=U.x-A.vel.x,fe=U.z-A.vel.z;!A.onGround&&!j&&(se=-A.vel.x,fe=-A.vel.z);let me=Math.hypot(se,fe),ge=$*J;me<=ge||me<1e-6?(A.onGround||j)&&(A.vel.x=U.x,A.vel.z=U.z):(A.vel.x+=se/me*ge,A.vel.z+=fe/me*ge),r=A.onGround?Nt.coyote:Math.max(0,r-J),a=oe&&G.pressed("jump")?Nt.jumpBuffer:Math.max(0,a-J),a>0&&r>0&&(!A.crouching||F())&&(A.vel.y=Pz,a=0,r=0,A.onGround=!1,A.crouching=!1,o=Nt.standHeight,n.events.emit("player:jump",{pos:A.pos})),A.vel.y-=Nt.gravity*J*.5,A.vel.y<-40&&(A.vel.y=-40);let ce=A.vel.y,P=n.physics.moveCapsule(A.pos,A.vel,J,zi.radius,o,l)||{};P.onGround||(A.vel.y-=Nt.gravity*J*.5);let D=n.physics.bounds;if(D&&(A.pos.x=Hn(A.pos.x,D.min.x+.4,D.max.x-.4),A.pos.z=Hn(A.pos.z,D.min.z+.4,D.max.z-.4)),A.onGround=!!P.onGround,P.surface&&(L=P.surface),A.onGround){if(!l&&c>.12){let Y=Math.max(0,-ce,u);x.v-=Math.min(Y*Nt.landDip,3.2),Y>7.5&&A.addShake(Math.min(.5,(Y-7.5)*.06)),n.events.emit("player:land",{speed:Y,surface:H(),pos:A.pos}),Y>13&&A.damage((Y-13)*7,null),f=.35}c=0,u=0,A.pos.x<=Kn.quayX-1.2&&A.pos.y>-.5&&C.copy(A.pos)}else c+=J,u=Math.max(u,-A.vel.y);l=A.onGround,A.pos.y<Kn.seaY-2.2&&(A.pos.copy(C),A.vel.set(0,0,0),A.onGround=!0,l=!0,M=.6,A.yaw+=Math.PI,A.damage(12,null),n.events.emit("player:rescued",{})),A.speed=Math.hypot(A.vel.x,A.vel.z);let B=A.crouching?Nt.stride.crouch:A.sprinting?Nt.stride.sprint:Nt.stride.walk;if(A.onGround&&A.speed>.5){let Y=f;f+=A.speed*J/B,Math.floor(f)>Math.floor(Y)&&n.events.emit("player:step",{surface:H(),sprint:A.sprinting,pos:A.pos})}else A.onGround&&(f=j0(f,Math.round(f),8,J));let X=A.onGround?Is(A.speed/Nt.walk)*(A.sprinting?Nt.bobSprint:1)*u0(1,Nt.bobAds,A.ads)*(A.crouching?.7:1):0;h=j0(h,X,9,J),d=-Math.cos(f*Math.PI*2)*Nt.bobY*h,p=Math.sin(f*Math.PI)*Nt.bobX*h;let re=A.vel.x*de-A.vel.z*ue;m=j0(m,-re/Nt.sprint*Nt.rollStrafe*u0(1,.4,A.ads),8,J),T+=J,T>Nt.regenDelay&&A.health<A.maxHealth&&(A.health=Math.min(A.maxHealth,A.health+Nt.regenRate*J)),Q(J),W(J)}function Z(J){A.vel.x=j0(A.vel.x,0,5,J),A.vel.z=j0(A.vel.z,0,5,J),A.vel.y-=Nt.gravity*J;try{let G=n.physics.moveCapsule(A.pos,A.vel,J,zi.radius,.6,l);l=!!(G&&G.onGround)}catch{}A.pos.y<Kn.seaY-1&&(A.pos.y=Kn.seaY-1,A.vel.y=0),A.speed=0,A.sprinting=!1,h=j0(h,0,10,J),p*=.9,d*=.9}function Q(J){let G=A.crouching?zi.crouchEye:zi.eye,te=0,oe=0;if(A.alive)J>0?s=j0(s,G,Nt.eyeRate,J):s=G;else{let se=ou(0,.85,R),fe=se*se;G=u0(zi.eye,.22,fe),s=j0(s,G,18,J),te=1.15*fe,oe=-.25*se+.12*Math.sin(se*Math.PI)}if(J>0){let se=-x.x*150-x.v*17;x.v+=se*J,x.x+=x.v*J,x.x=Hn(x.x,-Nt.landDipMax,.05),E-=J,E<=0&&(v=j0(v,0,Nt.recoilRecover,J),y=j0(y,0,Nt.recoilRecover,J)),b=j0(b,v,Nt.recoilApply,J),g=j0(g,y,Nt.recoilApply,J),M=Math.max(0,M-Nt.shakeDecay*J),_+=J}let ee=Math.sin(A.yaw),le=Math.cos(A.yaw);A.eye.set(A.pos.x+p*le,A.pos.y+s+d+x.x,A.pos.z-p*ee);let xe=Hn(A.pitch+b,-1.55,1.55),j=A.yaw+g;k.set(xe,j,0,"YXZ"),A.forward.set(0,0,-1).applyEuler(k);let O=M*M,q=_,ue=O*Nt.shakePitch*(Math.sin(q*43.1)+.6*Math.sin(q*71.7+1.3)),de=O*Nt.shakeYaw*(Math.sin(q*37.3+2.1)+.6*Math.sin(q*83.9)),$=O*Nt.shakeRoll*(Math.sin(q*29.7+.7)+.5*Math.sin(q*61.3+4));if(e.position.copy(A.eye),e.rotation.set(xe+ue+oe+x.x*.12,j+de,m+$+te+p*.35,"YXZ"),!n.params||!n.params.fov){let se=u0(A.baseFov+(A.sprinting?Nt.fovSprint:0),Nt.fovAds,A.ads);z=J>0?j0(z,se,A.ads>.02&&A.ads<.98?30:7,J):se,Math.abs(e.fov-z)>.01&&(e.fov=z,e.updateProjectionMatrix())}}function W(J){w=Math.max(0,w-J*1.9),A.hurtPulse=w;let G=A.alive?ou(.55,.12,A.health/A.maxHealth):1;S=j0(S,G,4,J);let te=t();te.damage=w,te.lowHealth=S,te.ads=A.ads}return A}
 function ey(n){let e={shots:0,hits:0,kills:0};return n.events.on("enemy:killed",k=>{k&&k.ally||e.kills++}),{stats:e,reset(){e.shots=e.hits=e.kills=0},playerShot(i,s,{damage:o=28,range:r=300,impulse:a=1}={}){e.shots++;let l=n.physics.raycast(i,s,r),c=n.enemies.raycast(i,s,l?l.dist:r);if(c){e.hits++;let u=c.part==="weak"?2.2:1,f=c.enemy.damage(o*u,c.point,s,c.part)===!0,h={point:c.point,normal:c.normal||s.clone().negate(),dist:c.dist,surface:"enemy",enemy:c.enemy,part:c.part,dir:s,from:"player",killed:f};return n.events.emit("impact",h),n.events.emit("player:hitEnemy",{enemy:c.enemy,part:c.part,killed:f,weak:c.part==="weak"}),h}if(l){let u={point:l.point,normal:l.normal,dist:l.dist,surface:l.surface,enemy:null,dir:s,from:"player",box:l.box};return n.events.emit("impact",u),u}return null},enemyShot(i,s,{damage:o=6,range:r=200}={}){let a=n.physics.raycast(i,s,r),l=a?a.dist:r,c=n.player;if(c&&c.alive){let u=a5.copy(c.pos);u.y+=1;let f=u.sub(i).dot(s);if(f>0&&f<l){v1.copy(i).addScaledVector(s,f);let h=Math.abs(v1.y-(c.pos.y+.95));if(Math.hypot(v1.x-c.pos.x,v1.z-c.pos.z)<.38&&h<.95)return c.damage(o,i),!0}}return a&&n.events.emit("impact",{point:a.point,normal:a.normal,dist:a.dist,surface:a.surface,enemy:null,dir:s,from:"enemy",box:a.box}),!1},explode(i,s=5,o=80,r="player"){for(let l of n.enemies.list){if(!l.alive)continue;let c=l.pos.distanceTo(i);c<s&&n.physics.lineOfSight(i,a5.copy(l.pos).setY(l.pos.y+.5))&&l.damage(o*(1-c/s),l.pos,v1.copy(l.pos).sub(i).normalize(),"body")}let a=n.player;if(a&&a.alive){let l=a5.copy(a.pos).setY(a.pos.y+1).distanceTo(i);l<s&&n.physics.lineOfSight(i,a5.copy(a.pos).setY(a.pos.y+1))&&a.damage(o*.5*(1-l/s),i)}r==="explosive"&&(e.blasts=(e.blasts||0)+1)}}}
 var a5=new K,v1=new K;var vE={barrel:{hp:50,fuse:1.6,size:1.9,radius:6.5,damage:170,chain:5.2},gas_cylinders:{hp:70,fuse:1.1,size:2.3,radius:7.5,damage:210,chain:6}},Dz=[[-12,6.5],[-5,1.5],[9,7],[13,13],[-14,13],[1,20],[11,21],[-20,19],[19,9],[21,-6],[24,11],[-21,-5],[0,-14.5],[-11,-21],[9,-24.5]],xh=K;function yE(n){let e=new At;e.name="explosives",n.scene.add(e);let t=[],i=new Map,s=n.rng&&n.rng.fork?n.rng.fork():Math.random,o=new B0,r=new B0,a=new xh,l=new xh,c=new xh(0,1,0);function u(v){let y=null;try{y=n.props.build(v.name,{...v.opts||{},...v.name==="barrel"?{color:"red"}:{}})}catch(M){return console.warn("[explosives] build failed: "+M),null}y.position.set(v.x,v.y||0,v.z),y.rotation.y=v.yaw||0,e.add(y),y.updateMatrixWorld(!0),o.makeEmpty();let b=y.userData.colliders||[];for(let M of b)r.min.fromArray(M.min),r.max.fromArray(M.max),r.applyMatrix4(y.matrixWorld),o.union(r);if(o.isEmpty()){let M=y.userData.size||[.6,.9,.6];o.min.set(v.x-M[0]/2,v.y||0,v.z-M[2]/2),o.max.set(v.x+M[0]/2,(v.y||0)+M[1],v.z+M[2]/2)}let g=vE[v.name]||vE.barrel,E={def:v,obj:y,inst:null,kind:v.name,spec:g,min:o.min.clone(),max:o.max.clone(),pos:o.getCenter(new xh),hp:g.hp,fuse:-1,alive:!0,box:null,leak:new xh,leakDir:new xh(0,1,0),tick:0};return t.push(E),f(E),E}function f(v){v.box||(v.box=n.physics.addBox(v.min,v.max,{surface:"metal",tag:"explosive"}),i.set(v.box,v))}for(let v of n.level&&n.level.explosives||[])u(v);try{let v=n.physics.nav,y=n.level&&n.level.playerStart&&n.level.playerStart.pos,b=(M,_)=>v.isWalkable(M,_)&&v.isWalkable(M+.3,_)&&v.isWalkable(M-.3,_)&&v.isWalkable(M,_+.3)&&v.isWalkable(M,_-.3),g=(M,_)=>M<28&&M>-37&&Math.abs(_)<27&&(!v.isWalkable(M+.6,_)||!v.isWalkable(M-.6,_)||!v.isWalkable(M,_+.6)||!v.isWalkable(M,_-.6)),E=0;for(let[M,_]of Dz){let T=null,w=1e9;for(let I=-3;I<=3;I+=.5)for(let L=-3;L<=3;L+=.5){let U=M+L,k=_+I,C=L*L+I*I;if(C>=w||!b(U,k)||!g(U,k)||y&&Math.hypot(U-y.x,k-y.z)<7)continue;let A=!1;for(let F of t)if(Math.hypot(F.pos.x-U,F.pos.z-k)<1.1){A=!0;break}for(let F of n.level&&n.level.objectives||[])F.pos&&Math.hypot(F.pos.x-U,F.pos.z-k)<2.2&&(A=!0);A||(T=[U,k],w=C)}if(!T)continue;let[S,R]=T;v.isWalkable(S+.6,R)?v.isWalkable(S-.6,R)?v.isWalkable(S,R+.6)?R-=.2:R+=.2:S-=.2:S+=.2;let z=n.level&&n.level.interiorBoxes&&n.level.interiorBoxes[0]&&S>n.level.interiorBoxes[0].min.x&&S<n.level.interiorBoxes[0].max.x&&R>n.level.interiorBoxes[0].min.z&&R<n.level.interiorBoxes[0].max.z?.03:0;u({name:"barrel",x:S,y:z,z:R,yaw:s()*6.28,opts:{seed:100+E%2}}),E++}}catch(v){console.warn("[explosives] extra barrels skipped: "+(v&&v.message||v))}let h=new Je().makeScale(0,0,0);try{let v=new Map;for(let y of t){if(y.obj.updateMatrixWorld(!0),y.kind!=="barrel"){let b=ig(y.obj);e.remove(y.obj),e.add(b),y.obj=b;continue}y.inst=[],y.obj.traverse(b=>{if(!b.isMesh||Array.isArray(b.material))return;let g=b.geometry.uuid+"|"+b.material.uuid,E=v.get(g);E||v.set(g,E={geo:b.geometry,mat:b.material,cast:b.castShadow,recv:b.receiveShadow,list:[]}),E.list.push({it:y,m:b.matrixWorld.clone()})}),e.remove(y.obj)}for(let y of v.values()){let b=new Wo(y.geo,y.mat,y.list.length);b.castShadow=y.cast,b.receiveShadow=y.recv,b.frustumCulled=!1,y.list.forEach((g,E)=>{b.setMatrixAt(E,g.m),g.it.inst.push({im:b,i:E,m:g.m})}),b.instanceMatrix.needsUpdate=!0,e.add(b)}}catch(v){console.error("[explosives] instancing failed, barrels stay as plain meshes: "+(v&&v.stack||v));for(let y of t)y.inst&&(y.inst=null,y.obj.parent||e.add(y.obj))}function p(v,y){if(!v.inst){v.obj.visible=y;return}for(let b of v.inst)b.im.setMatrixAt(b.i,y?b.m:h),b.im.instanceMatrix.needsUpdate=!0}function d(v,y,b,g){if(v.alive){if(v.hp-=y,v.hp<=0){v.fuse=v.fuse<0?.06:Math.min(v.fuse,.06);return}v.fuse<0&&(v.fuse=v.spec.fuse,b?(v.leak.copy(b),v.leakDir.set(b.x-v.pos.x,.35,b.z-v.pos.z).normalize()):(v.leak.copy(v.pos),v.leak.y=v.max.y,v.leakDir.copy(c)),n.events.emit("explosive:lit",{pos:v.pos,kind:v.kind}))}}n.events.on("impact",v=>{let y=v&&v.box&&i.get(v.box);y&&d(y,v.from==="player"?n.weapon&&n.weapon.damage||26:9,v.point,v.dir)}),n.events.on("explosion",v=>{if(!v||!v.pos)return;let y=2.2+(v.size||1)*1.6;for(let b of t){if(!b.alive)continue;let g=b.pos.distanceTo(v.pos);if(g>y||g<.05)continue;let E=.14+s()*.3+g*.03;b.fuse=b.fuse<0?E:Math.min(b.fuse,E)}});function m(v){v.alive=!1,v.fuse=-1,p(v,!1),v.box&&(n.physics.removeBox(v.box),i.delete(v.box),v.box=null);let y=v.spec;l.copy(v.pos);try{n.fx.explosion(l,y.size)}catch(g){console.error("[explosives] fx.explosion threw",g)}try{n.fx.debris(l,{count:14,color:v.kind==="barrel"?3804938:3159098,size:.09,speed:9,spread:1.4})}catch{}try{n.combat.explode(l,y.radius,y.damage,"explosive")}catch(g){console.error("[explosives] combat.explode threw",g)}let b=n.player;if(b&&b.addShake){let g=Math.max(0,1-b.pos.distanceTo(l)/28);g>0&&b.addShake(.15+.9*g*g)}try{n.enemies.alert&&n.enemies.alert(l,60)}catch{}n.events.emit("explosive:blast",{pos:l,kind:v.kind})}return{items:t,root:e,count(){let v=0;for(let y of t)y.alive&&v++;return v},reset(){for(let v of t)v.alive=!0,v.hp=v.spec.hp,v.fuse=-1,p(v,!0),f(v)},debugBlast(v=0,y=!0){let b=t.filter(E=>E.alive),g=b[v%Math.max(1,b.length)];return g&&(y?m(g):d(g,1,null,null)),g?g.pos.clone():null},update(v){for(let y=0;y<t.length;y++){let b=t[y];if(!(!b.alive||b.fuse<0)){if(b.fuse-=v,b.fuse<=0){m(b);continue}if(b.tick-=v,b.tick<=0){b.tick=.07;try{n.fx.sparks(b.leak,b.leakDir,3),n.fx.smoke(b.leak,{size:.3,life:.9,rise:1.4,count:1,color:1381653,vel:a.copy(b.leakDir).multiplyScalar(1.5)}),n.render&&n.render.lightPool&&n.render.lightPool.flash(b.leak,16742944,5,4,.09)}catch{}}}}}}}
+// ---------------------------------------------------------------------------------------------------------------
+// Burning battery containers. Hand-written (not minified), shares the bundle scope (K = THREE.Vector3).
+// Shooting a battery container damages it: the first hits make it vent smoke where the bullets went in, and once
+// its cells go into thermal runaway it flares up with a small blast and burns for over a minute, then smoulders.
+// Explosions close by set containers off too. Standing right next to a burning container hurts.
+// Uses the effect emitters of fx.js (addEmitter "fire" / "smolder"), which come from a shared pool of 24.
+// ---------------------------------------------------------------------------------------------------------------
+var BESS_FIRE = {
+  hp: 100, // a rifle round does ~26: four hits set a container off
+  burn: 80, // seconds of open fire
+  smoulder: 45, // seconds of smoke after that
+  heatRange: 1.4, // metres from the container walls where the fire hurts
+  heatDps: 9,
+  maxBurning: 6, // more than this at once and the extra ones only smoke (the emitter pool is shared)
+};
+function bessFires(n) {
+  let list = [],
+    tmp = new K(),
+    up = new K(0, 1, 0),
+    burningCount = 0,
+    heatAcc = 0,
+    now = 0, // seconds, to know which pooled emitters are still ours
+    ownBlast = !1,
+    said = !1;
+  for (let p of (n.level && n.level.placed) || []) {
+    if (p.name !== "bess_battery") continue;
+    // the container body is 6.06 x 2.44 m on 0.22 m sleepers, the cooling unit sticks out 0.5 m on one end
+    let flip = Math.abs(Math.cos(p.yaw || 0)) < 0.5,
+      hx = flip ? 1.25 : 3.3,
+      hz = flip ? 3.3 : 1.25,
+      door = Math.cos(p.yaw || 0) >= 0 ? 1 : -1; // doors face +z at yaw 0, -z at yaw pi
+    list.push({
+      x: p.x,
+      z: p.z,
+      min: new K(p.x - hx, 0, p.z - hz),
+      max: new K(p.x + hx, 3.0, p.z + hz),
+      door,
+      flip,
+      hp: BESS_FIRE.hp,
+      state: 0, // 0 intact, 1 venting, 2 burning, 3 smouldering, 4 burnt out
+      t: 0,
+      fx: [],
+    });
+  }
+  let stopFx = (c) => {
+      // emitters are pooled: one whose time is up may already be burning for someone else
+      for (let h of c.fx)
+        if (h.end > now)
+          try {
+            h.e.stop();
+          } catch {}
+      c.fx.length = 0;
+    },
+    emit = (c, x, y, z, kind, ttl, scale) => {
+      try {
+        let e = n.fx.addEmitter(tmp.set(x, y, z), kind, { ttl, scale });
+        e && e.active && c.fx.push({ e, end: now + ttl });
+      } catch {}
+    },
+    // along the container's length, f in [-1, 1]
+    along = (c, f, out) => (c.flip ? out.set(c.x, 0, c.z + f * 2.6) : out.set(c.x + f * 2.6, 0, c.z)),
+    find = (p) => {
+      for (let c of list)
+        if (p.x >= c.min.x - 0.08 && p.x <= c.max.x + 0.08 && p.z >= c.min.z - 0.08 && p.z <= c.max.z + 0.08 && p.y <= c.max.y + 0.15) return c;
+      return null;
+    };
+  function vent(c, point) {
+    c.state = 1;
+    // smoke seeping out of the bullet holes
+    emit(c, point.x, Math.max(0.6, point.y), point.z, "smolder", 14, 0.55);
+  }
+  function ignite(c) {
+    if (c.state >= 2) return;
+    stopFx(c);
+    c.state = 2;
+    c.t = 0;
+    burningCount++;
+    let pos = new K(),
+      roof = c.max.y - 0.05,
+      doorZ = c.flip ? c.z : c.z + c.door * 1.24,
+      full = burningCount <= BESS_FIRE.maxBurning;
+    // the vent panels blow: a small deflagration at the door side
+    along(c, 0, pos);
+    pos.y = 1.6;
+    c.flip ? (pos.x += c.door * 1.24) : (pos.z = doorZ);
+    ownBlast = !0;
+    try {
+      n.fx.explosion(pos.clone(), 0.85);
+    } catch {}
+    ownBlast = !1;
+    if (full) {
+      along(c, -0.55, pos);
+      emit(c, pos.x, roof, pos.z, "fire", BESS_FIRE.burn, 2.4);
+      along(c, 0.5, pos);
+      emit(c, pos.x, roof, pos.z, "fire", BESS_FIRE.burn * 0.9, 2.0);
+      // flames licking out of the doors
+      along(c, 0.05, pos);
+      c.flip ? (pos.x += c.door * 1.35) : (pos.z = c.z + c.door * 1.35);
+      emit(c, pos.x, 0.9, pos.z, "fire", BESS_FIRE.burn * 0.75, 1.3);
+    }
+    along(c, 0, pos);
+    emit(c, pos.x, roof + 0.6, pos.z, "smolder", BESS_FIRE.burn + BESS_FIRE.smoulder, 3.2);
+    // soot on the roof and around the doors
+    try {
+      along(c, 0, pos);
+      n.fx.decal(new K(pos.x, roof + 0.04, pos.z), up, "scorch", 3.2);
+      let side = c.flip ? new K(c.door, 0, 0) : new K(0, 0, c.door);
+      for (let f of [-0.5, 0.4]) {
+        along(c, f, pos);
+        c.flip ? (pos.x += c.door * 1.24) : (pos.z = c.z + c.door * 1.24);
+        n.fx.decal(new K(pos.x, 1.7, pos.z), side, "scorch", 2.1);
+      }
+    } catch {}
+    n.events.emit("bess:fire", { pos: pos.clone(), first: !said });
+    said = !0;
+  }
+  function hit(c, dmg, point) {
+    if (c.state >= 2) return;
+    c.hp -= dmg;
+    if (c.hp <= 0) ignite(c);
+    else if (c.state === 0) vent(c, point);
+  }
+  n.events.on("impact", (v) => {
+    if (!v || !v.point || v.enemy || v.from !== "player") return;
+    let c = find(v.point);
+    c && hit(c, (n.weapon && n.weapon.damage) || 26, v.point);
+  });
+  n.events.on("explosion", (v) => {
+    if (!v || !v.pos || ownBlast) return; // a container going up does not chain through the whole block
+    let r = 1.2 + (v.size || 1) * 1.6;
+    for (let c of list) {
+      if (c.state >= 2) continue;
+      let dx = Math.max(c.min.x - v.pos.x, 0, v.pos.x - c.max.x),
+        dz = Math.max(c.min.z - v.pos.z, 0, v.pos.z - c.max.z);
+      // a blast right against a container sets it off at once, a farther one only damages it
+      if (Math.hypot(dx, dz) < r) hit(c, Math.hypot(dx, dz) < r * 0.5 ? 1e3 : 55, v.pos);
+    }
+  });
+  return {
+    list,
+    get burning() {
+      return list.filter((c) => c.state === 2).length;
+    },
+    ignite(i = 0) {
+      let c = list[i % Math.max(1, list.length)];
+      c && ignite(c);
+      return c;
+    },
+    reset() {
+      for (let c of list) {
+        stopFx(c);
+        c.hp = BESS_FIRE.hp;
+        c.state = 0;
+        c.t = 0;
+      }
+      burningCount = 0;
+      said = !1;
+    },
+    update(dt) {
+      now += dt;
+      let pl = n.player,
+        hot = !1;
+      for (let c of list) {
+        if (c.state < 2 || c.state === 4) continue;
+        c.t += dt;
+        if (c.state === 2 && c.t > BESS_FIRE.burn) ((c.state = 3), burningCount--);
+        else if (c.state === 3 && c.t > BESS_FIRE.burn + BESS_FIRE.smoulder) ((c.state = 4), (c.fx.length = 0));
+        if (c.state === 2 && pl && pl.alive) {
+          let dx = Math.max(c.min.x - pl.pos.x, 0, pl.pos.x - c.max.x),
+            dz = Math.max(c.min.z - pl.pos.z, 0, pl.pos.z - c.max.z);
+          Math.hypot(dx, dz) < BESS_FIRE.heatRange && pl.pos.y < c.max.y + 1.5 && (hot = !0);
+        }
+      }
+      if (hot) {
+        heatAcc += dt;
+        if (heatAcc >= 0.5) {
+          heatAcc -= 0.5;
+          try {
+            pl.damage(BESS_FIRE.heatDps * 0.5, pl.pos.clone().setY(pl.pos.y + 1));
+          } catch {}
+        }
+      } else heatAcc = 0;
+    },
+  };
+}
+
 var Zy={};ar(Zy,{create:()=>I5,showcase:()=>BD});var Qo={model:[8,8,440,112],p_model:[456,8,300,112],rack:[764,8,420,150],p_rack:[1192,8,340,120],qr:[1540,8,150,150],cart:[1698,8,230,150],warn:[8,166,640,170],optic:[656,166,420,84],light:[1084,166,420,84],p_name:[1512,166,340,78],p_cal:[656,258,340,50],p_sn:[1004,258,340,50],sn:[1352,258,400,50],proof:[1760,258,200,60],maker:[8,344,880,56],cal:[896,344,880,56],prop:[8,408,1100,56],p_maker:[1116,408,880,56],p_prop:[8,472,900,56],safe:[916,472,96,60],semi:[1020,472,96,60],auto:[1124,472,96,60],dots:[1228,472,96,60],nm:[1332,472,660,50],tag:[8,610,560,200],arrow:[580,610,120,60],index:[710,610,60,60]};for(let n=0;n<20;n++)Qo["r"+(2+n*2)]=[8+n*100,540,92,60];var y1=2048,b1=1024;function Fz(){let n=document.createElement("canvas");n.width=y1,n.height=b1;let e=n.getContext("2d");e.clearRect(0,0,y1,b1),e.textBaseline="middle";let t=(h,p,d,m,x="left")=>{let[v,y,b,g]=Qo[h];e.font=d,e.fillStyle=m,e.textAlign=x,e.fillText(p,x==="left"?v+4:v+b/2,y+g/2+2,b-8)},i='"Barlow Condensed", "Arial Narrow", Arial, sans-serif',s='"IBM Plex Mono", "Courier New", monospace',o='"Big Shoulders Display", "Barlow Condensed", Impact, sans-serif',r="rgba(158,160,158,0.92)",a="rgba(206,198,160,0.92)",l="rgba(196,52,36,0.95)";t("model","PAC-9",`700 104px ${o}`,r),t("maker","LONGSHORE ARMS WORKS  \xB7  SALTLINE",`600 44px ${i}`,r),t("cal","CAL 5.8\xD740   SN PA-004217",`500 38px ${s}`,r),t("prop","PROPERTY OF PORT AUTHORITY \u2014 BERTH 4 ARMOURY",`600 40px ${i}`,r),t("sn","PA-004217",`500 40px ${s}`,r,"center"),t("nm","BARREL NUT 54 N\xB7m  \xB7  DO NOT OIL THREADS",`600 34px ${i}`,r),t("safe","S",`700 46px ${i}`,r,"center"),t("semi","1",`700 46px ${i}`,r,"center"),t("auto","A",`700 46px ${i}`,l,"center"),t("rack","B4-07",`800 142px ${o}`,a,"center");for(let h=0;h<20;h++)t("r"+(2+h*2),"T"+(2+h*2),`600 40px ${s}`,"rgba(150,152,150,0.88)","center");t("optic","HX-2 REFLEX",`700 62px ${i}`,r,"center"),t("light","900 LM  IPX8",`600 56px ${i}`,r,"center"),t("p_model","PAC-4",`700 104px ${o}`,r),t("p_name","BOSUN",`600 70px ${i}`,r),t("p_cal","9\xD719  PA-SVC",`500 38px ${s}`,r),t("p_sn","SN PB-011902",`500 38px ${s}`,r),t("p_rack","B4-11",`800 112px ${o}`,a,"center"),t("p_maker","LONGSHORE ARMS WORKS  \xB7  SALTLINE",`600 44px ${i}`,r),t("p_prop","PROPERTY OF PORT AUTHORITY \u2014 BERTH 4",`600 40px ${i}`,r);{let[h,p]=Qo.warn;e.fillStyle=r,e.textAlign="left",e.font=`600 38px ${i}`,["WARNING \u2014 CLEAR CHAMBER BEFORE","STOWAGE. AUTHORISED BREACH","PERSONNEL ONLY. PA-REG 44/7"].forEach((d,m)=>e.fillText(d,h+4,p+32+m*52,630))}{let[h,p,d,m]=Qo.dots;e.fillStyle=r,e.beginPath(),e.arc(h+24,p+m/2,11,0,7),e.fill(),e.fillStyle=l,e.beginPath(),e.arc(h+68,p+m/2,11,0,7),e.fill()}let c=7,u=()=>(c=c*16807%2147483647,c/2147483647);{let[h,p,d]=Qo.qr,m=16,x=(d-12)/m;e.fillStyle=r;for(let v=0;v<m;v++)for(let y=0;y<m;y++)(y===0||v===m-1||v===0&&y%2===0||y===m-1&&v%2===1||y>0&&v>0&&y<m-1&&v<m-1&&u()>.52)&&e.fillRect(h+6+y*x,p+6+v*x,x+.5,x+.5)}{let[h,p,d,m]=Qo.cart,x=h+d/2,v=p+m/2;e.strokeStyle=r,e.fillStyle=r,e.lineWidth=6,e.beginPath(),e.ellipse(x,v,d/2-8,m/2-8,0,0,7),e.stroke(),e.lineWidth=3,e.beginPath(),e.ellipse(x,v,d/2-20,m/2-20,0,0,7),e.stroke(),e.lineWidth=7,e.beginPath(),e.moveTo(x,v-36),e.lineTo(x,v+30),e.moveTo(x-16,v-20),e.lineTo(x+16,v-20),e.stroke(),e.beginPath(),e.arc(x,v+2,30,.25,Math.PI-.25),e.stroke(),e.beginPath(),e.arc(x,v-42,7,0,7),e.stroke(),e.font=`700 30px ${i}`,e.textAlign="center",e.fillText("L",x-62,v+2),e.fillText("W",x+62,v+2)}{let[h,p,,d]=Qo.proof,m=p+d/2;e.strokeStyle=r,e.fillStyle=r,e.lineWidth=4,e.font=`700 30px ${i}`,e.textAlign="center",e.beginPath(),e.arc(h+34,m,24,0,7),e.stroke(),e.fillText("P",h+34,m+2),e.beginPath(),e.moveTo(h+100,m-26),e.lineTo(h+126,m),e.lineTo(h+100,m+26),e.lineTo(h+74,m),e.closePath(),e.stroke(),e.fillText("4",h+100,m+2),e.strokeRect(h+144,m-22,44,44),e.fillText("N",h+166,m+2)}{let[h,p,d,m]=Qo.tag;e.fillStyle="rgba(186,184,174,0.97)",e.fillRect(h+4,p+4,d-8,m-8),e.fillStyle="rgba(24,24,26,0.96)",e.textAlign="left",e.font=`700 40px ${i}`,e.fillText("PORT AUTHORITY  \xB7  BERTH 4",h+22,p+38,d-44),e.font=`500 30px ${s}`,e.fillText("ASSET 0407-A   INSP 11/26",h+22,p+172,d-44);let x=h+22;for(;x<h+d-30;){let v=2+Math.floor(u()*4)*2;e.fillRect(x,p+66,v,78),x+=v+2+Math.floor(u()*3)*2}}{let[h,p,d,m]=Qo.arrow;e.fillStyle=r,e.beginPath(),e.moveTo(h+8,p+m/2-7),e.lineTo(h+d-40,p+m/2-7),e.lineTo(h+d-40,p+8),e.lineTo(h+d-8,p+m/2),e.lineTo(h+d-40,p+m-8),e.lineTo(h+d-40,p+m/2+7),e.lineTo(h+8,p+m/2+7),e.fill()}{let[h,p,d,m]=Qo.index;e.fillStyle="rgba(214,214,208,0.95)",e.fillRect(h+d/2-5,p+6,10,m-12)}e.globalCompositeOperation="destination-out";for(let h=0;h<5200;h++){e.fillStyle=`rgba(0,0,0,${.2+u()*.55})`;let p=u()<.92?1+u()*2:3+u()*7;e.fillRect(u()*y1,u()*b1,p,p*(.4+u()))}{let[h,p,d,m]=Qo.rack;for(let x=0;x<260;x++){e.fillStyle=`rgba(0,0,0,${.3+u()*.6})`;let v=2+u()*9;e.fillRect(h+u()*d,p+u()*m,v*(.5+u()*2),v*.6)}}let f=new Rs(n);return f.colorSpace=In,f.anisotropy=8,f.generateMipmaps=!0,f.minFilter=yn,f}var Nz=[[2,1],[4,3],[6,15],[8,17],[10,19],[12,21],[14,23],[26,35],[28,37],[30,39],[32,41]].map(([n,e])=>["r"+n,0,.04362,-.09211+e*.01001,.003,"T"]),ty={rifle:[["model",-.01522,-.035,.066,.0092,"L"],["maker",-.01522,-.0452,.0672,.003,"L"],["cal",-.01522,-.05,.0672,.0027,"L"],["prop",-.01522,-.0712,.0675,.0024,"L"],["cart",-.01522,-.061,.054,.008,"L"],["proof",-.01522,-.0612,.08,.0034,"L"],["auto",-.01642,-.0262,-.0335,.0038,"L"],["semi",-.01642,-.0252,-.049,.0038,"L"],["safe",-.01642,-.0362,-.0605,.0038,"L"],["warn",-.01652,-.0082,.033,.0058,"L"],["qr",-.01652,-.007,-.044,.0078,"L"],["sn",-.01652,-.0098,-.079,.0026,"L"],["cal",-.01812,.0244,0,.0022,"L"],["rack",-.01702,-.003,-.203,.019,"L"],["optic",-.01935,.0735,.021,.0024,"L"],["model",.01522,-.035,.069,.0092,"R"],["maker",.01522,-.0452,.0672,.003,"R"],["prop",.01522,-.0712,.0675,.0024,"R"],["tag",.01522,-.06,.067,.0094,"R"],["auto",.01642,-.0262,-.0335,.0038,"R"],["semi",.01642,-.0252,-.049,.0038,"R"],["safe",.01642,-.0362,-.0605,.0038,"R"],["sn",.01652,-.0098,-.067,.003,"R"],["proof",.01652,.001,.0808,.0036,"R"],["nm",.01812,.0244,.05,.002,"R"],["rack",.01702,-.003,-.203,.019,"R"],["optic",.01935,.0725,.025,.0022,"R"],...Nz],pistolSlide:[["p_model",-.01292,-6e-4,.047,.0066,"L"],["p_name",-.01292,-6e-4,.0225,.004,"L"],["p_maker",-.01292,-.0038,-.024,.0017,"L"],["cart",-.01292,6e-4,-.03,.0048,"L"],["p_cal",.01292,-6e-4,.047,.0036,"R"],["proof",.01292,-.001,-.035,.0026,"R"]],pistolFrame:[["p_prop",-.01282,-.0196,.061,.002,"L"],["qr",-.01282,-.025,.086,.0048,"L"],["p_sn",.01282,-.0196,.064,.0024,"R"],["p_rack",.01282,-.025,.08,.0036,"R"]]},bE=`vec3 dBump(vec3 N, float h){ vec3 dpdx = dFdx(-vViewPosition), dpdy = dFdy(-vViewPosition); float dhx = dFdx(h), dhy = dFdy(h);
   vec3 r1 = cross(dpdy, N), r2 = cross(N, dpdx); float det = dot(dpdx, r1); vec3 g = sign(det) * (dhx * r1 + dhy * r2);
   return normalize(abs(det) * N - g); }
@@ -9573,6 +9956,7 @@ function pT(n) {
       a(n.combat, "reset"),
       a(n.weapon, "reset"),
       a(n.explosives, "reset"),
+      a(n.fires, "reset"),
       a(n.launcher, "reset"),
       (g.time = 0),
       (g.cut = 0),
@@ -9985,6 +10369,9 @@ function pT(n) {
         V = Is(1 - he / 22) * Math.min(1.2, Y.size || 1);
       V > 0.05 && r.rumble && r.rumble(Math.min(1, V), Math.min(1, V * 0.8), 240 + 200 * V);
     }),
+    n.events.on("bess:fire", (Y) => {
+      Y && Y.first && C.state === "playing" && o.radio && o.radio("Grid Control: a container is in thermal runaway! Stay clear of the fire.", 3.6);
+    }),
     n.events.on("input:device", () => {
       ee(!0);
     }));
@@ -10059,7 +10446,7 @@ function pT(n) {
   );
 }
 
-var mT={mats:cv,level:Av,backdrop:zv,ground:Lv,fx:Wv,weapon:Zy,hands:zy,enemies:ib,props:hv,render:rv};window.__frames=0;window.__ready=!1;window.__fatal=null;window.__errors=[];var gT=document.getElementById("boot"),xT=document.getElementById("boot-msg"),vT=document.getElementById("boot-fill");function yT(n){window.__fatal=String(n),console.error("[fatal] "+n);let e=document.getElementById("fatal");e||(e=document.createElement("div"),e.id="fatal",document.getElementById("app").appendChild(e)),e.textContent="Call of BESS could not start: "+n}window.addEventListener("error",n=>{window.__errors.push(String(n.message))});{let n=console.error.bind(console);console.error=(...e)=>{try{window.__errors.push(e.map(t=>t&&t.stack||String(t)).join(" ").slice(0,400))}catch{}n(...e)}}var lL=()=>new Promise(n=>setTimeout(n,0));async function fa(n,e){xT&&(xT.textContent=n),vT&&(vT.style.width=Math.round(e*100)+"%"),await lL()}async function cL(){let n=Object.fromEntries(new URLSearchParams(location.search)),e=!!n.bench||location.hash==="#bench";e&&(n.noaudio="1",n.autostart="1");let t={THREE:ut,params:n,events:BM(),rng:su(+(n.seed||4207)),time:{t:0,dt:0,frame:0,real:0},quality:UM(n.q||(n.shot?"test":""))};window.__G=t;let i=n.show&&mT[n.show]?n.show:null;t.showcase=i;let s=null;function o(p){if(p.cam){let d=String(p.cam).split(",").map(Number);s={pos:new K(d[0],d[1],d[2]),look:new K(d[3]??0,d[4]??1,d[5]??0)}}p.cam===""&&(s=null),p.fov&&(t.camera.fov=+p.fov,t.camera.updateProjectionMatrix()),p.exposure&&(t.render.exposure=+p.exposure)}window.__setShot=o;async function r(p,d,m,x=!1){let v=performance.now();try{t[p]=await m()}catch(b){if(console.error(`[boot] module "${p}" failed: ${b&&b.stack||b}`),x||!Sr[p])throw b;t[p]=Sr[p]()}let y=performance.now()-v;y>150&&console.log(`[boot] ${p} ${y.toFixed(0)}ms`)}if(await fa("Waking the renderer",.04),await r("render","render",()=>ov(t),!0),t.renderer=t.render.renderer,t.scene=t.render.scene,t.camera=t.render.camera,t.viewCamera=t.render.viewCamera,await fa("Mixing paint, steel and dust",.12),await r("mats","materials",()=>lv(t)),t.physics=v_(t),t.props=fv(t),t.input=i?fL():gE(t),i){let p=ns(new w0(80,80).rotateX(-Math.PI/2),t.mats.get("concrete"),{cast:!1});if(t.scene.add(p),t.level={stub:!0,playerStart:{pos:new K(0,0,4),yaw:0},objectives:[],enemySpawns:[],zones:[],interiorBoxes:[],cinematicPath:[],extraction:{pos:new K,radius:2},groundSurfaceAt:()=>"concrete",update(){}},t.backdrop=Sr.backdrop(),t.ground=Sr.ground(),t.physics.build(),i==="fx")await r("fx","fx",()=>f1(t));else try{t.fx=await f1(t)}catch{t.fx=Sr.fx()}t.audio=Sr.audio(),t.hud=Sr.hud(),t.player=hL(t),t.combat=ey(t),t.weapon=Sr.weapon(),t.enemies=Sr.enemies(),t.game={state:"showcase",update:()=>!1,start(){}};let d=null;try{d=await mT[i].showcase(t)}catch(m){yT(`showcase "${i}" threw: ${m&&m.stack||m}`)}t.showcaseInfo=d||{},d&&d.cam&&o({cam:[...d.cam,...d.target||[0,1,0]].join(",")})}else{if(await fa("Placing battery containers",.34),await r("level","level",()=>Pg(t),!0),await fa("Planting trees and turbines",.5),await r("backdrop","backdrop",()=>Iv(t)),await fa("Spreading gravel",.58),await r("ground","ground",()=>Vg(t)),t.ground.stub){let p=ns(new w0(400,400).rotateX(-Math.PI/2),t.mats.get("asphalt"),{cast:!1});t.scene.add(p)}t.physics.build(),await fa("Loading tracers and smoke",.66),await r("fx","fx",()=>f1(t)),await r("audio","audio",()=>n.noaudio?Sr.audio():cE(t)),t.player=xE(t),t.combat=ey(t);try{t.explosives=yE(t)}catch(p){console.error("[boot] explosives failed: "+(p&&p.stack||p)),t.explosives={items:[],reset(){},update(){}}}await fa("Checking the rifle",.74),await r("weapon","weapon",()=>I5(t)),t.launcher=bessLauncher(t),await fa("Waking the guard dogs",.82),await r("enemies","enemies",()=>W5(t)),await r("hud","hud",()=>sT(t)),t.game=pT(t)}await fa("Waiting for first light",.92);try{await t.render.onLevelReady()}catch(p){console.error("[boot] render.onLevelReady failed: "+(p&&p.stack||p))}let a=0;if(window.__stats=()=>({...t.render.stats?t.render.stats():{},fps:a?+(1/a).toFixed(1):0,state:t.game&&t.game.state}),n.cam&&o(n),n.fov&&o({fov:n.fov}),!i&&(n.shot||n.autostart))try{t.game.start({skipIntro:!0})}catch(p){console.error("[boot] game.start failed",p)}n.noweapon&&t.weapon.setVisible&&t.weapon.setVisible(!1),e&&uL(t),await fa("Ready",1),gT.classList.add("done"),setTimeout(()=>{gT.hidden=!0},700);let l=performance.now(),c=1,u=1.1,f=new K;n.step&&(window.__step=3);let h=(p,d)=>{let m=t[p];if(m&&m.update)try{m.update(d)}catch(x){h.err[p]||(h.err[p]=1,console.error(`[loop] ${p}.update threw: ${x&&x.stack||x}`))}};h.err={},t.renderer.setAnimationLoop(()=>{if(n.step){if(!(window.__step>0))return;window.__step--}let p=performance.now(),d=(p-l)/1e3;l=p,a=a?a*.95+d*.05:d;let m=Math.min(d,.05);n.dt&&(m=+n.dt),t.time.dt=m,t.time.t+=m,t.time.real=p/1e3,t.time.frame++,h("input",m);let x=!1;try{x=t.game.update(m)!==!1&&t.game.state!=="title"&&t.game.state!=="paused"}catch(v){h.err.game||(h.err.game=1,console.error("[loop] game.update threw: "+(v&&v.stack||v)))}if(i){if(t.showcaseInfo.update)try{t.showcaseInfo.update(m)}catch(v){h.err.sc||(h.err.sc=1,console.error("[loop] showcase update threw: "+(v&&v.stack||v)))}}else x&&(h("player",m),h("launcher",m),h("weapon",m),h("enemies",m),h("explosives",m));if(t.weapon&&t.weapon.setWetness&&t.level&&t.level.interiorBoxes&&t.level.interiorBoxes[0]){let v=t.level.interiorBoxes[0],y=t.camera.position,b=y.x>v.min.x&&y.x<v.max.x&&y.z>v.min.z&&y.z<v.max.z&&y.y<v.max.y;c+=((b?.3:1)-c)*Math.min(1,m*(b?.25:.6));try{t.weapon.setWetness(c)}catch{}if(!n.wfill&&t.render.sunDir){let g=t.camera.getWorldDirection(f),E=Math.max(0,g.x*t.render.sunDir.x+g.z*t.render.sunDir.z);u+=((b?1.1:1.1+.6*E*E)-u)*Math.min(1,m*2.5),t.render.viewFill=u}}t.game.state!=="paused"&&(h("fx",m),h("ground",m),h("level",m),h("backdrop",m),h("mats",m)),h("audio",m),h("hud",m),s&&(t.camera.position.copy(s.pos),t.camera.lookAt(s.look)),t.bench&&t.bench.frame(d);try{t.render.frame(m)}catch(v){h.err.render||(h.err.render=1,console.error("[loop] render.frame threw: "+(v&&v.stack||v)))}t.input.endFrame&&t.input.endFrame(),window.__frames++,window.__frames===2&&(window.__ready=!0)})}function uL(n){let e=document.createElement("pre");e.id="bench",e.style.cssText='position:absolute;left:12px;top:12px;z-index:90;margin:0;padding:10px 12px;font:12px/1.45 "IBM Plex Mono",ui-monospace,monospace;color:#d8f0d0;background:rgba(0,0,0,.72);white-space:pre-wrap;max-width:min(560px,90vw);pointer-events:none',document.getElementById("app").appendChild(e);let t="unknown";try{let h=n.renderer.getContext(),p=h.getExtension("WEBGL_debug_renderer_info");t=p?h.getParameter(p.UNMASKED_RENDERER_WEBGL):h.getParameter(h.RENDERER)}catch{}let i=n.level.cinematicPath&&n.level.cinematicPath.length>=2?n.level.cinematicPath:[{pos:[-32,1.7,6],look:[0,2,5]},{pos:[10,1.7,6],look:[30,6,0]}],s=[],o=0,r=0,a=30,l=new K,c=new K,u=new K,f=new K;n.player&&(n.player.enabled=!1),n.bench={frame(h){o+=h;let p=o/a%1*(i.length-1),d=Math.min(i.length-2,Math.floor(p)),m=p-d,x=m*m*(3-2*m);if(l.fromArray(i[d].pos),c.fromArray(i[d+1].pos),u.fromArray(i[d].look),f.fromArray(i[d+1].look),n.camera.position.lerpVectors(l,c,x),n.camera.lookAt(u.lerp(f,x)),o>2&&s.push(h*1e3),s.length>3e3&&s.shift(),o-r>1&&s.length>10){r=o;let v=s.slice().sort((_,T)=>_-T),y=v.reduce((_,T)=>_+T,0)/v.length,b=v[Math.floor(v.length*.99)],g=v[v.length>>1],E=n.render.stats?n.render.stats():{},M=n.renderer.getDrawingBufferSize(new We);e.textContent=`CALL OF BESS BENCH  t=${o.toFixed(0)}s
+var mT={mats:cv,level:Av,backdrop:zv,ground:Lv,fx:Wv,weapon:Zy,hands:zy,enemies:ib,props:hv,render:rv};window.__frames=0;window.__ready=!1;window.__fatal=null;window.__errors=[];var gT=document.getElementById("boot"),xT=document.getElementById("boot-msg"),vT=document.getElementById("boot-fill");function yT(n){window.__fatal=String(n),console.error("[fatal] "+n);let e=document.getElementById("fatal");e||(e=document.createElement("div"),e.id="fatal",document.getElementById("app").appendChild(e)),e.textContent="Call of BESS could not start: "+n}window.addEventListener("error",n=>{window.__errors.push(String(n.message))});{let n=console.error.bind(console);console.error=(...e)=>{try{window.__errors.push(e.map(t=>t&&t.stack||String(t)).join(" ").slice(0,400))}catch{}n(...e)}}var lL=()=>new Promise(n=>setTimeout(n,0));async function fa(n,e){xT&&(xT.textContent=n),vT&&(vT.style.width=Math.round(e*100)+"%"),await lL()}async function cL(){let n=Object.fromEntries(new URLSearchParams(location.search)),e=!!n.bench||location.hash==="#bench";e&&(n.noaudio="1",n.autostart="1");let t={THREE:ut,params:n,events:BM(),rng:su(+(n.seed||4207)),time:{t:0,dt:0,frame:0,real:0},quality:UM(n.q||(n.shot?"test":""))};window.__G=t;let i=n.show&&mT[n.show]?n.show:null;t.showcase=i;let s=null;function o(p){if(p.cam){let d=String(p.cam).split(",").map(Number);s={pos:new K(d[0],d[1],d[2]),look:new K(d[3]??0,d[4]??1,d[5]??0)}}p.cam===""&&(s=null),p.fov&&(t.camera.fov=+p.fov,t.camera.updateProjectionMatrix()),p.exposure&&(t.render.exposure=+p.exposure)}window.__setShot=o;async function r(p,d,m,x=!1){let v=performance.now();try{t[p]=await m()}catch(b){if(console.error(`[boot] module "${p}" failed: ${b&&b.stack||b}`),x||!Sr[p])throw b;t[p]=Sr[p]()}let y=performance.now()-v;y>150&&console.log(`[boot] ${p} ${y.toFixed(0)}ms`)}if(await fa("Waking the renderer",.04),await r("render","render",()=>ov(t),!0),t.renderer=t.render.renderer,t.scene=t.render.scene,t.camera=t.render.camera,t.viewCamera=t.render.viewCamera,await fa("Mixing paint, steel and dust",.12),await r("mats","materials",()=>lv(t)),t.physics=v_(t),t.props=fv(t),t.input=i?fL():gE(t),i){let p=ns(new w0(80,80).rotateX(-Math.PI/2),t.mats.get("concrete"),{cast:!1});if(t.scene.add(p),t.level={stub:!0,playerStart:{pos:new K(0,0,4),yaw:0},objectives:[],enemySpawns:[],zones:[],interiorBoxes:[],cinematicPath:[],extraction:{pos:new K,radius:2},groundSurfaceAt:()=>"concrete",update(){}},t.backdrop=Sr.backdrop(),t.ground=Sr.ground(),t.physics.build(),i==="fx")await r("fx","fx",()=>f1(t));else try{t.fx=await f1(t)}catch{t.fx=Sr.fx()}t.audio=Sr.audio(),t.hud=Sr.hud(),t.player=hL(t),t.combat=ey(t),t.weapon=Sr.weapon(),t.enemies=Sr.enemies(),t.game={state:"showcase",update:()=>!1,start(){}};let d=null;try{d=await mT[i].showcase(t)}catch(m){yT(`showcase "${i}" threw: ${m&&m.stack||m}`)}t.showcaseInfo=d||{},d&&d.cam&&o({cam:[...d.cam,...d.target||[0,1,0]].join(",")})}else{if(await fa("Placing battery containers",.34),await r("level","level",()=>Pg(t),!0),await fa("Planting trees and turbines",.5),await r("backdrop","backdrop",()=>Iv(t)),await fa("Spreading gravel",.58),await r("ground","ground",()=>Vg(t)),t.ground.stub){let p=ns(new w0(400,400).rotateX(-Math.PI/2),t.mats.get("asphalt"),{cast:!1});t.scene.add(p)}t.physics.build(),await fa("Loading tracers and smoke",.66),await r("fx","fx",()=>f1(t)),await r("audio","audio",()=>n.noaudio?Sr.audio():cE(t)),t.player=xE(t),t.combat=ey(t);try{t.explosives=yE(t)}catch(p){console.error("[boot] explosives failed: "+(p&&p.stack||p)),t.explosives={items:[],reset(){},update(){}}}try{t.fires=bessFires(t)}catch(p){console.error("[boot] fires failed: "+(p&&p.stack||p)),t.fires={list:[],reset(){},update(){}}}await fa("Checking the rifle",.74),await r("weapon","weapon",()=>I5(t)),t.launcher=bessLauncher(t),await fa("Waking the guard dogs",.82),await r("enemies","enemies",()=>W5(t)),await r("hud","hud",()=>sT(t)),t.game=pT(t)}await fa("Waiting for first light",.92);try{await t.render.onLevelReady()}catch(p){console.error("[boot] render.onLevelReady failed: "+(p&&p.stack||p))}let a=0;if(window.__stats=()=>({...t.render.stats?t.render.stats():{},fps:a?+(1/a).toFixed(1):0,state:t.game&&t.game.state}),n.cam&&o(n),n.fov&&o({fov:n.fov}),!i&&(n.shot||n.autostart))try{t.game.start({skipIntro:!0})}catch(p){console.error("[boot] game.start failed",p)}n.noweapon&&t.weapon.setVisible&&t.weapon.setVisible(!1),e&&uL(t),await fa("Ready",1),gT.classList.add("done"),setTimeout(()=>{gT.hidden=!0},700);let l=performance.now(),c=1,u=1.1,f=new K;n.step&&(window.__step=3);let h=(p,d)=>{let m=t[p];if(m&&m.update)try{m.update(d)}catch(x){h.err[p]||(h.err[p]=1,console.error(`[loop] ${p}.update threw: ${x&&x.stack||x}`))}};h.err={},t.renderer.setAnimationLoop(()=>{if(n.step){if(!(window.__step>0))return;window.__step--}let p=performance.now(),d=(p-l)/1e3;l=p,a=a?a*.95+d*.05:d;let m=Math.min(d,.05);n.dt&&(m=+n.dt),t.time.dt=m,t.time.t+=m,t.time.real=p/1e3,t.time.frame++,h("input",m);let x=!1;try{x=t.game.update(m)!==!1&&t.game.state!=="title"&&t.game.state!=="paused"}catch(v){h.err.game||(h.err.game=1,console.error("[loop] game.update threw: "+(v&&v.stack||v)))}if(i){if(t.showcaseInfo.update)try{t.showcaseInfo.update(m)}catch(v){h.err.sc||(h.err.sc=1,console.error("[loop] showcase update threw: "+(v&&v.stack||v)))}}else x&&(h("player",m),h("launcher",m),h("weapon",m),h("enemies",m),h("explosives",m),h("fires",m));if(t.weapon&&t.weapon.setWetness&&t.level&&t.level.interiorBoxes&&t.level.interiorBoxes[0]){let v=t.level.interiorBoxes[0],y=t.camera.position,b=y.x>v.min.x&&y.x<v.max.x&&y.z>v.min.z&&y.z<v.max.z&&y.y<v.max.y;c+=((b?.3:1)-c)*Math.min(1,m*(b?.25:.6));try{t.weapon.setWetness(c)}catch{}if(!n.wfill&&t.render.sunDir){let g=t.camera.getWorldDirection(f),E=Math.max(0,g.x*t.render.sunDir.x+g.z*t.render.sunDir.z);u+=((b?1.1:1.1+.6*E*E)-u)*Math.min(1,m*2.5),t.render.viewFill=u}}t.game.state!=="paused"&&(h("fx",m),h("ground",m),h("level",m),h("backdrop",m),h("mats",m)),h("audio",m),h("hud",m),s&&(t.camera.position.copy(s.pos),t.camera.lookAt(s.look)),t.bench&&t.bench.frame(d);try{t.render.frame(m)}catch(v){h.err.render||(h.err.render=1,console.error("[loop] render.frame threw: "+(v&&v.stack||v)))}t.input.endFrame&&t.input.endFrame(),window.__frames++,window.__frames===2&&(window.__ready=!0)})}function uL(n){let e=document.createElement("pre");e.id="bench",e.style.cssText='position:absolute;left:12px;top:12px;z-index:90;margin:0;padding:10px 12px;font:12px/1.45 "IBM Plex Mono",ui-monospace,monospace;color:#d8f0d0;background:rgba(0,0,0,.72);white-space:pre-wrap;max-width:min(560px,90vw);pointer-events:none',document.getElementById("app").appendChild(e);let t="unknown";try{let h=n.renderer.getContext(),p=h.getExtension("WEBGL_debug_renderer_info");t=p?h.getParameter(p.UNMASKED_RENDERER_WEBGL):h.getParameter(h.RENDERER)}catch{}let i=n.level.cinematicPath&&n.level.cinematicPath.length>=2?n.level.cinematicPath:[{pos:[-32,1.7,6],look:[0,2,5]},{pos:[10,1.7,6],look:[30,6,0]}],s=[],o=0,r=0,a=30,l=new K,c=new K,u=new K,f=new K;n.player&&(n.player.enabled=!1),n.bench={frame(h){o+=h;let p=o/a%1*(i.length-1),d=Math.min(i.length-2,Math.floor(p)),m=p-d,x=m*m*(3-2*m);if(l.fromArray(i[d].pos),c.fromArray(i[d+1].pos),u.fromArray(i[d].look),f.fromArray(i[d+1].look),n.camera.position.lerpVectors(l,c,x),n.camera.lookAt(u.lerp(f,x)),o>2&&s.push(h*1e3),s.length>3e3&&s.shift(),o-r>1&&s.length>10){r=o;let v=s.slice().sort((_,T)=>_-T),y=v.reduce((_,T)=>_+T,0)/v.length,b=v[Math.floor(v.length*.99)],g=v[v.length>>1],E=n.render.stats?n.render.stats():{},M=n.renderer.getDrawingBufferSize(new We);e.textContent=`CALL OF BESS BENCH  t=${o.toFixed(0)}s
 GPU: ${t}
 buffer ${M.x}x${M.y}  quality ${n.quality.name}  dpr ${window.devicePixelRatio}
 frame ms avg ${y.toFixed(1)}  median ${g.toFixed(1)}  p99 ${b.toFixed(1)}  => ${(1e3/y).toFixed(0)} fps
