@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paolo's Arcade</title>
+<meta name="theme-color" content="#0a4fa3">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,800;0,900;1,800&family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fbf7ec;
+    --ink: #161616;
+    --muted: #5a5750;
+    --blue: #0a4fa3;
+    --blue-dk: #073a7a;
+    --yellow: #ffe100;
+    --red: #e2001a;
+    --rule: #d9d2bf;
+    --cond: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+    --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--paper);
+    /* faint newsprint grain */
+    background-image: radial-gradient(rgba(0,0,0,.035) 1px, transparent 1.2px);
+    background-size: 4px 4px;
+    color: var(--ink);
+    font: 400 17px/1.45 var(--body);
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---------- masthead ---------- */
+  .mast { background: var(--blue); color: #fff; border-bottom: 6px solid var(--yellow); }
+  .mast .wrap { display: flex; align-items: center; gap: 18px; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; }
+  .logo {
+    background: var(--yellow); color: var(--blue);
+    font: 900 italic 30px/0.9 var(--cond); text-transform: uppercase; letter-spacing: -.01em;
+    padding: 8px 12px 6px; transform: rotate(-3deg);
+    box-shadow: 4px 4px 0 var(--red);
+  }
+  .logo small { display: block; color: var(--red); font-size: 15px; letter-spacing: .06em; }
+  .mast-copy { flex: 1; min-width: 200px; }
+  .mast-copy .week { font: 800 15px/1 var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--yellow); }
+  .mast-copy h1 { font: 900 clamp(34px, 6vw, 60px)/.95 var(--cond); text-transform: uppercase; margin-top: 4px; }
+  .valid {
+    font: 600 14px/1.3 var(--cond); text-transform: uppercase; letter-spacing: .06em;
+    border: 2px solid #fff; padding: 6px 10px; text-align: center;
+  }
+  .valid b { display: block; font-size: 20px; font-weight: 900; }
+
+  /* ---------- strip ---------- */
+  .strip { background: var(--red); color: #fff; font: 800 15px/1 var(--cond); text-transform: uppercase; letter-spacing: .1em; }
+  .strip .wrap { display: flex; gap: 22px; padding-top: 8px; padding-bottom: 8px; overflow: hidden; white-space: nowrap; }
+  .strip span::before { content: "★ "; color: var(--yellow); }
+
+  /* ---------- section headings ---------- */
+  .sec { display: flex; align-items: baseline; gap: 12px; margin: 40px 0 16px; border-bottom: 3px solid var(--ink); padding-bottom: 6px; }
+  .sec h2 { font: 900 clamp(26px, 4vw, 36px)/1 var(--cond); text-transform: uppercase; }
+  .sec p { font: 600 15px/1.2 var(--cond); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+  /* ---------- price tag ---------- */
+  .tag-wrap { display: flex; align-items: flex-end; gap: 10px; }
+  .was { font: 600 16px/1 var(--cond); color: var(--muted); } .was s { text-decoration-color: var(--red); text-decoration-thickness: 2px; }
+  .was small { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 2px; }
+  .price {
+    background: var(--yellow); color: var(--red);
+    font: 900 italic 54px/.8 var(--cond); letter-spacing: -.02em;
+    padding: 8px 10px 4px 8px; display: inline-flex; align-items: flex-start;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .price sup { font-size: .45em; line-height: 1; margin-left: 2px; margin-top: 2px; }
+  .unit { font: 600 12px/1.25 var(--body); color: var(--muted); margin-top: 8px; }
+
+  /* starburst */
+  .burst {
+    position: absolute; width: 74px; height: 74px; display: grid; place-items: center;
+    background: var(--red); color: #fff; text-align: center;
+    font: 900 18px/.9 var(--cond); text-transform: uppercase; transform: rotate(12deg);
+    clip-path: polygon(50% 0,61% 13%,77% 6%,79% 23%,95% 23%,88% 39%,100% 50%,88% 61%,95% 77%,79% 77%,77% 94%,61% 87%,50% 100%,39% 87%,23% 94%,21% 77%,5% 77%,12% 61%,0 50%,12% 39%,5% 23%,21% 23%,23% 6%,39% 13%);
+  }
+  .burst.yellow { background: var(--yellow); color: var(--red); }
+
+  /* ---------- hero deal ---------- */
+  .hero {
+    position: relative; margin-top: 28px; background: #fff; border: 3px solid var(--ink);
+    display: grid; grid-template-columns: 1fr 1.25fr; text-decoration: none;
+  }
+  .hero .pic {
+    background: var(--yellow); display: grid; place-items: center; min-height: 260px;
+    font-size: clamp(110px, 18vw, 190px); border-right: 3px solid var(--ink);
+    background-image: radial-gradient(rgba(226,0,26,.18) 2px, transparent 2.5px); background-size: 12px 12px;
+  }
+  .hero .pic span { filter: drop-shadow(6px 6px 0 rgba(0,0,0,.18)); }
+  .hero .info { padding: 24px 24px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .hero .kicker { font: 800 15px/1 var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--red); }
+  .hero h3 { font: 900 clamp(34px, 5vw, 52px)/.95 var(--cond); text-transform: uppercase; color: var(--blue); }
+  .hero p { max-width: 46ch; }
+  .hero .burst { top: -22px; right: -14px; width: 104px; height: 104px; font-size: 26px; }
+  .hero .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
+  .hero .price { font-size: 88px; }
+
+  /* ---------- product grid ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+  .item {
+    position: relative; background: #fff; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    padding: 18px 18px 16px; display: flex; flex-direction: column; text-decoration: none;
+    transition: background-color .12s;
+  }
+  .item:hover, .item:focus-visible { background: #fffbd6; outline: none; }
+  .item:focus-visible { box-shadow: inset 0 0 0 3px var(--blue); }
+  .item .pic { font-size: 64px; line-height: 1; height: 84px; display: flex; align-items: center; filter: drop-shadow(4px 4px 0 rgba(0,0,0,.12)); }
+  .item .brand { font: 700 12px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+  .item h3 { font: 800 26px/1 var(--cond); text-transform: uppercase; color: var(--blue); margin: 4px 0 6px; }
+  .item p { font-size: 15px; flex: 1; }
+  .item .specs { font: 600 13px/1.3 var(--body); color: var(--muted); margin: 10px 0 12px; }
+  .item .specs b { color: var(--ink); }
+  .item .bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+  .item .burst { top: 10px; right: 10px; }
+  .play {
+    font: 800 16px/1 var(--cond); text-transform: uppercase; letter-spacing: .06em;
+    background: var(--blue); color: #fff; padding: 9px 12px 8px; white-space: nowrap;
+  }
+  .item:hover .play, .hero:hover .play { background: var(--red); }
+  .hero .play { font-size: 20px; padding: 12px 16px 10px; }
+
+  /* ---------- coupon / log ---------- */
+  .coupon {
+    position: relative; border: 3px dashed var(--ink); background: #fff; padding: 22px 22px 18px; margin-top: 8px;
+  }
+  .coupon::before { content: "✂"; position: absolute; top: -17px; left: 24px; background: var(--paper); padding: 0 6px; font-size: 22px; }
+  .coupon h3 { font: 900 28px/1 var(--cond); text-transform: uppercase; color: var(--red); }
+  .coupon .sub { font: 600 14px/1.2 var(--cond); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 4px 0 14px; }
+  .log { list-style: none; columns: 2 280px; column-gap: 32px; }
+  .log li { break-inside: avoid; display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dotted var(--rule); font-size: 15px; }
+  .log time { font: 800 15px/1.4 var(--cond); color: var(--blue); min-width: 62px; }
+
+  /* ---------- fine print ---------- */
+  footer { margin: 44px 0 0; background: var(--blue); color: #dfe8f6; }
+  footer .wrap { padding-top: 22px; padding-bottom: 28px; font-size: 12.5px; line-height: 1.5; }
+  footer b { color: var(--yellow); font: 800 15px/1 var(--cond); text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 6px; }
+
+  @media (max-width: 720px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero .pic { border-right: 0; border-bottom: 3px solid var(--ink); min-height: 200px; }
+    .hero .burst { width: 86px; height: 86px; font-size: 21px; right: -6px; }
+    .hero .price { font-size: 72px; }
+    .valid { display: none; }
+    .logo { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .item { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="logo">Paolo's<small>Arcade</small></div>
+    <div class="mast-copy">
+      <div class="week">Week 46 · Offers of the week</div>
+      <h1>Fresh games, every week!</h1>
+    </div>
+    <div class="valid">Valid from<b>Mon 09.11.</b>while stocks last</div>
+  </div>
+</header>
+<div class="strip"><div class="wrap">
+  <span>11 games in stock</span><span>0% VAT</span><span>No batteries required</span><span>Works offline</span><span>Add to home screen</span>
+</div></div>
+
+<main class="wrap">
+  <div id="hero"></div>
+
+  <div class="sec"><h2>All offers</h2><p>Tap a product to play</p></div>
+  <div class="grid" id="grid"></div>
+
+  <div class="sec"><h2>New arrivals</h2><p>Restocked daily</p></div>
+  <div class="coupon">
+    <h3>Delivery note</h3>
+    <div class="sub">Received at the warehouse · please keep for your records</div>
+    <ul class="log" id="log"></ul>
+  </div>
+</main>
+
+<footer><div class="wrap">
+  <b>The small print</b>
+  All games available only while stocks last; stocks never run out. Prices include 0% VAT. Previous prices are fictional and were never charged.
+  No returns, no refunds, no batteries. Errors, typos and vibe-coding excepted. Built by Paolo · hosted on GitHub Pages.
+</div></footer>
+
+<script>
+const GAMES = [
+  { title: "Name That Tune: Queen", emoji: "👑", brand: "Music quiz", desc: "Hear 15 seconds of a Queen song, name it before the clock runs out. Three levels, 10 rounds.", url: "./queen-name-that-tune/", added: "2026-11-12", tags: ["1 player", "online"], was: "24.99", unit: "1 song = 0.00 € · bohemian rhapsody not included" },
+  { title: "Call of BESS", emoji: "🔋", brand: "3D shooter", desc: "Drones and rogue robot dogs attack the battery storage site. You are on duty.", url: "./call-of-bess/", added: "2026-11-11", tags: ["1 player", "desktop"], was: "59.99", unit: "per MWh 0.00 €" },
+  { title: "Piano Chords", emoji: "🎹", brand: "Music tool", desc: "Any chord from C to 13♯11, on keyboard and sheet music, with inversions.", url: "./piano-chords/", added: "2026-11-08", tags: ["tool", "offline"], was: "19.99", unit: "88 keys · 0.00 € per key" },
+  { title: "Whisker Rush", emoji: "🐈", brand: "3D racing", desc: "Build your cat, chase the laser dot against 5 rivals across 8 tracks.", url: "./whisker-rush/", added: "2026-11-08", tags: ["1 player", "offline"], was: "34.99", unit: "1 kg cat = 0.00 €" },
+  { title: "D2R Leveling Guide", emoji: "⚔️", brand: "Diablo II planner", desc: "Pick a class and build, see where every skill and stat point goes.", url: "./d2r-leveling-guide/", added: "2026-11-07", tags: ["tool", "offline"], was: "9.99", unit: "stay a while and save" },
+  { title: "Bridge School", emoji: "♠️", brand: "Card game", desc: "10 short lessons, bidding drills, then play full hands with hints.", url: "./bridge-school/", added: "2026-11-07", tags: ["1 player", "offline"], was: "14.99", unit: "52 cards · 0.00 € per card" },
+  { title: "Atomic Chess", emoji: "💥", brand: "Strategy", desc: "Every capture explodes. Blow up the enemy king to win.", url: "./atomic-chess/", added: "2026-11-06", tags: ["1–2 players", "offline"], was: "12.99", unit: "contains explosives" },
+  { title: "FingerTwist", emoji: "🖐️", brand: "Party game", desc: "Tap the colours as they light up. 1 to 4 players, one screen.", url: "./finger-twist/", added: "2026-11-06", tags: ["1–4 players"], was: "7.99", unit: "max. 20 fingers per phone" },
+  { title: "Neon Ice Hockey", emoji: "🏒", brand: "Action", desc: "Air-hockey duel for two on one phone.", url: "./neon-ice-hockey/", added: "2026-11-05", tags: ["2 players"], was: "8.99", unit: "ice not included" },
+  { title: "Neon Pong Duo", emoji: "🏓", brand: "Classic", desc: "Two players, one screen, first to the target score wins.", url: "./neon-pong-duo/", added: "2026-11-05", tags: ["2 players"], was: "4.99", unit: "1972 recipe" },
+  { title: "Dots and Lines", emoji: "🔲", brand: "Strategy", desc: "Punti e Linee: close boxes to score. Two players or vs a 4-level bot.", url: "./dots-and-lines/", added: "2026-11-04", tags: ["1–2 players", "offline"], was: "3.99", unit: "pen and paper not required" },
+];
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const dm = d => { const [, m, day] = d.split("-"); return `${day}.${m}.`; };
+const isNew = g => (Date.now() - new Date(g.added + "T12:00:00")) / 864e5 <= 6;
+const games = [...GAMES].sort((a, b) => b.added.localeCompare(a.added));
+const price = big => `<span class="price">0<sup>.–</sup></span>`;
+const was = g => `<span class="was"><small>was</small><s>${esc(g.was)}</s></span>`;
+
+const hero = games[0];
+document.getElementById("hero").innerHTML = `
+  <a class="hero" href="${esc(hero.url)}">
+    <div class="burst">−100%</div>
+    <div class="pic"><span>${esc(hero.emoji)}</span></div>
+    <div class="info">
+      <div class="kicker">Deal of the week · new in stock</div>
+      <h3>${esc(hero.title)}</h3>
+      <p>${esc(hero.desc)}</p>
+      <div class="unit">${esc(hero.tags.join(" · "))} · ${esc(hero.unit)}</div>
+      <div class="row">
+        <div class="tag-wrap">${was(hero)}${price()}</div>
+        <span class="play">Play now ▸</span>
+      </div>
+    </div>
+  </a>`;
+
+document.getElementById("grid").innerHTML = games.slice(1).map(g => `
+  <a class="item" href="${esc(g.url)}">
+    ${isNew(g) ? '<div class="burst">New!</div>' : ""}
+    <div class="pic">${esc(g.emoji)}</div>
+    <div class="brand">${esc(g.brand)}</div>
+    <h3>${esc(g.title)}</h3>
+    <p>${esc(g.desc)}</p>
+    <div class="specs"><b>${esc(g.tags.join(" · "))}</b><br>${esc(g.unit)}</div>
+    <div class="bottom">
+      <div class="tag-wrap">${was(g)}${price()}</div>
+      <span class="play">Play ▸</span>
+    </div>
+  </a>`).join("");
+
+document.getElementById("log").innerHTML = games.map(g => `
+  <li><time datetime="${esc(g.added)}">${dm(g.added)}</time><span>${esc(g.emoji)} <b>${esc(g.title)}</b> · 1 pc.</span></li>`).join("");
+</script>
+</body>
+</html>

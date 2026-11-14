@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paolo's Arcade</title>
+<meta name="theme-color" content="#ffffff">
+<style>
+  :root { --ink:#202122; --muted:#54595d; --link:#3366cc; --rule:#a2a9b1; --soft:#eaecf0; --box:#f8f9fa; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; color: var(--ink); font: 16px/1.6 "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px 48px; }
+
+  .top { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--soft); }
+  .mark { font: 28px/1 Georgia, serif; }
+  .site { font: 20px/1.1 Georgia, "Linux Libertine", "Times New Roman", serif; }
+  .site small { display: block; font: 12px/1.3 "Helvetica Neue", Arial, sans-serif; color: var(--muted); }
+
+  h1 { font: 32px/1.25 Georgia, "Linux Libertine", "Times New Roman", serif; border-bottom: 1px solid var(--rule); margin: 22px 0 4px; padding-bottom: 4px; }
+  .from { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  h2 { font: 24px/1.3 Georgia, "Linux Libertine", "Times New Roman", serif; border-bottom: 1px solid var(--rule); margin: 30px 0 10px; padding-bottom: 2px; }
+
+  .infobox { float: right; width: 270px; margin: 0 0 16px 20px; border: 1px solid var(--rule); background: var(--box); font-size: 14px; }
+  .infobox caption, .infobox .cap { font-weight: 700; text-align: center; padding: 6px; font-size: 15px; }
+  .infobox .img { text-align: center; font-size: 72px; line-height: 1.2; padding: 6px 0 2px; }
+  .infobox .img + div { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 6px; }
+  .infobox table { width: 100%; border-collapse: collapse; }
+  .infobox th, .infobox td { text-align: left; vertical-align: top; padding: 4px 8px; border-top: 1px solid var(--soft); }
+  .infobox th { width: 42%; }
+
+  .lead { margin-bottom: 12px; }
+  sup.cn { font-size: 11px; white-space: nowrap; }
+
+  table.games { width: auto; min-width: 0; border-collapse: collapse; font-size: 15px; background: var(--box); border: 1px solid var(--rule); }
+  .games th, .games td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+  .games th { background: var(--soft); }
+  .games td:first-child { white-space: nowrap; }
+  .games .new { font-size: 11px; color: #d33; font-weight: 700; margin-left: 6px; vertical-align: super; }
+  .games .date { white-space: nowrap; color: var(--muted); }
+
+  ol.hist { padding-left: 22px; font-size: 15px; }
+  .clear { clear: both; }
+  footer { margin-top: 36px; padding-top: 10px; border-top: 1px solid var(--soft); font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 640px) {
+    .infobox { float: none; width: 100%; margin: 0 0 16px; }
+    h1 { font-size: 28px; }
+    .games .hide-sm { display: none; }
+    .games td:first-child { white-space: normal; }
+    table.games { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">🕹️</div>
+    <div class="site">Paolopedia<small>The free arcade</small></div>
+  </div>
+
+  <h1>Paolo's Arcade</h1>
+  <div class="from">From Paolopedia, the free arcade</div>
+
+  <div class="infobox">
+    <div class="cap">Paolo's Arcade</div>
+    <div class="img">🕹️</div>
+    <div>Logo, c. 2026</div>
+    <table id="facts"></table>
+  </div>
+
+  <p class="lead"><b>Paolo's Arcade</b> is a collection of small browser games and tools made by Paolo. Most work offline and can be added to a phone's home screen. It is widely regarded as the finest arcade on GitHub Pages.<sup class="cn">[<a href="#">citation needed</a>]</sup></p>
+
+  <h2>Games</h2>
+  <table class="games">
+    <thead><tr><th>Title</th><th>Genre</th><th class="hide-sm">Players</th><th>Added</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="clear"></div>
+
+  <footer>This page was last edited by Paolo. Text is available under the Pizza-Sharing licence.</footer>
+</div>
+
+<script>
+const GAMES = [
+  { title: "Name That Tune: Queen", genre: "Music quiz", players: "1", url: "./queen-name-that-tune/", added: "2026-11-12" },
+  { title: "Call of BESS", genre: "3D shooter", players: "1", url: "./call-of-bess/", added: "2026-11-11" },
+  { title: "Piano Chords", genre: "Music tool", players: "–", url: "./piano-chords/", added: "2026-11-08" },
+  { title: "Whisker Rush", genre: "3D racing", players: "1", url: "./whisker-rush/", added: "2026-11-08" },
+  { title: "D2R Leveling Guide", genre: "Game planner", players: "–", url: "./d2r-leveling-guide/", added: "2026-11-07" },
+  { title: "Bridge School", genre: "Card game", players: "1", url: "./bridge-school/", added: "2026-11-07" },
+  { title: "Atomic Chess", genre: "Strategy", players: "1–2", url: "./atomic-chess/", added: "2026-11-06" },
+  { title: "FingerTwist", genre: "Party", players: "1–4", url: "./finger-twist/", added: "2026-11-06" },
+  { title: "Neon Ice Hockey", genre: "Action", players: "2", url: "./neon-ice-hockey/", added: "2026-11-05" },
+  { title: "Neon Pong Duo", genre: "Classic", players: "2", url: "./neon-pong-duo/", added: "2026-11-05" },
+  { title: "Dots and Lines", genre: "Strategy", players: "1–2", url: "./dots-and-lines/", added: "2026-11-04" },
+];
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+const short = d => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const isNew = g => (Date.now() - new Date(g.added + "T12:00:00")) / 864e5 <= 6;
+const games = [...GAMES].sort((a, b) => b.added.localeCompare(a.added));
+
+document.getElementById("facts").innerHTML = `
+  <tr><th>Type</th><td>Arcade</td></tr>
+  <tr><th>Founded</th><td>${fmt(games.at(-1).added)}</td></tr>
+  <tr><th>Founder</th><td>Paolo</td></tr>
+  <tr><th>Games</th><td>${games.length}</td></tr>
+  <tr><th>Latest</th><td><a href="${esc(games[0].url)}">${esc(games[0].title)}</a></td></tr>
+  <tr><th>Admission</th><td>Free</td></tr>`;
+
+document.getElementById("rows").innerHTML = games.map(g => `
+  <tr><td><a href="${esc(g.url)}">${esc(g.title)}</a>${isNew(g) ? '<span class="new">new</span>' : ""}</td>
+  <td>${esc(g.genre)}</td><td class="hide-sm">${esc(g.players)}</td><td class="date">${short(g.added)}</td></tr>`).join("");
+
+</script>
+</body>
+</html>
