@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="BSB Tune">
+<title>Name That Tune: Backstreet Boys Edition</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #f5f7fc; --panel: #ffffff; --line: #e2e6f0; --text: #141826; --muted: #6a7187;
+    --blue: #1e6bff; --violet: #8a4dff; --sky: #00a6d6; --green: #12a150; --red: #e5484d;
+    --shadow: 0 1px 2px rgba(20,24,38,.05), 0 6px 20px -10px rgba(20,24,38,.18);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(900px 500px at 0% -10%, #e4edff 0%, transparent 60%),
+      radial-gradient(700px 420px at 110% 0%, #efe7ff 0%, transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent; overscroll-behavior: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button, a.btn { font: inherit; color: inherit; border: 0; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .app { min-height: 100%; max-width: 520px; margin: 0 auto; padding: 18px 18px 12px; display: flex; flex-direction: column; }
+  .screen { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+  .hidden { display: none !important; }
+
+  /* ---------- top bar ---------- */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+  .pill {
+    border: 1px solid var(--line); background: rgba(255,255,255,.85); border-radius: 999px;
+    padding: 6px 14px; font-size: 14px; color: var(--muted); white-space: nowrap; box-shadow: var(--shadow);
+  }
+  .pill b { color: var(--text); }
+  .icon-btn {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line);
+    display: grid; place-items: center; font-size: 19px; box-shadow: var(--shadow);
+  }
+  .back { color: var(--muted); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; min-height: 44px; }
+
+  /* ---------- home ---------- */
+  .eyebrow { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--blue); font-weight: 700; }
+  h1 {
+    font-size: clamp(36px, 10.5vw, 52px); line-height: 1.02; margin-top: 6px;
+    background: linear-gradient(90deg, var(--blue), var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tagline { color: var(--muted); font-size: 16px; line-height: 1.5; }
+  .hero { display: grid; place-items: center; padding: 8px 0; }
+  .hero svg { width: 124px; height: 124px; filter: drop-shadow(0 12px 22px rgba(30,107,255,.22)); }
+  .rules { list-style: none; padding: 0; display: grid; gap: 8px; }
+  .big {
+    width: 100%; min-height: 58px; border-radius: 16px; font-size: 19px; font-weight: 800; letter-spacing: .02em;
+    background: linear-gradient(90deg, var(--blue), var(--violet)); color: #fff;
+    box-shadow: 0 12px 30px -12px var(--blue);
+    transition: transform .1s ease;
+  }
+  .big:active { transform: scale(.98); }
+  .big:disabled { opacity: .5; }
+  .ghost {
+    width: 100%; min-height: 50px; border-radius: 14px; font-size: 16px; font-weight: 700;
+    background: var(--panel); border: 1px solid var(--line); color: var(--text); box-shadow: var(--shadow);
+  }
+  .q { font-size: 22px; font-weight: 800; text-align: center; margin-top: 4px; }
+  .levels { display: grid; gap: 10px; }
+  .lvl {
+    width: 100%; min-height: 72px; border-radius: 16px; padding: 12px 16px; text-align: left;
+    background: var(--panel); border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line)); box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: 14px; transition: transform .1s ease, box-shadow .15s ease;
+  }
+  .lvl:active { transform: scale(.98); box-shadow: 0 0 0 2px var(--c), 0 10px 28px -12px var(--c); }
+  .lvl .crowns { flex: none; width: 54px; font-size: 17px; letter-spacing: -1px; text-align: center; color: var(--c); }
+  .lvl .a { font-size: 17px; font-weight: 800; display: block; }
+  .lvl .lv { margin-left: auto; text-align: right; font-size: 12px; color: var(--c); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  .lvl .lv small { display: block; color: var(--muted); font-weight: 600; letter-spacing: 0; text-transform: none; font-size: 12px; }
+  .lvl:disabled { opacity: .5; }
+  .livetag { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .1em; color: #fff; background: var(--red); border-radius: 5px; padding: 1px 6px; margin-right: 6px; vertical-align: 2px; }
+  .share {
+    width: 100%; min-height: 54px; border-radius: 16px; font-size: 17px; font-weight: 800;
+    background: var(--panel); color: var(--blue); border: 1px solid color-mix(in srgb, var(--blue) 40%, var(--line));
+    box-shadow: var(--shadow);
+  }
+  .share:active { transform: scale(.98); }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
+    background: var(--text); color: #fff; font-weight: 700; font-size: 14px; border-radius: 12px; padding: 10px 16px;
+    box-shadow: 0 10px 30px -10px rgba(20,24,38,.5); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 9;
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .warn {
+    border: 1px solid color-mix(in srgb, var(--red) 40%, transparent); background: color-mix(in srgb, var(--red) 8%, #fff);
+    border-radius: 14px; padding: 11px 14px; font-size: 14px; color: #a3262a;
+  }
+
+  /* ---------- loading ---------- */
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
+  .spinner { width: 54px; height: 54px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--blue); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .muted { color: var(--muted); }
+
+  /* ---------- play ---------- */
+  .stage {
+    position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow);
+    padding: 18px; display: grid; place-items: center; min-height: 216px;
+  }
+  .ring { position: relative; width: 168px; height: 168px; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .ring .track { stroke: #edf0f7; }
+  .ring .bar { stroke: var(--blue); stroke-linecap: round; transition: stroke .3s; }
+  .ring.low .bar { stroke: var(--red); }
+  .ring-inner { position: absolute; inset: 0; display: grid; place-items: center; }
+  .playbtn {
+    width: 116px; height: 116px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #6fa0ff, var(--blue) 55%, #5a3fe0);
+    color: #fff; font-size: 44px; box-shadow: 0 14px 34px -10px rgba(30,107,255,.6);
+    display: grid; place-items: center; padding-left: 8px;
+  }
+  .playbtn:active { transform: scale(.96); }
+  .count { font-size: 50px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .eq { display: flex; gap: 4px; align-items: flex-end; height: 22px; margin-top: 8px; justify-content: center; }
+  .eq i { width: 5px; background: var(--violet); border-radius: 3px; animation: eq .9s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -.3s; } .eq i:nth-child(3) { animation-delay: -.6s; } .eq i:nth-child(4) { animation-delay: -.15s; } .eq i:nth-child(5) { animation-delay: -.45s; }
+  @keyframes eq { 0%,100% { height: 5px; } 50% { height: 22px; } }
+  .paused .eq i { animation-play-state: paused; }
+  .hint { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+  .options { display: grid; gap: 10px; }
+  .opt {
+    min-height: 58px; border-radius: 14px; padding: 10px 16px; text-align: left; font-size: 17px; font-weight: 700;
+    background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px;
+    transition: transform .1s ease, border-color .15s ease, background .15s ease;
+  }
+  .opt .k {
+    flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 14px;
+    border: 1px solid var(--line); color: var(--muted); background: #f7f8fc;
+  }
+  .opt:not(:disabled):active { transform: scale(.98); border-color: var(--blue); }
+  .opt:disabled { cursor: default; }
+  .options.waiting .opt { opacity: .45; }
+  .opt.right { border-color: var(--green); background: color-mix(in srgb, var(--green) 10%, #fff); }
+  .opt.right .k { border-color: var(--green); color: #fff; background: var(--green); }
+  .opt.wrong { border-color: var(--red); background: color-mix(in srgb, var(--red) 8%, #fff); }
+  .opt.wrong .k { border-color: var(--red); color: #fff; background: var(--red); }
+  .opt.dim { opacity: .4; }
+
+  .reveal {
+    display: flex; gap: 14px; align-items: center; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+    border-radius: 16px; padding: 12px; animation: pop .25s ease;
+  }
+  @keyframes pop { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .reveal img { width: 64px; height: 64px; border-radius: 10px; flex: none; background: var(--line); object-fit: cover; }
+  .reveal .t { font-weight: 800; font-size: 16px; }
+  .reveal .s { color: var(--muted); font-size: 13px; }
+  .reveal a { color: var(--blue); font-size: 13px; font-weight: 700; text-decoration: none; }
+  .verdict { font-size: 22px; font-weight: 800; text-align: center; }
+  .verdict.ok { color: var(--green); }
+  .verdict.ko { color: var(--red); }
+
+  /* ---------- results ---------- */
+  .score-big {
+    font-size: 72px; font-weight: 800; line-height: 1; text-align: center;
+    background: linear-gradient(90deg, var(--blue), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .newbest { text-align: center; color: #fff; background: var(--green); border-radius: 8px; padding: 3px 10px; font-weight: 800; font-size: 13px; letter-spacing: .08em; justify-self: center; }
+  .summary { list-style: none; padding: 0; display: grid; gap: 6px; }
+  .summary li { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 15px; }
+  .summary .mk { width: 22px; text-align: center; font-weight: 800; }
+  .summary .ok { color: var(--green); } .summary .ko { color: var(--red); }
+  .summary .nm { flex: 1; }
+  .summary .pts { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .summary a { color: var(--blue); text-decoration: none; font-size: 18px; padding: 0 2px; }
+
+  footer.credit { margin-top: 14px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  @media (prefers-reduced-motion: reduce) { .eq i, .spinner { animation: none; } .reveal { animation: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HOME -->
+  <section class="screen" id="home">
+    <div class="top">
+      <a class="back" href="../">‹ Paolo's Arcade</a>
+      <div style="display:flex;gap:8px">
+        <button class="icon-btn" id="vibeBtn" aria-label="Vibration">📳</button>
+        <button class="icon-btn" id="muteBtn" aria-label="Sound effects">🔊</button>
+      </div>
+    </div>
+    <div>
+      <div class="eyebrow">Name That Tune</div>
+      <h1>Backstreet Boys Edition</h1>
+    </div>
+    <div class="hero" aria-hidden="true">
+      <svg viewBox="0 0 160 160">
+        <defs>
+          <linearGradient id="hg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#1e6bff"/><stop offset="1" stop-color="#8a4dff"/></linearGradient>
+        </defs>
+        <circle cx="80" cy="92" r="58" fill="#141826"/>
+        <circle cx="80" cy="92" r="46" fill="none" stroke="#2c3247" stroke-width="2"/>
+        <circle cx="80" cy="92" r="34" fill="none" stroke="#2c3247" stroke-width="2"/>
+        <circle cx="80" cy="92" r="16" fill="url(#hg)"/>
+        <circle cx="80" cy="92" r="3.5" fill="#fff"/>
+        <g fill="url(#hg)" stroke="#fff" stroke-width="2.5" stroke-linejoin="round">
+          <path id="st" d="M0 -11 L3.2 -3.6 L11 -3.4 L5 1.6 L6.8 9.4 L0 5.2 L-6.8 9.4 L-5 1.6 L-11 -3.4 L-3.2 -3.6 Z" transform="translate(24 40)"/>
+          <use href="#st" transform="translate(28 -18)"/>
+          <use href="#st" transform="translate(56 -26)"/>
+          <use href="#st" transform="translate(84 -18)"/>
+          <use href="#st" transform="translate(112 0)"/>
+        </g>
+      </svg>
+    </div>
+    <p class="tagline">Name the song from a 15-second clip. Faster answers score more.</p>
+    <div class="warn hidden" id="offlineWarn">You're offline. The song clips stream from Apple Music, so connect to the internet to play.</div>
+    <div class="q">How well do you know the Backstreet Boys?</div>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <!-- LOADING -->
+  <section class="screen hidden" id="loading">
+    <div class="center">
+      <div class="spinner"></div>
+      <div style="font-size:20px;font-weight:800">Warming up the harmonies…</div>
+      <div class="muted" id="loadText">Finding song previews</div>
+      <button class="ghost hidden" id="loadRetry" style="max-width:260px">Try again</button>
+      <button class="ghost hidden" id="loadHome" style="max-width:260px">Back</button>
+    </div>
+  </section>
+
+  <!-- PLAY -->
+  <section class="screen hidden" id="play">
+    <div class="top">
+      <button class="icon-btn" id="quitBtn" aria-label="Quit game">✕</button>
+      <div class="pill"><span id="levelName">Easy</span> · <b id="roundNo">1</b>/10</div>
+      <div class="pill">Score <b id="scoreNo">0</b></div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="44" fill="none" stroke-width="7"/><circle class="bar" id="ringBar" cx="50" cy="50" r="44" fill="none" stroke-width="7" stroke-dasharray="276.46" stroke-dashoffset="0"/></svg>
+        <div class="ring-inner">
+          <button class="playbtn" id="playBtn" aria-label="Play clip">▶</button>
+          <div class="hidden" id="countWrap" style="text-align:center">
+            <div class="count" id="count">15</div>
+            <div class="eq"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint" id="hint">Tap to play the clip</div>
+    </div>
+    <div class="options waiting" id="options"></div>
+    <div id="after" class="hidden" style="display:grid;gap:12px">
+      <div class="verdict" id="verdict"></div>
+      <div class="reveal" id="reveal"></div>
+      <button class="big" id="nextBtn">Next song ▶</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="screen hidden" id="results">
+    <div class="top">
+      <a class="back" href="../">‹ Paolo's Arcade</a>
+    </div>
+    <div style="display:grid;gap:8px;text-align:center">
+      <div class="muted" id="finalLevel" style="font-size:14px"></div>
+      <div class="eyebrow" id="rank">Final score</div>
+      <div class="score-big" id="finalScore">0</div>
+      <div class="muted" id="finalLine"></div>
+      <div class="newbest hidden" id="newBest">NEW BEST</div>
+    </div>
+    <ul class="summary" id="summary"></ul>
+    <button class="share" id="shareBtn">Share my score ↗</button>
+    <button class="big" id="againBtn">Play again ▶</button>
+    <button class="ghost" id="levelBtn">Change level</button>
+  </section>
+
+  <footer class="credit">
+    Song previews courtesy of Apple Music<br>
+    Fan-made for fun · not affiliated with the Backstreet Boys or Apple
+  </footer>
+</div>
+ <div class="toast" id="toast"></div>
+<audio id="audio" preload="auto" playsinline></audio>
+<script src="songs.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
