@@ -1,0 +1,18 @@
+{
+  "name": "Apollo AGC — Apollo 11 Guidance Computer",
+  "short_name": "Apollo AGC",
+  "description": "Fly the real Apollo 11 guidance computer: DSKY emulator, astronaut training, live code view and a guided tour of the source.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0b0e13",
+  "theme_color": "#0b0e13",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

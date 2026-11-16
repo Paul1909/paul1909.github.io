@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0b0e13"/>
+  <rect x="76" y="70" width="360" height="372" rx="34" fill="#8e908e"/>
+  <rect x="104" y="98" width="128" height="150" rx="10" fill="#6c6e6c"/>
+  <rect x="120" y="116" width="44" height="30" rx="5" fill="#fffbe8"/>
+  <rect x="172" y="116" width="44" height="30" rx="5" fill="#ffc94d"/>
+  <rect x="120" y="158" width="44" height="30" rx="5" fill="#a8a99f"/>
+  <rect x="172" y="158" width="44" height="30" rx="5" fill="#ffc94d"/>
+  <rect x="120" y="200" width="44" height="30" rx="5" fill="#a8a99f"/>
+  <rect x="172" y="200" width="44" height="30" rx="5" fill="#a8a99f"/>
+  <rect x="246" y="98" width="162" height="150" rx="10" fill="#0c0f0c"/>
+  <g fill="#6dff8e">
+    <path d="M300 118l9 8v30l-9 6-9-6v-30zM300 166l9 6v30l-9 8-9-8v-30z"/><path d="M352 118l9 8v30l-9 6-9-6v-30zM352 166l9 6v30l-9 8-9-8v-30z"/>
+    
+  </g>
+  <g fill="#ecebe3">
+    <rect x="104" y="272" width="78" height="44" rx="9"/><rect x="194" y="272" width="56" height="44" rx="9"/><rect x="262" y="272" width="56" height="44" rx="9"/><rect x="330" y="272" width="78" height="44" rx="9"/>
+    <rect x="104" y="328" width="78" height="44" rx="9"/><rect x="194" y="328" width="56" height="44" rx="9"/><rect x="262" y="328" width="56" height="44" rx="9"/><rect x="330" y="328" width="78" height="44" rx="9"/>
+    <rect x="194" y="384" width="56" height="30" rx="8"/><rect x="262" y="384" width="56" height="30" rx="8"/>
+  </g>
+</svg>
