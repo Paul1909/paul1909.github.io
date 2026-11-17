@@ -13,7 +13,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 const settings = { sound: store.get('sound', true), vibe: store.get('vibe', true), color: store.get('color', 0), gfx: store.get('gfx', 'high'),
-  cam: store.get('cam', 'chase'), retro: store.get('retro', true), ctrl: store.get('ctrl', 'halves') };
+  cam: store.get('cam', 'chase'), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), retro: store.get('retro', true), ctrl: store.get('ctrl', 'halves') };
 const progress = store.get('progress', { unlocked: 1, best: {} });
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const vibrate = ms => { if (settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
@@ -1293,7 +1293,7 @@ function policeMesh() {
 }
 function resetPolice() { Object.assign(police, { heat: 0, bust: 0, spawnT: 0, calmT: 0, cool: {}, block: false, wrongT: 0, nearest: 999 }); }
 function violation(kind, text) {
-  if (game.state !== 'race' || !player.alive) return;
+  if (game.state !== 'race' || !player.alive || !settings.road.police) return;
   if (game.t - (police.cool[kind] ?? -99) < 9) return;
   police.cool[kind] = game.t;
   police.heat = Math.min(3, police.heat + 1); police.calmT = 0; police.spawnT = Math.min(police.spawnT, 0.6);
@@ -1392,6 +1392,8 @@ function activateFeatures() {
 }
 function makeFeature(f) {
   const t = f.t;
+  if (t === 'jay' && !settings.road.peds) return;
+  if (!settings.road.obstacles && t !== 'jay' && t !== 'ramp' && t !== 'wrench' && t !== 'turbo') return;   // ramps and power-ups always stay
   if (t === 'jay') { spawnPed(f.s, f.d, 'jay'); return; }
   if (t === 'parked') {
     const type = f.sub, c = type === 'bus' ? pick(BUS_COLORS) : pick(CAR_COLORS);
@@ -1426,6 +1428,7 @@ function laneFree(s, d, gap) {
   return true;
 }
 function spawnTraffic(dir, sAt) {
+  if (!settings.road.traffic) return;
   const st = T.stage;
   const s = sAt ?? (dir > 0 ? player.s + R(230, 340) : player.s + R(300, 420));
   if (s > T.len + 150) return;
@@ -1444,6 +1447,7 @@ function spawnTraffic(dir, sAt) {
     lcT: R(5, 14) });
 }
 function spawnCross(I, k) {
+  if (!settings.road.traffic) return;
   const dir = k ? 1 : -1, d = -dir * 44, s = I.s + (k ? -3 : 3);
   for (const o of ents) if (!o.dead && o.kind === 'cross' && Math.abs(o.s - s) < 1 && Math.abs(o.d - d) < 9) return;
   const type = pick(['sedan', 'hatch', 'van', 'taxi', 'sedan']), c = type === 'taxi' ? 0xf4c20d : pick(CAR_COLORS);
@@ -1475,7 +1479,7 @@ function updateWorld(dt) {
     if (opp < st.oncoming * 3.2 && Math.random() < dt * 3) spawnTraffic(-1);
   }
   // sidewalk walkers in town
-  if (sidePeds < 10 * st.peds) {
+  if (settings.road.peds && sidePeds < 10 * st.peds) {
     const s = ps + R(80, 320);
     if (isTownAt(s) && !T.inters.some(I => Math.abs(I.s - s) < 12)) spawnPed(s, (Math.random() < 0.5 ? -1 : 1) * R(8.6, 10.6), 'side');
   }
@@ -1494,7 +1498,7 @@ function updateWorld(dt) {
       if (I.cyc !== L.cyc && I.s > ps + 25) {
         I.cyc = L.cyc;
         const n = Math.round(R(0.5, 2.5) * st.peds);
-        for (let i = 0; i < n; i++) { const sd = Math.random() < 0.5 ? -1 : 1; spawnPed(I.s + (Math.random() < 0.5 ? -9 : 9) + R(-1, 1), sd * R(8.2, 9.8), 'cross', -sd * R(1.6, 2.2)); }
+        if (settings.road.peds) for (let i = 0; i < n; i++) { const sd = Math.random() < 0.5 ? -1 : 1; spawnPed(I.s + (Math.random() < 0.5 ? -9 : 9) + R(-1, 1), sd * R(8.2, 9.8), 'cross', -sd * R(1.6, 2.2)); }
       }
     }
   }
@@ -2237,7 +2241,7 @@ function finishRace(reason) {
   const canNext = idx + 1 < STAGES.length && progress.unlocked > idx + 1;
   $('nextBtn').classList.toggle('hidden', !canNext);
   releaseWake();
-  const tag = reason === 'busted' ? 'BUSTED' : reason ? 'DNF' : ord(place).toUpperCase();
+  const tag = (reason === 'busted' ? 'BUSTED' : reason ? 'DNF' : ord(place).toUpperCase()) + (Object.values(settings.road).every(Boolean) ? '' : '*');
   const hl = hsList(idx), rank = hl.filter(e => e.s >= game.score).length;
   if (rank < 5 && game.score > 0) openEntry(idx, rank, game.score, tag); else showResult(idx, -1);
 }
@@ -2264,6 +2268,7 @@ function swapPlayerColor() {
   if (!player) return;
   const pc = PLAYER_COLORS[settings.color]; scene.remove(player.mesh); player.mesh = rallyMesh(pc.col, pc.acc, 1); player.mesh.add(headSpot, headSpot.target); scene.add(player.mesh);
 }
+const ROAD_OPTS = [['traffic', 'TRAFFIC'], ['police', 'POLICE'], ['obstacles', 'OBSTACLES'], ['peds', 'PEOPLE']];
 const OPT = {
   cam: { label: () => 'CAMERA: ' + CAM_NAMES[settings.cam], click: () => cycleCamera() },
   retro: { label: () => 'SCREEN: ' + (settings.retro ? "90'S" : 'SHARP'), click: () => { settings.retro = !settings.retro; store.set('retro', settings.retro); applyRetro(); } },
@@ -2274,6 +2279,8 @@ const OPT = {
 function syncToggles() {
   document.querySelectorAll('[data-opt]').forEach(b => { const o = OPT[b.dataset.opt]; b.textContent = o.label(); b.classList.toggle('off', !!(o.off && o.off())); b.classList.toggle('hidden', !!(o.touchOnly && !isTouch)); });
 }
+for (const [k, name] of ROAD_OPTS) OPT['road_' + k] = { label: () => name + ': ' + (settings.road[k] ? 'ON' : 'OFF'), off: () => !settings.road[k],
+  click: () => { settings.road[k] = !settings.road[k]; store.set('road', settings.road); loadStage(game.stageIdx, true); } };
 document.querySelectorAll('[data-opt]').forEach(b => { b.onclick = () => { audioInit(); OPT[b.dataset.opt].click(); syncToggles(); }; });
 function applyRetro() { document.body.classList.toggle('retro', settings.retro); applyQuality(Q.level); }
 /* ---------- high scores (top 5 per stage, 3-letter initials, arcade style) ---------- */

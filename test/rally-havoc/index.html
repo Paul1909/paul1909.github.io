@@ -154,6 +154,8 @@
   .chip:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
   .chip.off { background: linear-gradient(180deg, #6a6f80, #3a3e4e); }
   .chip.alt { background: linear-gradient(180deg, #3d63ff, #1028a0); }
+  .chip.road { background: linear-gradient(180deg, #3dd65a, #0f8a24); min-width: 128px; }
+  .chip.road.off { background: linear-gradient(180deg, #6a6f80, #3a3e4e); }
   .sw { width: 50px; height: 40px; border: 3px solid #000; box-shadow: 3px 3px 0 #000; transform: skewX(-8deg); }
   .sw.sel { border-color: var(--y); outline: 3px solid #000; }
   .big { padding: 14px; font-family: var(--disp); font-style: italic; font-size: 24px; letter-spacing: 1px; text-shadow: 3px 3px 0 #000;
@@ -231,6 +233,13 @@
   <div class="wrap">
     <div class="logo"><span class="a chrome">RALLY</span><span class="b gold">HAVOC</span></div>
     <div class="copy pix">© 1997 PAOLO'S ARCADE · FREE PLAY</div>
+    <div class="sect pix">ROAD SETUP</div>
+    <div class="row">
+      <button class="chip road" data-opt="road_traffic"></button>
+      <button class="chip road" data-opt="road_police"></button>
+      <button class="chip road" data-opt="road_obstacles"></button>
+      <button class="chip road" data-opt="road_peds"></button>
+    </div>
     <div class="sect pix blink">SELECT STAGE</div>
     <div class="stages" id="stages"></div>
     <div class="sect pix">SELECT CAR</div>
@@ -257,6 +266,7 @@
         <li>RED LIGHT = CROSS TRAFFIC + PEOPLE. PEDESTRIANS COST 1000 PTS.</li>
         <li><b>POLICE:</b> RUN A RED, DRIVE THE WRONG WAY, HIT PEOPLE OR CARS AND THE COPS COME. EACH OFFENCE = ONE MORE STAR. IF THEY BOX YOU IN AND STOP YOU: BUSTED! LOSE THEM FOR 7 SECONDS TO ESCAPE. TAKEDOWNS PAY 1000.</li>
         <li>TOP 3 UNLOCKS THE NEXT STAGE.</li>
+        <li><b>ROAD SETUP:</b> SWITCH TRAFFIC, POLICE, OBSTACLES AND PEOPLE ON OR OFF. RAMPS AND POWER-UPS ALWAYS STAY. HIGH SCORES MADE WITH SOMETHING SWITCHED OFF GET A *.</li>
       </ul>
     </div>
     <div class="foot pix">WORKS OFFLINE ONCE OPENED</div>
