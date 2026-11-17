@@ -72,6 +72,8 @@
   #pos { font-size: clamp(30px, 11vh, 64px); color: var(--y); }
   #pos small { font-size: .45em; color: #fff; }
   #lap, #split { font-size: clamp(14px, 4vh, 22px); }
+  #note { margin-top: .5vh; font-size: clamp(14px, 4.4vh, 24px); color: var(--y); animation: blink .35s steps(2) infinite; }
+  #note small { color: #fff; font-size: .75em; }
   #timer { font-size: clamp(26px, 9vh, 52px); color: #fff; }
   #timer.warn { color: #ff4a3a; animation: blink .5s steps(2) infinite; }
   #timerLbl { font-size: clamp(11px, 2.8vh, 15px); color: var(--y); }
@@ -79,8 +81,8 @@
   #msg { position: absolute; left: 0; right: 0; top: 30%; text-align: center; font-size: clamp(36px, 15vh, 96px); color: var(--y); pointer-events: none; }
   #msg small { display: block; font-size: .4em; color: #fff; }
   #speedo { position: absolute; left: 50%; bottom: max(4px, env(safe-area-inset-bottom)); transform: translateX(-50%); text-align: center; line-height: .9; }
-  #tacho { display: block; width: clamp(150px, 46vh, 240px); height: auto; }
-  #spd { font-size: clamp(22px, 7.5vh, 44px); margin-top: -.15em; }
+  #spd { font-size: clamp(30px, 10vh, 60px); }
+  #gear { font-size: clamp(12px, 3vh, 18px); color: var(--y); }
   #spd small { font-size: .38em; color: var(--y); }
   .tbtn { position: absolute; top: max(8px, env(safe-area-inset-top)); pointer-events: auto; font-family: var(--arcade); font-size: 18px; width: 44px; height: 44px;
     background: rgba(0, 0, 0, .45); border: 2px solid #fff; border-radius: 6px; text-shadow: 1px 1px 0 #000; }
@@ -110,11 +112,11 @@
 <canvas id="gl"></canvas>
 
 <div id="hud" hidden>
-  <div class="hl arc"><div id="pos">4<small>/4</small></div><div id="lap">LAP 1/2</div></div>
+  <div class="hl arc"><div id="pos">4<small>/4</small></div><div id="lap">LAP 1/2</div><div id="note"></div></div>
   <div class="hc arc"><div id="timerLbl">TIME</div><div id="timer">0:00.00</div><div id="split" class="yel"></div></div>
   <div class="hr"><canvas id="mini" width="150" height="150"></canvas></div>
   <div id="msg" class="arc"></div>
-  <div id="speedo" class="arc"><canvas id="tacho" width="256" height="132"></canvas><div id="spd">0<small> km/h</small></div></div>
+  <div id="speedo" class="arc"><div id="spd">0<small> km/h</small></div><div id="gear">GEAR 1</div></div>
   <button id="pauseBtn" class="tbtn" aria-label="Pause">II</button>
   <button id="camBtn" class="tbtn" aria-label="Camera">CAM</button>
   <div id="steerZone" class="ctl"><div class="pad" id="left">◀</div><div class="pad" id="right">▶</div></div>
@@ -134,7 +136,7 @@
       <div class="row"><span class="lbl">Music</span><button class="opt" data-set="music" data-v="1">On</button><button class="opt" data-set="music" data-v="0">Off</button></div>
       <div class="row"><span class="lbl">Sound FX</span><button class="opt" data-set="sfx" data-v="1">On</button><button class="opt" data-set="sfx" data-v="0">Off</button></div>
       <div class="row"><span class="lbl">Vibration</span><button class="opt" data-set="vibe" data-v="1">On</button><button class="opt" data-set="vibe" data-v="0">Off</button></div>
-      <div class="row"><span class="lbl">Graphics</span><button class="opt" data-set="res" data-v="240">Retro 240p</button><button class="opt" data-set="res" data-v="480">Sharp 480p</button></div>
+      <div class="row"><span class="lbl">Graphics</span><button class="opt" data-set="res" data-v="240">Retro</button><button class="opt" data-set="res" data-v="480">Sharp</button></div>
       <div class="row"><span class="lbl">Auto-accel</span><button class="opt" data-set="auto" data-v="1">On</button><button class="opt" data-set="auto" data-v="0">Off</button></div>
       <div class="row" style="margin-top:1.4vh"><button class="btn" id="optBack">Back</button></div>
     </div>

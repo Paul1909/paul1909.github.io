@@ -1,16 +1,15 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'rally-italia-95';
-const VERSION = APP + '-v2';
+const VERSION = APP + '-v4';
 const FILES = [
   './',
   './index.html',
   './app.js',
   './js/tracks.js',
   './js/cars.js',
-  './js/world.js',
-  './js/gfx.js',
+  './js/render.js',
+  './js/sprites.js',
   './js/audio.js',
-  './vendor/three.module.min.js',
   './music.mp3',
   './fonts/racing-sans-one.woff2',
   './fonts/OFL.txt',
