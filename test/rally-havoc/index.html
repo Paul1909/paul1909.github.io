@@ -100,6 +100,17 @@
   #padL { left: max(12px, env(safe-area-inset-left)); }
   #padR { left: calc(max(12px, env(safe-area-inset-left)) + 100px); }
   #padB.small { right: max(14px, env(safe-area-inset-right)); width: 96px; height: 96px; font-size: 11px; }
+  #padN { right: calc(max(14px, env(safe-area-inset-right)) + 112px); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 26px); width: 78px; height: 78px; font-size: 12px; line-height: 1.6; text-align: center;
+    background: radial-gradient(circle at 38% 32%, #a8f0ff, #1a7bff 55%, #0a2a90); box-shadow: 0 6px 0 #061850, 0 6px 0 3px #000; }
+  #padN span { display: block; font-size: 9px; color: var(--y); }
+  #padN.empty { filter: grayscale(1) brightness(.7); }
+  #padN.burn { animation: nosburn .2s steps(1) infinite; }
+  @keyframes nosburn { 50% { filter: brightness(1.9) saturate(1.4); } }
+  #nosIcons { display: flex; gap: 4px; align-items: center; height: 22px; }
+  #nosIcons i { width: 11px; height: 20px; border: 2px solid #000; border-radius: 3px 3px 2px 2px; background: linear-gradient(180deg, #ff2a1a 0 18%, #a8f0ff 18%, #1a7bff); box-shadow: 2px 2px 0 #000; }
+  #nosIcons b { font-family: var(--pix); font-size: 11px; font-weight: normal; color: #fff; text-shadow: 2px 2px 0 #000; }
+  #nosIcons .none { font-family: var(--pix); font-size: 8px; color: #8a90a8; text-shadow: 2px 2px 0 #000; }
+  #nosIcons.burn i { animation: nosburn .2s steps(1) infinite; }
   #wanted { margin-top: 6px; padding: 4px 10px 6px; background: rgba(0,0,0,.6); border: 3px solid #ff2a1a; box-shadow: 3px 3px 0 #000; text-align: center; animation: siren .45s steps(1) infinite; }
   #wanted .lbl { color: #fff; } #stars { font-size: 14px; color: var(--y); letter-spacing: 2px; margin-left: 6px; }
   #bust { height: 6px; background: #000; margin-top: 4px; border: 1px solid #fff; } #bustI { display: block; height: 100%; width: 0; background: #ff2a1a; }
@@ -174,7 +185,7 @@
     <div class="col">
       <div id="pos"><span class="lbl">POS</span><span id="posN" class="gold">6</span><span id="posOf" class="chrome">/6</span></div>
       <div class="barRow"><span class="lbl">DAMAGE</span><div class="bar"><i id="hpBar"></i></div></div>
-      <div class="barRow"><span class="lbl">TURBO</span><div class="bar turbo" id="tbWrap"><i id="tbBar"></i></div></div>
+      <div class="barRow"><span class="lbl">NOS</span><div id="nosIcons"></div></div>
     </div>
     <div id="mid">
       <span class="lbl">TIME</span>
@@ -191,8 +202,9 @@
   <div id="msgs"></div>
   <div id="padL" class="pad">◀</div>
   <div id="padR" class="pad">▶</div>
+  <div id="padN" class="pad small">NOS<span id="padNc">×2</span></div>
   <div id="padB" class="pad small">BRAKE</div>
-  <div id="keysHint" class="pix hidden">ARROWS STEER - DOWN BRAKE - SPACE DRIFT - C CAMERA - P PAUSE</div>
+  <div id="keysHint" class="pix hidden">ARROWS STEER - DOWN BRAKE - UP/SHIFT NOS - SPACE DRIFT - C CAMERA - P PAUSE</div>
 </div>
 <button id="pauseBtn" class="icon hidden" aria-label="Pause">II</button>
 <button id="camBtn" class="icon hidden" aria-label="Change camera">CAM</button>
@@ -219,10 +231,10 @@
     <div class="howto hidden" id="howto">
       <b>THE CAR ACCELERATES BY ITSELF.</b> YOU STEER AND BRAKE.
       <ul>
-        <li><b>PHONE/IPAD:</b> ARROWS ON THE LEFT STEER. THE WHOLE RIGHT SIDE IS THE BRAKE. BRAKE + STEER AT SPEED = DRIFT.</li>
-        <li><b>KEYBOARD:</b> LEFT/RIGHT ARROWS STEER, DOWN ARROW BRAKES, SPACE HANDBRAKE, C CAMERA, P PAUSE.</li>
+        <li><b>PHONE/IPAD:</b> ARROWS ON THE LEFT STEER. ON THE RIGHT: BRAKE AND THE BLUE NOS BUTTON.</li>
+        <li><b>KEYBOARD:</b> LEFT/RIGHT ARROWS STEER, DOWN ARROW BRAKES, UP ARROW OR SHIFT = NOS, SPACE HANDBRAKE, C CAMERA, P PAUSE.</li>
         <li>CURVES PUSH YOU OUT: BRAKE BEFORE, STEER EARLY. HANDBRAKE + STEER = DRIFT.</li>
-        <li><b>NEAR MISSES, DRIFTS, JUMPS</b> FILL TURBO. FULL BAR = BOOST.</li>
+        <li><b>NOS:</b> YOU START WITH 2. BLUE BOTTLES ON THE ROAD GIVE ONE MORE. RIVALS AND POLICE GRAB THEM TOO! NEAR MISSES, DRIFTS AND JUMPS SCORE POINTS.</li>
         <li>EVERY HIT COSTS DAMAGE. TOO MUCH AND YOU <b>EXPLODE</b>. WRENCHES REPAIR.</li>
         <li>RAM RIVALS INTO TRAFFIC. RED BARRELS GO BOOM.</li>
         <li>RED LIGHT = CROSS TRAFFIC + PEOPLE. PEDESTRIANS COST 1000 PTS.</li>

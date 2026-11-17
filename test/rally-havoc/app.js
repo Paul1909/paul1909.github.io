@@ -652,7 +652,7 @@ const PROPS = {
   ramp: () => { const p = [P_('wedge', 3.6, 1.15, 6.5, 0, 0, -3.25, 0xf2c21a)]; for (let i = 0; i < 4; i++) p.push(P_('box', 3.62, 0.04, 0.45, 0, 0.09 + i * 0.27, -2.45 + i * 1.55, 0x1a1a1a, -Math.atan2(1.15, 6.5))); p.push(P_('box', 0.3, 1.2, 0.3, -1.65, 0.6, 3.1, 0x444444)); p.push(P_('box', 0.3, 1.2, 0.3, 1.65, 0.6, 3.1, 0x444444)); return merge(p); },
   oil: () => merge([P_('cyl', 2.2, 0.02, 1.7, 0, 0.03, 0, 0x0b0b10), P_('cyl', 1.2, 0.022, 0.9, 0.5, 0.034, 0.3, 0x1a1830)]),
   wrench: () => merge([P_('torus', 0.75, 0.75, 0.9, 0, 0, 0, 0x2bff6a), P_('box', 0.9, 0.28, 0.12, 0, 0, 0, 0xffffff), P_('box', 0.28, 0.9, 0.12, 0, 0, 0, 0xffffff)]),
-  turbo: () => merge([P_('torus', 0.75, 0.75, 0.9, 0, 0, 0, 0x3db7ff), P_('cyl', 0.28, 0.75, 0.28, 0, -0.05, 0, 0xffffff), P_('cone', 0.22, 0.35, 0.22, 0, 0.5, 0, 0xff7a1a)]),
+  turbo: () => merge([P_('torus', 0.8, 0.8, 0.9, 0, 0, 0, 0x3db7ff), P_('cyl', 0.26, 0.8, 0.26, 0, -0.05, 0, 0x1a5cff), P_('cyl', 0.27, 0.12, 0.27, 0, 0.05, 0, 0xffffff), P_('cone', 0.26, 0.2, 0.26, 0, 0.45, 0, 0x1a5cff), P_('cyl', 0.08, 0.16, 0.08, 0, 0.6, 0, 0xff2a1a)]),
   triangle: () => merge([P_('cone', 0.4, 0.05, 0.4, 0, 0.42, 0, 0xff2a1a, Math.PI / 2, 0, 0), P_('box', 0.05, 0.42, 0.05, 0, 0.2, 0, 0x333333)]),
 };
 const propGeo = t => cached('prop_' + t, PROPS[t]);
@@ -779,6 +779,10 @@ function buildTrack(st) {
     const both = rng() < 0.3, side = rng() < 0.6 ? 1 : -1;
     for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 18 && F[k].t !== 'jay' && (both || Math.sign(F[k].d) === side)) F.splice(k, 1);
     if (both) F.push({ t: 'ramp', s: q, d: 3.5 }, { t: 'ramp', s: q, d: -3.5 }); else F.push({ t: 'ramp', s: q, d: 3.5 * side });
+  }
+  for (let q = 200; q < st.len - 100; q += 140 + rng() * 160) {
+    if (nearInter(q) || F.some(f => Math.abs(f.s - q) < 10)) continue;
+    F.push({ t: rng() < 0.55 ? 'turbo' : 'wrench', s: q, d: LANES[(rng() * 4) | 0] });
   }
   F.sort((a, b) => a.s - b.s); T.feats = F; T.featIdx = 0;
 }
@@ -1143,12 +1147,12 @@ const SFX = {
 
 /* ============================== input ============================== */
 // Touch: each finger is assigned a zone (L, R, B = brake, H = handbrake) from where it is on screen.
-const input = { kL: false, kR: false, kB: false, kH: false, touches: new Map() };
+const input = { kL: false, kR: false, kB: false, kH: false, kN: false, touches: new Map() };
 const touchEl = $('touch');
 function rectOf(id, pad = 14) { const el = $(id); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left - pad, r: r.right + pad, t: r.top - pad, b: r.bottom + pad, cx: (r.left + r.right) / 2 }; }
 const inRect = (q, x, y) => q && x >= q.l && x <= q.r && y >= q.t && y <= q.b;
 function touchZone(x, y) {
-  if (x >= innerWidth / 2) return 'B';
+  if (x >= innerWidth / 2) { const a = rectOf('padB'), b = rectOf('padN'); return a && b ? (x > (a.cx + b.cx) / 2 ? 'B' : 'N') : 'B'; }
   const a = rectOf('padL'), b = rectOf('padR');
   return a && b ? (x < (a.cx + b.cx) / 2 ? 'L' : 'R') : 'L';
 }
@@ -1162,6 +1166,7 @@ addEventListener('keydown', e => {
   else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.kR = true;
   else if (k === 'ArrowDown' || k === 's' || k === 'S') input.kB = true;
   else if (k === ' ') input.kH = true;
+  else if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === 'n' || k === 'N' || k === 'Shift') input.kN = true;
   else if (k === 'c' || k === 'C') { if (game.state !== 'menu') cycleCamera(); }
   else if (k === 'p' || k === 'P' || k === 'Escape') { if (game.state === 'race' || game.state === 'countdown') pauseGame(); else if (game.state === 'paused') resumeGame(); }
   else return;
@@ -1173,15 +1178,14 @@ addEventListener('keyup', e => {
   else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.kR = false;
   else if (k === 'ArrowDown' || k === 's' || k === 'S') input.kB = false;
   else if (k === ' ') input.kH = false;
+  else if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === 'n' || k === 'N' || k === 'Shift') input.kN = false;
 });
-addEventListener('blur', () => { input.kL = input.kR = input.kB = input.kH = false; input.touches.clear(); });
+addEventListener('blur', () => { input.kL = input.kR = input.kB = input.kH = input.kN = false; input.touches.clear(); });
 function readInput() {
-  let L = input.kL, Rr = input.kR, B = input.kB, H = input.kH;
-  for (const v of input.touches.values()) { if (v === 'L') L = true; else if (v === 'R') Rr = true; else if (v === 'B') B = true; else H = true; }
+  let L = input.kL, Rr = input.kR, B = input.kB, H = input.kH, N = input.kN;
+  for (const v of input.touches.values()) { if (v === 'L') L = true; else if (v === 'R') Rr = true; else if (v === 'B') B = true; else if (v === 'N') N = true; }
   const steer = (Rr ? 1 : 0) - (L ? 1 : 0);
-  let touchB = false; for (const v of input.touches.values()) if (v === 'B') touchB = true;
-  const slide = touchB && steer !== 0 && player && player.v > 18;    // touch: brake while steering at speed = drift
-  return { steer, brake: B, hand: H || slide, L, R: Rr, B, H };
+  return { steer, brake: B, hand: H, nos: N, L, R: Rr, B, H, N };
 }
 
 /* ============================== entities ============================== */
@@ -1267,10 +1271,10 @@ function spawnRallyCars(colorIdx) {
     const st = T.stage;
     addEnt('rival', { name: r.name, s: grid[i][0], d: grid[i][1], hs: 2.05, hd: 0.92, mass: 1, hp: 100, maxhp: 100, vehicle: true,
       mesh: rallyMesh(r.col, r.acc, i + 2), colorCss: '#' + new THREE.Color(r.col).getHexString(), noPool: true,
-      base: st.rival * r.skill, aggr: r.aggr, look: 55 + r.skill * 30, think: Math.random() * 0.3, targetD: grid[i][1], ramT: 0, finished: false });
+      base: st.rival * r.skill, nos: 2, boostT: 0, aggr: r.aggr, look: 55 + r.skill * 30, think: Math.random() * 0.3, targetD: grid[i][1], ramT: 0, finished: false });
   });
   player = addEnt('player', { s: grid[5][0], d: grid[5][1], hs: 2.05, hd: 0.92, mass: 1, hp: 100, maxhp: 100, vehicle: true,
-    mesh: rallyMesh(pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, meter: 0, oil: 0, onRamp: false, drift: 0, finished: false });
+    mesh: rallyMesh(pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, nos: 2, oil: 0, onRamp: false, drift: 0, finished: false });
   player.mesh.add(headSpot, headSpot.target);
 }
 
@@ -1296,7 +1300,7 @@ function violation(kind, text) {
 function spawnCop(s, d, vs, block, ang = 0) {
   const key = 'policeX';
   return addEnt('police', { sub: 'police', s, d, hs: 2.2, hd: 0.92, mass: 1.4, hp: 150, maxhp: 150, vehicle: true, key, mesh: getMesh(key, policeMesh),
-    vs, ang, think: 0, targetD: d, block, parked: block, giveUp: false });
+    vs, ang, think: 0, targetD: d, block, parked: block, giveUp: false, nos: 0, boostT: 0 });
 }
 function spawnChaser() {
   const s = Math.max(4, player.s - R(85, 110));
@@ -1349,6 +1353,7 @@ function updatePolice(e, dt) {
   if (!chasing) target = e.giveUp ? 12 : 0;
   else if (ds > 20) {                                          // catching up: fast, weaving through traffic
     target = Math.min(56, p.v + 14);
+    if (e.boostT > 0) { e.boostT -= dt; target = 66; } else if (e.nos > 0 && ds > 45) { e.nos--; e.boostT = 3; if (ds < 120) msg('POLICE NOS!', 'blue'); }
     if (e.think <= 0) {
       e.think = 0.25; let best = e.targetD, bs = -1e9;
       for (const L of [...LANES, p.d]) { const sc = Math.min(4, blockersAhead(e, L, 60, 1)) - Math.abs(L - p.d) * 0.12 - Math.abs(L - e.d) * 0.05; if (sc > bs) { bs = sc; best = L; } }
@@ -1662,7 +1667,7 @@ function zones(e) {
       else if (e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
     } else if (e === player && game.state === 'race') {
       if (z.zone === 'wrench') { player.hp = Math.min(100, player.hp + 30); msg('REPAIR +30%', 'good'); }
-      else { player.meter = Math.min(100, player.meter + 50); msg('TURBO +50', 'blue'); }
+      else { player.nos++; msg('NOS +1', 'blue'); }
       SFX.pickup(); vibrate(20); addScore(100); removeEnt(z);
     }
   }
@@ -1674,7 +1679,7 @@ function verticalStep(e, dt) {
   if (e.onRamp) {
     const z = e.onRamp;
     if (e.s > z.s + z.hs || Math.abs(z.d - e.d) > z.hd) {
-      if (e.s > z.s + z.hs) { const sp = Math.abs(e.vs); e.vy = sp * 0.17 + 1.5; if (e === player) { msg('AIR!', 'blue'); player.meter = Math.min(100, player.meter + 20); addScore(200); } }
+      if (e.s > z.s + z.hs) { const sp = Math.abs(e.vs); e.vy = sp * 0.17 + 1.5; if (e === player) { msg('AIR! +200', 'blue'); addScore(200); } }
       e.onRamp = null;
     } else return;
   }
@@ -1727,10 +1732,9 @@ function updatePlayer(p, dt, inp) {
   p.drift = !air && p.v > 16 ? slip : 0;
   if (p.drift > 0.08) {
     p.v -= p.drift * 3.2 * dt;
-    if (racing && p.turbo <= 0) { p.meter = Math.min(100, p.meter + p.drift * dt * 70); if (game.state === 'race') addScore(Math.round(p.drift * dt * 400)); }
+    if (game.state === 'race') addScore(Math.round(p.drift * dt * 400));
   }
   if (p.turbo > 0) p.turbo -= dt;
-  else if (p.meter >= 100 && racing && p.alive) { p.turbo = 3.2; p.meter = 0; msg('TURBO!', 'blue'); SFX.turbo(); vibrate(30); }
   p.vs = p.v * Math.cos(p.vh); p.vd = p.v * Math.sin(p.vh);
   updateGearbox(p, dt, inp, air);
 }
@@ -1792,6 +1796,7 @@ function updateRival(r, dt) {
     for (const L of LANES) {
       let sc = Math.min(4, blockersAhead(r, L, r.look, 1));
       sc -= Math.abs(L - r.d) * 0.08 + (L < 0 ? 0.25 : 0) + R(0, 0.25);
+      sc += pickupAhead(r, L, r.hp < 75) * 0.9;
       if (sc > bestScore) { bestScore = sc; best = L; }
     }
     r.targetD = best; r.ttc = blockersAhead(r, r.d, 40, 1);
@@ -1800,6 +1805,13 @@ function updateRival(r, dt) {
     if (player.alive && Math.abs(ds) < 3.5 && Math.abs(dd) < 4.2 && Math.random() < r.aggr * 0.35) { r.ramT = 0.6; r.ramD = player.d; }
   }
   let target = racing ? r.base * (0.8 + 0.2 * r.hp / r.maxhp) : 0;
+  // rivals fire their NOS on a clear straight, mostly when the player is close or late in the stage
+  if (r.boostT > 0) r.boostT -= dt;
+  else if (r.nos > 0 && game.state === 'race' && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
+    ((Math.abs(player.s - r.s) < 60 && Math.random() < dt * 0.6) || (r.s > T.len * 0.7 && Math.random() < dt * 0.3))) {
+    r.nos--; r.boostT = 3.5; if (Math.abs(r.s - player.s) < 90) msg(r.name.toUpperCase() + ' NOS!', 'hot');
+  }
+  if (r.boostT > 0 && racing) target *= 1.3;
   const gap = r.s - player.s;
   if (player.alive && game.state === 'race') {
     if (gap > 70) target *= 1 - Math.min(0.14, (gap - 70) / 1200);
@@ -1812,7 +1824,7 @@ function updateRival(r, dt) {
   if (r.ramT > 0) { r.ramT -= dt; tD = r.ramD; }
   if (r.knock > 0) { r.knock -= dt; r.vs += clamp(target - r.vs, -6, 3) * dt * 0.5; r.vd *= Math.exp(-2 * dt); }
   else {
-    r.vs += clamp(target - r.vs, -14 * dt, 7 * dt);
+    r.vs += clamp(target - r.vs, -14 * dt, (r.boostT > 0 ? 18 : 7) * dt);
     const want = clamp((tD - r.d) * 2.4, -7.5, 7.5);
     r.vd += clamp(want - r.vd, -22 * dt, 22 * dt);
     r.spin *= Math.exp(-4 * dt);
@@ -1956,7 +1968,7 @@ function nearMisses() {
         const onc = (e.kind === 'traffic' && e.dir < 0) || e.kind === 'cross';
         const big = e.sub === 'bus';
         const bonus = (onc ? 30 : 18) + (big ? 8 : 0);
-        player.meter = Math.min(100, player.meter + (player.turbo > 0 ? 0 : bonus));
+        void bonus;
         addScore(onc ? 250 : 120); game.stats.near++;
         msg(onc ? 'CLOSE CALL!' : 'NEAR MISS', onc ? 'gold' : 'good'); SFX.near();
         if (e.kind === 'traffic' && Math.random() < 0.5) SFX.horn();
@@ -2072,11 +2084,12 @@ function vehicleFx(dt) {
   const back = -1.9;
   if (p.drift > 0.12 && p.y < 0.1) for (const sd of [-0.8, 0.8]) puff(SMK, p.s + back, p.d + sd, 0.25, 1, COL.tyre0, COL.tyre1, 1.0, 1.1, 0.6, clamp(p.drift * 1.6, 0.2, 0.7), 0.8);
   if (Math.abs(p.d) > RW + 0.2 && p.v > 8 && !trackAt(p.s, tr1).town && p.y < 0.1) puff(SMK, p.s + back, p.d, 0.3, 2, COL.dust0, COL.dust1, 1.4, 1.2, 1, 0.55, 1.2);
+  for (const e of ents) if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) { worldPos(e.s - 2.2, e.d + 0.5, 0.35 + e.y, _w); for (let i = 0; i < 2; i++) emit(FX, _w.x, _w.y, _w.z, R(-0.5, 0.5), R(0, 0.5), R(-0.5, 0.5), 0.18, 0.7, 0.2, 0, COL.blue0, COL.blue1, 1, 0); }
   if (p.turbo > 0) { worldPos(p.s - 2.2, p.d + 0.55, 0.35 + p.y, _w); for (let i = 0; i < 3; i++) emit(FX, _w.x, _w.y, _w.z, R(-0.5, 0.5), R(0, 0.5), R(-0.5, 0.5), 0.18, 0.7, 0.2, 0, COL.blue0, COL.blue1, 1, 0); }
 }
 
 /* ============================== HUD ============================== */
-const hud = { wanted: $('wanted'), stars: $('stars'), bustI: $('bustI'), gear: $('gear'), padB: $('padB'), seg: [], lit: -1, pos: $('posN'), time: $('time'), score: $('score'), spd: $('spdN'), hp: $('hpBar'), tb: $('tbBar'), tbWrap: $('tbWrap'), bar: $('progBar'), dots: $('progDots'), padL: $('padL'), padR: $('padR'), acc: 0 };
+const hud = { nos: $('nosIcons'), padN: $('padN'), padNc: $('padNc'), lastNos: -1, wanted: $('wanted'), stars: $('stars'), bustI: $('bustI'), gear: $('gear'), padB: $('padB'), seg: [], lit: -1, pos: $('posN'), time: $('time'), score: $('score'), spd: $('spdN'), hp: $('hpBar'), tb: $('tbBar'), tbWrap: $('tbWrap'), bar: $('progBar'), dots: $('progDots'), padL: $('padL'), padR: $('padR'), acc: 0 };
 function buildDots() {
   hud.dots.innerHTML = '';
   for (const e of ents) if (e.kind === 'rival' || e === player) {
@@ -2100,7 +2113,7 @@ function computePlace() {
   }
 })();
 function updateHud(dt, inp) {
-  hud.padL.classList.toggle('on', inp.L); hud.padR.classList.toggle('on', inp.R); hud.padB.classList.toggle('on', inp.B);
+  hud.padL.classList.toggle('on', inp.L); hud.padR.classList.toggle('on', inp.R); hud.padB.classList.toggle('on', inp.B); hud.padN.classList.toggle('on', inp.N);
   const lit = Math.round(clamp((player.rpm - 800) / 6800, 0, 1) * hud.seg.length);
   if (lit !== hud.lit) { for (let i = 0; i < hud.seg.length; i++) hud.seg[i].classList.toggle('on', i < lit); hud.lit = lit; }
   hud.acc += dt; if (hud.acc < 0.08) return; hud.acc = 0;
@@ -2116,8 +2129,13 @@ function updateHud(dt, inp) {
   const hpF = Math.max(0, player.hp) / 100;
   hud.hp.style.width = ((1 - hpF) * 100) + '%';    // DAMAGE fills up as the car gets hurt
   hud.hp.style.background = hpF > 0.6 ? 'linear-gradient(180deg,#a6ff8a,#20c040)' : hpF > 0.3 ? 'linear-gradient(180deg,#fff3a0,#ffb000)' : 'linear-gradient(180deg,#ffb0a0,#e01800)';
-  hud.tb.style.width = (player.turbo > 0 ? player.turbo / 3.2 * 100 : player.meter) + '%';
-  hud.tbWrap.classList.toggle('full', player.turbo > 0);
+  const nk = player.nos + (player.turbo > 0 ? 100 : 0);
+  if (nk !== hud.lastNos) {
+    hud.lastNos = nk; const n = player.nos;
+    hud.nos.innerHTML = n === 0 ? '<span class="none">EMPTY</span>' : n <= 6 ? '<i></i>'.repeat(n) : '<i></i><b>×' + n + '</b>';
+    hud.padNc.textContent = '×' + n; hud.padN.classList.toggle('empty', n === 0);
+  }
+  hud.nos.classList.toggle('burn', player.turbo > 0); hud.padN.classList.toggle('burn', player.turbo > 0);
   hud.bar.style.width = clamp(player.s / T.len, 0, 1) * 100 + '%';
   for (const e of ents) if (e.dot) { e.dot.style.left = clamp((e.s - 44) / (T.len - 44), 0, 1) * 100 + '%'; e.dot.classList.toggle('dead', !e.alive); }
 }
@@ -2144,10 +2162,10 @@ function loadStage(idx, forMenu = false) {
     buildDots();
     game.state = 'countdown'; game.count = 3.6; game.lastBeep = 4;
     show('hud'); $('pauseBtn').classList.remove('hidden'); $('camBtn').classList.remove('hidden'); hide('menu'); hide('result'); hide('pause');
-    for (const id of ['padL', 'padR', 'padB']) $(id).classList.toggle('hidden', !isTouch); $('keysHint').classList.toggle('hidden', isTouch);
-    player.gear = 1; player.rpm = 900; player.shiftT = 0;
+    for (const id of ['padL', 'padR', 'padB', 'padN']) $(id).classList.toggle('hidden', !isTouch); $('keysHint').classList.toggle('hidden', isTouch);
+    player.gear = 1; player.rpm = 900; player.shiftT = 0; hud.lastNos = -1; game.nosHeld = false;
     const first = !store.get('seenTip', false);
-    if (first || idx === 0) { const tip = $('tip'); tip.innerHTML = !isTouch ? '<b>ARROWS</b> STEER &nbsp; <b>DOWN</b> BRAKE &nbsp; <b>SPACE</b> DRIFT<br><b>C</b> CAMERA &nbsp; BREAK THE RULES = POLICE!' : '<b>ARROWS</b> ON THE LEFT STEER, <b>BRAKE</b> ON THE RIGHT<br>BRAKE + STEER AT SPEED = DRIFT'; tip.classList.remove('hidden'); store.set('seenTip', true); }
+    if (first || idx === 0) { const tip = $('tip'); tip.innerHTML = !isTouch ? '<b>ARROWS</b> STEER &nbsp; <b>DOWN</b> BRAKE &nbsp; <b>UP/SHIFT</b> NOS<br>2 NOS TO START - GRAB MORE ON THE ROAD!' : '<b>ARROWS</b> ON THE LEFT STEER<br><b>BRAKE</b> + <b>NOS</b> ON THE RIGHT - 2 NOS TO START!'; tip.classList.remove('hidden'); store.set('seenTip', true); }
     try { history.pushState({ rh: 1 }, ''); } catch {}
     requestWake();
   } else game.state = 'menu';
@@ -2290,6 +2308,7 @@ function step(dt, inp) {
       else if (n <= 0) { countN.textContent = 'GO!'; countN.className = 'gold greenc'; countEl.classList.remove('hidden'); SFX.beep(true); game.state = 'race'; setTimeout(() => countEl.classList.add('hidden'), 700); }
     }
   }
+  if (inp.nos && !game.nosHeld) useNos(); game.nosHeld = inp.nos;
   if (game.state === 'race') { game.raceT += dt; if (game.raceT > 4 && game.raceT - dt <= 4) hide('tip'); }
   game.t += dt;
 
@@ -2332,7 +2351,7 @@ function step(dt, inp) {
 }
 function zonesRival(e) {
   for (const z of ents) {
-    if (z.dead || z.zone !== 'ramp' && z.zone !== 'oil') continue;
+    if (z.dead || !z.zone) continue;
     if (Math.abs(z.s - e.s) > z.hs + 2) continue;
     zonesOne(e, z);
   }
@@ -2343,6 +2362,22 @@ function zonesOne(e, z) {
     const h = (e.s - (z.s - z.hs)) / (2 * z.hs) * 1.15;
     if (h >= 0 && h <= 1.15 && e.y <= h + 0.25) { e.y = Math.max(e.y, h); e.vy = Math.max(e.vy, 0); e.onRamp = z; }
   } else if (z.zone === 'oil' && e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
+  else if ((z.zone === 'wrench' || z.zone === 'turbo') && (e.kind === 'rival' || e.kind === 'police') && game.state === 'race') {
+    if (z.zone === 'wrench') e.hp = Math.min(e.maxhp, e.hp + 30); else e.nos = (e.nos || 0) + 1;
+    const who = e.kind === 'police' ? 'POLICE' : e.name.toUpperCase();
+    if (Math.abs(z.s - player.s) < 90) msg(who + (z.zone === 'wrench' ? ' REPAIRED' : ' GOT NOS'), 'hot');
+    removeEnt(z);
+  }
+}
+// a power-up in lane L a little way ahead (rivals steer for them)
+function pickupAhead(e, L, want) {
+  for (const z of ents) if (!z.dead && (z.zone === 'turbo' || (z.zone === 'wrench' && want)) && Math.abs(z.d - L) < 1.2 && z.s - e.s > 12 && z.s - e.s < 90) return 1;
+  return 0;
+}
+function useNos() {
+  if (game.state !== 'race' || !player.alive || player.turbo > 0) return;
+  if (player.nos <= 0) { msg('NO NOS LEFT', 'hot'); return; }
+  player.nos--; player.turbo = 3.5; msg('NOS!', 'blue'); SFX.turbo(); vibrate(30);
 }
 const warm = []; for (const c of CAR_COLORS) for (const t of ['sedan', 'hatch', 'van']) warm.push([t, c]); warm.push(['taxi', 0xf4c20d]); for (const c of BUS_COLORS) warm.push(['bus', c]);
 function frame(now) {
