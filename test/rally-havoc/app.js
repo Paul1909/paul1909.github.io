@@ -649,7 +649,7 @@ const PROPS = {
   hay: () => merge([P_('cyl', 0.62, 1.3, 0.62, 0, 0.62, 0, 0xd9b44a, 0, 0, Math.PI / 2), P_('cyl', 0.5, 1.32, 0.5, 0, 0.62, 0, 0xc49a36, 0, 0, Math.PI / 2)]),
   rock: () => merge([P_('dode', 1.0, 0.75, 1.05, 0, 0.45, 0, 0x7b7670, 0.3, 0.5, 0), P_('dode', 0.6, 0.5, 0.6, 0.6, 0.3, 0.3, 0x6a655f, 0.7, 0, 0.2)]),
   barrier: () => { const p = []; for (let i = 0; i < 6; i++) p.push(P_('box', 0.62, 0.95, 0.55, -1.55 + i * 0.62, 0.48, 0, i % 2 ? 0xffffff : 0xd8261c)); p.push(P_('box', 3.75, 0.12, 0.62, 0, 0.06, 0, 0x555555)); p.push(P_('cyl', 0.12, 0.08, 0.12, -1.6, 1.0, 0, 0xffb000, Math.PI / 2)); p.push(P_('cyl', 0.12, 0.08, 0.12, 1.6, 1.0, 0, 0xffb000, Math.PI / 2)); return merge(p); },
-  ramp: () => { const p = [P_('wedge', 3.6, 1.15, 6.5, 0, 0, -3.25, 0xf2c21a)]; for (let i = 0; i < 4; i++) p.push(P_('box', 3.62, 0.04, 0.45, 0, 0.09 + i * 0.27, -2.45 + i * 1.55, 0x1a1a1a, -Math.atan2(1.15, 6.5))); p.push(P_('box', 0.3, 1.2, 0.3, -1.65, 0.6, 3.1, 0x444444)); p.push(P_('box', 0.3, 1.2, 0.3, 1.65, 0.6, 3.1, 0x444444)); return merge(p); },
+  ramp: () => { const p = [P_('wedge', 2.7, 1.15, 6.5, 0, 0, -3.25, 0xf2c21a)]; for (let i = 0; i < 4; i++) p.push(P_('box', 2.72, 0.04, 0.45, 0, 0.09 + i * 0.27, -2.45 + i * 1.55, 0x1a1a1a, -Math.atan2(1.15, 6.5))); p.push(P_('box', 0.26, 1.2, 0.26, -1.22, 0.6, 3.1, 0x444444)); p.push(P_('box', 0.26, 1.2, 0.26, 1.22, 0.6, 3.1, 0x444444)); return merge(p); },
   oil: () => merge([P_('cyl', 2.2, 0.02, 1.7, 0, 0.03, 0, 0x0b0b10), P_('cyl', 1.2, 0.022, 0.9, 0.5, 0.034, 0.3, 0x1a1830)]),
   wrench: () => merge([P_('torus', 0.75, 0.75, 0.9, 0, 0, 0, 0x2bff6a), P_('box', 0.9, 0.28, 0.12, 0, 0, 0, 0xffffff), P_('box', 0.28, 0.9, 0.12, 0, 0, 0, 0xffffff)]),
   turbo: () => merge([P_('torus', 0.8, 0.8, 0.9, 0, 0, 0, 0x3db7ff), P_('cyl', 0.26, 0.8, 0.26, 0, -0.05, 0, 0x1a5cff), P_('cyl', 0.27, 0.12, 0.27, 0, 0.05, 0, 0xffffff), P_('cone', 0.26, 0.2, 0.26, 0, 0.45, 0, 0x1a5cff), P_('cyl', 0.08, 0.16, 0.08, 0, 0.6, 0, 0xff2a1a)]),
@@ -776,9 +776,10 @@ function buildTrack(st) {
   // jump ramps on their own schedule: one side of the road, or both sides at once
   for (let q = 260; q < st.len - 160; q += (230 + rng() * 200) / st.ramps) {
     if (nearInter(q) || (isTownAt(q) && rng() < 0.3)) continue;
-    const both = rng() < 0.3, side = rng() < 0.6 ? 1 : -1;
-    for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 18 && F[k].t !== 'jay' && (both || Math.sign(F[k].d) === side)) F.splice(k, 1);
-    if (both) F.push({ t: 'ramp', s: q, d: 3.5 }, { t: 'ramp', s: q, d: -3.5 }); else F.push({ t: 'ramp', s: q, d: 3.5 * side });
+    // one lane wide, so traffic can steer around; sometimes one in each direction's inner lane
+    const lanes = rng() < 0.3 ? [1.75, -1.75] : [LANES[(rng() * 4) | 0]];
+    for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 18 && F[k].t !== 'jay' && lanes.some(d => Math.abs(F[k].d - d) < 2.6)) F.splice(k, 1);
+    for (const d of lanes) F.push({ t: 'ramp', s: q, d });
   }
   for (let q = 200; q < st.len - 100; q += 140 + rng() * 160) {
     if (nearInter(q) || F.some(f => Math.abs(f.s - q) < 10)) continue;
@@ -1246,7 +1247,7 @@ function propMesh(t) {
   const gr = new THREE.Group();
   const flat = t === 'oil', glow = t === 'wrench' || t === 'turbo';
   const m = new THREE.Mesh(propGeo(t), glow ? matLights : matV); if (!flat && !glow) m.castShadow = true; gr.add(m);
-  if (!flat && !glow && t !== 'triangle') { const s = shadowMesh(t === 'barrier' ? 4.4 : t === 'ramp' ? 4.4 : t === 'rock' ? 2.8 : 1.4, t === 'ramp' ? 7.5 : t === 'rock' ? 2.8 : 1.4); gr.add(s); gr.userData.shadow = s; }
+  if (!flat && !glow && t !== 'triangle') { const s = shadowMesh(t === 'barrier' ? 4.4 : t === 'ramp' ? 3.4 : t === 'rock' ? 2.8 : 1.4, t === 'ramp' ? 7.5 : t === 'rock' ? 2.8 : 1.4); gr.add(s); gr.userData.shadow = s; }
   return gr;
 }
 
@@ -1379,7 +1380,7 @@ function updatePolice(e, dt) {
 
 /* ---------- static features ---------- */
 function activateFeatures() {
-  const ahead = player.s + 340;
+  const ahead = player.s + 560;
   while (T.featIdx < T.feats.length && T.feats[T.featIdx].s < ahead) {
     const f = T.feats[T.featIdx++];
     if (f.s < player.s - 20) continue;
@@ -1404,7 +1405,7 @@ function makeFeature(f) {
     rock: { hs: 1.0, hd: 1.0, mass: Infinity, hard: 1.5 },
     barrier: { hs: 0.32, hd: 1.88, mass: Infinity, hard: 1.3 },
     triangle: { hs: 0.25, hd: 0.3, mass: 0.03, hard: 0, light: true },
-    ramp: { hs: 3.25, hd: 1.8, solid: false, zone: 'ramp', mass: Infinity },
+    ramp: { hs: 3.25, hd: 1.35, solid: false, zone: 'ramp', mass: Infinity },
     oil: { hs: 2.0, hd: 2.0, solid: false, zone: 'oil', mass: Infinity },
     wrench: { hs: 1.0, hd: 1.0, solid: false, zone: 'wrench', mass: Infinity, y: 1.1 },
     turbo: { hs: 1.0, hd: 1.0, solid: false, zone: 'turbo', mass: Infinity, y: 1.1 },
@@ -1412,6 +1413,7 @@ function makeFeature(f) {
   if (!spec) return;
   const e = addEnt('prop', Object.assign({ sub: t, s: f.s, d: f.d, key: 'p_' + t, mesh: getMesh('p_' + t, () => propMesh(t)), ang: t === 'barrier' || t === 'ramp' || t === 'oil' ? 0 : Math.random() * 6, hp: 1, maxhp: 1, tumble: 0 }, spec));
   if (t === 'rock') e.ang = f.s;
+  if (t === 'ramp') for (const o of ents) if (!o.dead && o.kind === 'traffic' && Math.abs(o.s - e.s) < e.hs + 4 && Math.abs(o.d - e.d) < 2.4) removeEnt(o);   // ramps appear far ahead; clear any car parked on the spot
   return e;
 }
 
@@ -1430,6 +1432,7 @@ function spawnTraffic(dir, sAt) {
   const type = isBus ? 'bus' : pick(['sedan', 'sedan', 'hatch', 'hatch', 'van', 'taxi']);
   if (!laneFree(s, d, isBus ? 26 : 18)) return;
   if (T.inters.some(I => Math.abs(I.s - s) < 16)) return;
+  if (ents.some(o => !o.dead && o.zone === 'ramp' && Math.abs(o.d - d) < 2 && Math.abs(o.s - s) < 16)) return;
   const c = type === 'bus' ? pick(BUS_COLORS) : type === 'taxi' ? 0xf4c20d : pick(CAR_COLORS);
   const spd = type === 'bus' ? R(10, 12.5) : R(13, 19);
   addEnt('traffic', { sub: type, s, d, dir, hs: { bus: 5.6, hatch: 1.85, van: 2.4 }[type] || 2.2, hd: { bus: 1.25, hatch: 0.85, van: 0.95 }[type] || 0.9,
@@ -1768,20 +1771,24 @@ function wallCheck(e) {
 }
 function p_spinWall(e, sd, v) { e.spin -= sd * v * 0.04; }
 
+function rampAhead(e, laneD, dir, look) {
+  for (const o of ents) if (!o.dead && o.zone === 'ramp' && Math.abs(o.d - laneD) < 1.5) { const ds = (o.s - e.s) * dir; if (ds > -o.hs - 3 && ds < look) return true; }
+  return false;
+}
 function blockersAhead(e, laneD, look, dir) {
   // time-to-contact with the nearest thing ahead in a lane
   let best = 99;
   const v = Math.max(1, Math.abs(e.vs));
   for (const o of ents) {
     if (o === e || o.dead) continue;
-    if (!o.solid && o.zone !== 'oil') continue;
+    if (!o.solid && o.zone !== 'oil' && !(o.zone === 'ramp' && e.kind === 'traffic')) continue;
     if (o.zone === 'oil' && e.kind === 'traffic') continue;
     const ds = (o.s - e.s) * dir; if (ds < -1 || ds > look) continue;
     let lat = Math.abs(o.d - laneD);
     if (o.kind === 'cross') lat = Math.abs(o.d + o.vd * Math.min(2, ds / v) - laneD);
     if (lat > o.hd + e.hd + (o.kind === 'ped' ? 1.2 : 0.4)) continue;
-    const close = v - o.vs * dir;
-    const ttc = close <= 0.5 ? (ds < 9 ? 0.2 : 99) : ds / close;
+    const close = v - o.vs * dir, gap = ds - (o.hs || 0) - e.hs;   // bumper-to-bumper distance
+    const ttc = close <= 0.5 ? (gap < 4 ? 0.2 : 99) : Math.max(0, gap) / close;
     if (ttc < best) best = ttc;
   }
   return best;
@@ -1864,6 +1871,8 @@ function updateTraffic(e, dt) {
   if (ttc < 2.5) target = Math.min(target, Math.max(0, Math.abs(e.vs) * (ttc - 0.6) / 2));
   const L = nextLight(e, dir);
   if (L && L.st !== 'G' && !(L.st === 'Y' && L.dist < 9)) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 4.5 * (L.dist - 1))));
+  // a ramp in our lane ahead: move over in good time (traffic never drives onto ramps)
+  if (!e.changing && rampAhead(e, e.laneD, dir, 70)) { const other = dir * (Math.abs(e.laneD) > 3 ? 1.75 : 5.25); if (!rampAhead(e, other, dir, 70) && blockersAhead(e, other, 30, dir) > 2) { e.laneD = other; e.changing = true; } }
   // stuck behind a wreck or obstacle (not a light): pull into the other lane
   if (Math.abs(e.vs) < 1.5 && !(L && L.st !== 'G')) e.stuckT = (e.stuckT || 0) + dt; else e.stuckT = 0;
   if (e.stuckT > 1.5 && !e.changing) { const other = dir * (Math.abs(e.laneD) > 3 ? 1.75 : 5.25); if (blockersAhead(e, other, 20, dir) > 2) { e.laneD = other; e.changing = true; e.stuckT = 0; } }
@@ -2325,7 +2334,7 @@ function step(dt, inp) {
       else if (e.kind === 'cross') updateCross(e, h);
       else if (e.kind === 'ped') updatePed(e, h);
       else if (e.kind === 'prop') updateProp(e, h);
-      if (e.vehicle || e.kind === 'ped' || (e.kind === 'prop' && e.inv > 0)) { if (e.vehicle && e.alive && e.kind !== 'cross') zonesRival(e); verticalStep(e, h); }
+      if (e.vehicle || e.kind === 'ped' || (e.kind === 'prop' && e.inv > 0)) { if (e.vehicle && e.alive && (e.kind === 'rival' || e.kind === 'police')) zonesRival(e); verticalStep(e, h); }
     }
     if (player.alive) { zones(player); }
     integratePlayer(player, h);
