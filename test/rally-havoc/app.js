@@ -525,7 +525,7 @@ function carDetails(S, B, b, l, lo) {
       if (xh > 0) for (const sx of [-1, 1]) b.push(withRM(P_('box', 0.03, 0.035, 0.15, sx * (xh + 0.006), yh, zh, TRIMC), M_TRIM.slice(1)));
     }
   }
-  if (!lo && S.exhaust !== false) b.push(withRM(P_('cyl', 0.045, 0.22, 0.045, -0.5, 0.26, endZ(B, 0.5, 0.3, false) + 0.02, 0x666666, HPI), M_CHROME.slice(1)));
+  if (S.exhaust !== false) b.push(withRM(P_('cyl', 0.045, 0.22, 0.045, -0.5, 0.26, endZ(B, 0.5, 0.3, false) + 0.02, 0x666666, HPI), M_CHROME.slice(1)));
 }
 function buildCar(S, lo) {
   buildLo = lo;
@@ -608,6 +608,7 @@ function rallyGeo(col, acc) {
         const C = cabinSpec(S0, B), roofY = z => C.yt(z);
         b.push(RB(0.38, 0.1, 0.42, 0.04, 0, roofY(-0.25) + 0.03, -0.25, acc));                    // roof scoop
         b.push(withRM(P_('box', 0.24, 0.06, 0.04, 0, roofY(-0.25) + 0.04, -0.03, TRIMC), M_TRIM.slice(1)));
+        b.push(withRM(P_('cyl', 0.055, 0.22, 0.055, 0.5, 0.26, endZ(B, 0.5, 0.3, false) + 0.02, 0x666666, HPI), M_CHROME.slice(1)));   // second exhaust
         for (const zw of [1.3, -1.3]) for (const sx of [-1, 1]) b.push(withRM(P_('box', 0.32, 0.3, 0.02, sx * 0.8, 0.2, zw - 0.36 - 0.12, zw < 0 ? acc : TRIMC), [0.8, 0, 0]));   // mudflaps
       } });
     const S0 = mk();
@@ -958,7 +959,7 @@ function buildTrackMeshes(st) {
 }
 
 /* ============================== particles ============================== */
-const PMAX = 1800;
+const PMAX = 3200;
 function makePS(blending, cap) {
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(cap * 3), pcol = new Float32Array(cap * 4), psize = new Float32Array(cap);
@@ -1150,10 +1151,10 @@ const SFX = {
 // Touch: each finger is assigned a zone (L, R, B = brake, H = handbrake) from where it is on screen.
 const input = { kL: false, kR: false, kB: false, kH: false, kN: false, touches: new Map() };
 const touchEl = $('touch');
-function rectOf(id, pad = 14) { const el = $(id); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left - pad, r: r.right + pad, t: r.top - pad, b: r.bottom + pad, cx: (r.left + r.right) / 2 }; }
+function rectOf(id, pad = 14) { const el = $(id); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left - pad, r: r.right + pad, t: r.top - pad, b: r.bottom + pad, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; }
 const inRect = (q, x, y) => q && x >= q.l && x <= q.r && y >= q.t && y <= q.b;
 function touchZone(x, y) {
-  if (x >= innerWidth / 2) { const a = rectOf('padB'), b = rectOf('padN'); return a && b ? (x > (a.cx + b.cx) / 2 ? 'B' : 'N') : 'B'; }
+  if (x >= innerWidth / 2) { const a = rectOf('padB'), b = rectOf('padN'); return a && b ? (y < (a.cy + b.cy) / 2 ? 'N' : 'B') : 'B'; }   // NOS sits above BRAKE
   const a = rectOf('padL'), b = rectOf('padR');
   return a && b ? (x < (a.cx + b.cx) / 2 ? 'L' : 'R') : 'L';
 }
@@ -2095,8 +2096,27 @@ function vehicleFx(dt) {
   const back = -1.9;
   if (p.drift > 0.12 && p.y < 0.1) for (const sd of [-0.8, 0.8]) puff(SMK, p.s + back, p.d + sd, 0.25, 1, COL.tyre0, COL.tyre1, 1.0, 1.1, 0.6, clamp(p.drift * 1.6, 0.2, 0.7), 0.8);
   if (Math.abs(p.d) > RW + 0.2 && p.v > 8 && !trackAt(p.s, tr1).town && p.y < 0.1) puff(SMK, p.s + back, p.d, 0.3, 2, COL.dust0, COL.dust1, 1.4, 1.2, 1, 0.55, 1.2);
-  for (const e of ents) if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) { worldPos(e.s - 2.2, e.d + 0.5, 0.35 + e.y, _w); for (let i = 0; i < 2; i++) emit(FX, _w.x, _w.y, _w.z, R(-0.5, 0.5), R(0, 0.5), R(-0.5, 0.5), 0.18, 0.7, 0.2, 0, COL.blue0, COL.blue1, 1, 0); }
-  if (p.turbo > 0) { worldPos(p.s - 2.2, p.d + 0.55, 0.35 + p.y, _w); for (let i = 0; i < 3; i++) emit(FX, _w.x, _w.y, _w.z, R(-0.5, 0.5), R(0, 0.5), R(-0.5, 0.5), 0.18, 0.7, 0.2, 0, COL.blue0, COL.blue1, 1, 0); }
+  for (const e of ents) { if (e === p) continue; if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) nosTrail(e, e.ang, false); else if (e.trail) e.trail = null; }
+  if (p.turbo > 0) nosTrail(p, p.yaw, true); else p.trail = null;
+}
+
+// NOS: two fat blue contrails from the twin exhausts. Particles are laid along the path travelled
+// since the last tick, so the trails stay continuous at 200 km/h, and they hang in the air behind the car.
+const _t0 = new THREE.Vector3(), _t1 = new THREE.Vector3(), NOS0 = [0.15, 0.45, 1], NOS1 = [0.02, 0.12, 0.85];
+function nosTrail(e, yaw, big) {
+  const c = Math.cos(yaw), sn = Math.sin(yaw), z = -2.15, now = [];
+  for (const x of [-0.5, 0.5]) worldPos(e.s + z * c + x * sn, e.d + z * sn - x * c, 0.3 + e.y, _t0), now.push(_t0.clone());
+  const prev = e.trail; e.trail = now;
+  if (!prev) return;
+  const n = big ? 9 : 5;
+  for (let k = 0; k < 2; k++) {
+    if (prev[k].distanceToSquared(now[k]) > 64) continue;
+    for (let i = 0; i < n; i++) {
+      _t1.copy(prev[k]).lerp(now[k], i / n);
+      emit(FX, _t1.x, _t1.y, _t1.z, R(-0.12, 0.12), R(0.05, 0.3), R(-0.12, 0.12), R(0.5, 0.75), big ? 0.6 : 0.45, big ? 1.25 : 0.9, -0.3, NOS0, NOS1, 0.8, 0.4);
+      if (i % 3 === 0) emit(FX, _t1.x, _t1.y, _t1.z, 0, R(0, 0.2), 0, 0.16, 0.4, 0.2, 0, COL.blue0, NOS0, 0.9, 0);   // hot core at the nozzle
+    }
+  }
 }
 
 /* ============================== HUD ============================== */
