@@ -7,9 +7,16 @@ traffic lights with cross traffic, pedestrians, road works, rocks, oil, ramps, e
 repair and turbo pickups. Top 3 unlocks the next stage.
 
 ## Controls
-- Phone / iPad: hold the left or right half of the screen. Hold both = handbrake (drift).
-- Keyboard: ← → or A / D. ↓ or Space = handbrake. P or Esc = pause.
+- Phone / iPad: hold the left or right half of the screen to steer, red button = brake, hold both halves = handbrake (drift).
+  Options → "Controls: Buttons" puts both arrows on the left and Brake + Drift on the right.
+- Keyboard: ← → or A / D steer, ↓ / S brake, Space handbrake, C camera, P or Esc pause.
+- Cameras: chase, far chase, bonnet, bumper (CAM button, C key, or Options).
 - Near misses, drifts and jumps fill the TURBO bar; when full you get a 3-second boost.
+
+## Look and sound
+90s arcade styling (fonts in `fonts/`, Russo One and Press Start 2P, SIL Open Font License). "Screen: 90's" renders
+at ~300 lines with scanlines; "Screen: Sharp" renders at full resolution. The engine is a synth driven by a
+6-speed automatic gearbox: rpm climbs through each gear, drops on shifts, with throttle cut, exhaust pops and blow-off.
 
 ## Graphics
 Real-time shadows, reflective car paint and glass, a shader sky with clouds, bloom on lights and explosions,
@@ -21,6 +28,7 @@ cannot hold about 45 fps; the **Graphics: high / fast** button in the menu force
 |---|---|
 | `index.html` | Markup, HUD and menus, all CSS |
 | `app.js` | The whole game (track generator, driving model, traffic AI, damage, effects, audio, UI) |
+| `fonts/` | The two arcade fonts (OFL) |
 | `three.min.js` | Three.js r187 plus its bloom/post-processing add-ons, minified local copy (MIT), so the game works offline |
 | `sw.js` | Offline cache (service worker) |
 | `manifest.webmanifest` | Makes it installable and fullscreen |

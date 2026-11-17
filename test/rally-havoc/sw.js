@@ -1,11 +1,13 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'rally-havoc';
-const VERSION = APP + '-v3';
+const VERSION = APP + '-v4';
 const FILES = [
   './',
   './index.html',
   './app.js',
   './three.min.js',
+  './fonts/russo-one.woff2',
+  './fonts/press-start-2p.woff2',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',

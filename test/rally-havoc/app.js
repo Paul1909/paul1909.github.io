@@ -12,7 +12,8 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(APP + ':' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
-const settings = { sound: store.get('sound', true), vibe: store.get('vibe', true), color: store.get('color', 0), gfx: store.get('gfx', 'high') };
+const settings = { sound: store.get('sound', true), vibe: store.get('vibe', true), color: store.get('color', 0), gfx: store.get('gfx', 'high'),
+  cam: store.get('cam', 'chase'), retro: store.get('retro', true), ctrl: store.get('ctrl', 'halves') };
 const progress = store.get('progress', { unlocked: 1, best: {} });
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const vibrate = ms => { if (settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
@@ -24,7 +25,7 @@ const R = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
 function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const fmtTime = t => { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
+const fmtTime = t => { const m = Math.floor(t / 60), s = Math.floor(t - m * 60), d = Math.floor((t - Math.floor(t)) * 10); return m + "'" + (s < 10 ? '0' : '') + s + '"' + d; };
 const ord = n => n + (['th', 'st', 'nd', 'rd'][n] || 'th');
 const $ = id => document.getElementById(id);
 
@@ -244,6 +245,7 @@ matCar.onBeforeCompile = sh => {
     .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\n material.clearcoat *= vRM.z;\n#endif');
 };
 const matLights = new THREE.MeshBasicMaterial({ vertexColors: true });
+const matBrake = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff1808).multiplyScalar(6) });
 const matChar = new THREE.MeshStandardMaterial({ color: 0x1e1b19, roughness: 0.95, metalness: 0.1 });
 const matTrack = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: grainTex });
 const matBuild = new THREE.MeshLambertMaterial({ vertexColors: true, map: facadeTex, side: THREE.DoubleSide, emissive: 0xffffff, emissiveMap: facadeEmisTex, emissiveIntensity: 0 });
@@ -603,11 +605,6 @@ function rallyGeo(col, acc) {
         b.push(RB(0.38, 0.1, 0.42, 0.04, 0, roofY(-0.25) + 0.03, -0.25, acc));                    // roof scoop
         b.push(withRM(P_('box', 0.24, 0.06, 0.04, 0, roofY(-0.25) + 0.04, -0.03, TRIMC), M_TRIM.slice(1)));
         for (const zw of [1.3, -1.3]) for (const sx of [-1, 1]) b.push(withRM(P_('box', 0.32, 0.3, 0.02, sx * 0.8, 0.2, zw - 0.36 - 0.12, zw < 0 ? acc : TRIMC), [0.8, 0, 0]));   // mudflaps
-        if (!lo) {   // bonnet light pod
-          const zp = 1.7, yp = B.yt(zp) + 0.13;
-          b.push(withRM(RB(1.5, 0.06, 0.08, 0.02, 0, yp - 0.1, zp, TRIMC), M_TRIM.slice(1)));
-          for (const x of [-0.6, -0.2, 0.2, 0.6]) { b.push(withRM(P_('cyl', 0.13, 0.14, 0.13, x, yp, zp, TRIMC, HPI), M_TRIM.slice(1))); l.push(P_('cyl', 0.11, 0.04, 0.11, x, yp, zp + 0.06, 0xfff3c8, HPI)); }
-        }
       } });
     const S0 = mk();
     const hi = buildCar(S0, false), lo = buildCar(mk(), true), B = hi.B;
@@ -618,8 +615,13 @@ function rallyGeo(col, acc) {
     const C = cabinSpec(S0, B), ry = C.yt(-1.5) + 0.05;
     const spoiler = merge([RB(1.62, 0.05, 0.42, 0.02, 0, ry + 0.04, -1.72, acc, -0.12), RB(0.04, 0.16, 0.44, 0.015, -0.8, ry + 0.06, -1.72, col), RB(0.04, 0.16, 0.44, 0.015, 0.8, ry + 0.06, -1.72, col),
       withRM(P_('box', 0.05, 0.1, 0.2, -0.45, ry - 0.02, -1.6, TRIMC), M_TRIM.slice(1)), withRM(P_('box', 0.05, 0.1, 0.2, 0.45, ry - 0.02, -1.6, TRIMC), M_TRIM.slice(1))], true);
+    const brk = []; for (const sx of [-1, 1]) { const zt = endZ(B, sx * 0.62, 0.84, false); brk.push(RB(0.37, 0.15, 0.03, 0.02, sx * 0.62, 0.84, zt - 0.008, 0xffffff)); }
+    brk.push(RB(0.5, 0.045, 0.03, 0.012, 0, ry + 0.02, -1.935, 0xffffff));
+    const pb = [], pl = [], zp = 1.7, yp = B.yt(zp) + 0.13;   // bonnet light pod (hidden in the onboard cameras)
+    pb.push(withRM(RB(1.5, 0.06, 0.08, 0.02, 0, yp - 0.1, zp, TRIMC), M_TRIM.slice(1)));
+    for (const x of [-0.6, -0.2, 0.2, 0.6]) { pb.push(withRM(P_('cyl', 0.13, 0.14, 0.13, x, yp, zp, TRIMC, HPI), M_TRIM.slice(1))); pl.push(P_('cyl', 0.11, 0.04, 0.11, x, yp, zp + 0.06, 0xfff3c8, HPI)); }
     const yr = 0.7; let xr = 0; for (let y = yr - 0.26; y <= yr + 0.26; y += 0.02) xr = Math.max(xr, halfAt(B, -0.1, y));
-    return { hi: hi.geo, lo: lo.geo, lights: hi.lights, hood, bumper, spoiler, wheel: wheelGeo(0.36, 0.27, false, 0xe6e6e6, 6), roundel: { x: xr + 0.006, y: yr, z: -0.1 } };
+    return { hi: hi.geo, lo: lo.geo, lights: hi.lights, brake: merge(brk), podBody: merge(pb), podLights: merge(pl), hood, bumper, spoiler, wheel: wheelGeo(0.36, 0.27, false, 0xe6e6e6, 6), roundel: { x: xr + 0.006, y: yr, z: -0.1 } };
   });
 }
 const SKIN = [0xf0c8a0, 0xd8a47a, 0xa86a42, 0x6b4428, 0xf5d5b8];
@@ -1002,6 +1004,8 @@ function puff(ps, s, d, y, n, c0, c1, sz, life, vy = 1, a = 0.7, spread = 1) {
 }
 
 /* ============================== audio ============================== */
+// Engine: 4-cylinder synth driven by a simulated gearbox (rpm + gear), so pitch climbs through each gear
+// and drops on every shift, with a throttle cut, exhaust pops and a turbo blow-off.
 const AU = { ctx: null };
 function audioInit() {
   if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
@@ -1011,33 +1015,53 @@ function audioInit() {
   const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0);
   for (let i = 0; i < len; i++) dd[i] = Math.random() * 2 - 1;
   AU.noise = buf;
-  AU.eF = ctx.createBiquadFilter(); AU.eF.type = 'lowpass'; AU.eF.frequency.value = 500; AU.eF.Q.value = 3;
+  // engine voice: saw + detuned 2nd harmonic + sub square, soft-clipped, low-passed
+  const shaper = ctx.createWaveShaper(), curveN = 1024, cv = new Float32Array(curveN);
+  for (let i = 0; i < curveN; i++) { const x = i / (curveN - 1) * 2 - 1; cv[i] = Math.tanh(x * 2.4) / Math.tanh(2.4); }
+  shaper.curve = cv;
+  AU.eF = ctx.createBiquadFilter(); AU.eF.type = 'lowpass'; AU.eF.frequency.value = 600; AU.eF.Q.value = 2.2;
   AU.eG = ctx.createGain(); AU.eG.gain.value = 0;
-  AU.o1 = ctx.createOscillator(); AU.o1.type = 'sawtooth'; AU.o2 = ctx.createOscillator(); AU.o2.type = 'square';
-  const g2 = ctx.createGain(); g2.gain.value = 0.45;
-  AU.o1.connect(AU.eF); AU.o2.connect(g2); g2.connect(AU.eF); AU.eF.connect(AU.eG); AU.eG.connect(AU.master);
-  AU.o1.start(); AU.o2.start();
-  const ns = ctx.createBufferSource(); ns.buffer = buf; ns.loop = true;
+  const pre = ctx.createGain(); pre.gain.value = 0.55;
+  AU.o1 = ctx.createOscillator(); AU.o1.type = 'sawtooth';
+  AU.o2 = ctx.createOscillator(); AU.o2.type = 'sawtooth'; AU.o2.detune.value = 9;
+  AU.o3 = ctx.createOscillator(); AU.o3.type = 'square';
+  const g2 = ctx.createGain(), g3 = ctx.createGain(); g2.gain.value = 0.32; g3.gain.value = 0.5;
+  AU.o1.connect(pre); AU.o2.connect(g2); g2.connect(pre); AU.o3.connect(g3); g3.connect(pre);
+  pre.connect(shaper); shaper.connect(AU.eF); AU.eF.connect(AU.eG); AU.eG.connect(AU.master);
+  // firing-pulse wobble: an LFO at half the firing rate shakes the volume (lumpy at idle, smooth at high rpm)
+  AU.lfo = ctx.createOscillator(); AU.lfoG = ctx.createGain(); AU.lfoG.gain.value = 0; AU.lfo.connect(AU.lfoG); AU.lfoG.connect(AU.eG.gain);
+  for (const o of [AU.o1, AU.o2, AU.o3, AU.lfo]) o.start();
+  const loopNoise = () => { const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true; n.start(); return n; };
+  // intake / exhaust roar
+  const bpI = ctx.createBiquadFilter(); bpI.type = 'bandpass'; bpI.Q.value = 1.4; AU.iF = bpI;
+  AU.iG = ctx.createGain(); AU.iG.gain.value = 0; loopNoise().connect(bpI); bpI.connect(AU.iG); AU.iG.connect(AU.master);
+  // tyre squeal
   const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 5;
-  AU.sG = ctx.createGain(); AU.sG.gain.value = 0; ns.connect(bp); bp.connect(AU.sG); AU.sG.connect(AU.master);
-  const ns2 = ctx.createBufferSource(); ns2.buffer = buf; ns2.loop = true;
+  AU.sG = ctx.createGain(); AU.sG.gain.value = 0; loopNoise().connect(bp); bp.connect(AU.sG); AU.sG.connect(AU.master);
+  // gravel rumble
   const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
-  AU.rG = ctx.createGain(); AU.rG.gain.value = 0; ns2.connect(lp); lp.connect(AU.rG); AU.rG.connect(AU.master);
-  ns.start(); ns2.start();
+  AU.rG = ctx.createGain(); AU.rG.gain.value = 0; loopNoise().connect(lp); lp.connect(AU.rG); AU.rG.connect(AU.master);
+  // turbo whistle
+  AU.tw = ctx.createOscillator(); AU.tw.type = 'sine'; AU.tG = ctx.createGain(); AU.tG.gain.value = 0; AU.tw.connect(AU.tG); AU.tG.connect(AU.master); AU.tw.start();
 }
 function setSound(on) { settings.sound = on; store.set('sound', on); if (AU.master) AU.master.gain.value = on ? 0.75 : 0; }
-function audioUpdate(v, drift, off, turbo, active) {
+function audioMute() { if (AU.ctx) for (const g of [AU.eG, AU.iG, AU.sG, AU.rG, AU.tG, AU.lfoG]) { g.gain.cancelScheduledValues(0); g.gain.value = 0; } }
+function audioUpdate(p, drift, off, active) {
   if (!AU.ctx) return;
-  const t = AU.ctx.currentTime;
-  const gears = [0, 12, 21, 29, 37, 45, 99];
-  let g = 0; while (v > gears[g + 1] && g < 5) g++;
-  const frac = clamp((v - gears[g]) / (gears[g + 1] - gears[g]), 0, 1);
-  const f = active ? 48 + frac * 70 + g * 7 + (turbo ? 18 : 0) : 42;
-  AU.o1.frequency.setTargetAtTime(f, t, 0.05); AU.o2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
-  AU.eF.frequency.setTargetAtTime(380 + frac * 900 + (turbo ? 600 : 0), t, 0.08);
-  AU.eG.gain.setTargetAtTime(active ? 0.075 : 0.035, t, 0.1);
+  const t = AU.ctx.currentTime, rpm = p.rpm, rn = clamp((rpm - 800) / 6800, 0, 1), th = active ? p.throttle : 0;
+  const f = rpm / 30;                                   // firing frequency of a 4-cylinder (2 pulses per rev)
+  AU.o1.frequency.setTargetAtTime(f, t, 0.012); AU.o2.frequency.setTargetAtTime(f * 2, t, 0.012); AU.o3.frequency.setTargetAtTime(f * 0.5, t, 0.012);
+  AU.lfo.frequency.setTargetAtTime(f * 0.5, t, 0.02);
+  AU.eF.frequency.setTargetAtTime(260 + rn * 2300 + th * 900 + (p.turbo > 0 ? 500 : 0), t, 0.03);
+  const base = active ? 0.045 + th * 0.05 + rn * 0.035 : 0.03;
+  AU.eG.gain.setTargetAtTime(base, t, 0.03);
+  AU.lfoG.gain.setTargetAtTime(base * (0.55 - rn * 0.45), t, 0.05);
+  AU.iF.frequency.setTargetAtTime(f * 4 + 300, t, 0.03);
+  AU.iG.gain.setTargetAtTime(active ? th * (0.015 + rn * 0.05) : 0, t, 0.04);
   AU.sG.gain.setTargetAtTime(clamp(drift, 0, 1) * 0.11, t, 0.05);
-  AU.rG.gain.setTargetAtTime(off ? clamp(v / 30, 0, 1) * 0.35 : 0, t, 0.08);
+  AU.rG.gain.setTargetAtTime(off ? clamp(p.v / 30, 0, 1) * 0.35 : 0, t, 0.08);
+  AU.tw.frequency.setTargetAtTime(1800 + rn * 2600, t, 0.05);
+  AU.tG.gain.setTargetAtTime(active && (p.turbo > 0 || rn > 0.6) ? (p.turbo > 0 ? 0.022 : 0.006) * th : 0, t, 0.08);
 }
 function sfxNoise(dur, freq, gain, type = 'lowpass', f2) {
   if (!AU.ctx || !settings.sound) return;
@@ -1052,6 +1076,41 @@ function sfxTone(f, dur, type = 'square', gain = 0.12, f2, delay = 0) {
   o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
   g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + dur + 0.05);
+}
+// Gearbox: 6 speeds, automatic. Speed at the 7400 rpm limit in each gear (m/s).
+const GEAR_TOP = [0, 12, 19, 26, 33, 40, 58];
+function rpmIn(g, v) { return 900 + v / GEAR_TOP[g] * 6500; }
+function updateGearbox(p, dt, inp, air) {
+  const live = p.alive && (game.state === 'race' || game.state === 'finished' || game.state === 'countdown');
+  if (!p.gear) { p.gear = 1; p.rpm = 900; p.shiftT = 0; }
+  if (p.shiftT > 0) p.shiftT -= dt;
+  let target;
+  if (game.state === 'countdown' || p.v < 1.2 && game.state !== 'race') {
+    // on the grid: any input revs the engine, with the limiter bouncing at the top
+    const rev = inp.L || inp.R || inp.brake || inp.hand;
+    target = rev ? 7300 + Math.sin(game.t * 40) * 250 : 950 + Math.sin(game.t * 7) * 40;
+    p.throttle = rev ? 1 : 0.15; p.gear = 1;
+  } else {
+    if (p.shiftT <= 0 && live) {
+      if (rpmIn(p.gear, p.v) > 7250 && p.gear < 6 && p.throttle > 0.5) { p.gear++; p.shiftT = 0.2; shiftSfx(true, p.rpm); }
+      else if (p.gear > 1 && rpmIn(p.gear, p.v) < 4600 && rpmIn(p.gear - 1, p.v) < 6300) { p.gear--; p.shiftT = 0.14; shiftSfx(false, p.rpm); }
+    }
+    target = rpmIn(p.gear, p.v);
+    if (air) target += 1800 * p.throttle;                    // wheels spinning in the air
+    else if (p.drift > 0.1) target += Math.min(1400, p.drift * 2600) * p.throttle;
+    if (p.shiftT > 0) p.throttle = 0;                          // clutch in: throttle cut
+    if (!live) p.throttle = 0;
+  }
+  target = clamp(target, 800, 7600);
+  if (target >= 7550 && p.throttle > 0.5) target -= Math.random() * 500;   // rev limiter
+  p.rpm += (target - p.rpm) * (1 - Math.exp(-(p.shiftT > 0 ? 18 : 11) * dt));
+}
+function shiftSfx(up, rpm) {
+  if (!AU.ctx || !settings.sound) return;
+  if (up) {
+    if (rpm > 6000 && Math.random() < 0.75) { sfxNoise(0.07, 700, 0.32, 'lowpass'); sfxTone(60 + Math.random() * 30, 0.06, 'square', 0.1); }   // exhaust pop
+    if (Math.random() < 0.6) sfxNoise(0.28, 4200, 0.045, 'bandpass', 1400);                                                              // blow-off "pssh"
+  } else { sfxNoise(0.05, 500, 0.2, 'lowpass'); }
 }
 let lastCrash = 0;
 const SFX = {
@@ -1068,18 +1127,30 @@ const SFX = {
 };
 
 /* ============================== input ============================== */
-const input = { kL: false, kR: false, kB: false, touches: new Map() };
+// Touch: each finger is assigned a zone (L, R, B = brake, H = handbrake) from where it is on screen.
+const input = { kL: false, kR: false, kB: false, kH: false, touches: new Map() };
 const touchEl = $('touch');
-function touchSide(x) { return x < innerWidth / 2 ? 'L' : 'R'; }
-touchEl.addEventListener('pointerdown', e => { audioInit(); input.touches.set(e.pointerId, touchSide(e.clientX)); try { touchEl.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
-touchEl.addEventListener('pointermove', e => { if (input.touches.has(e.pointerId)) input.touches.set(e.pointerId, touchSide(e.clientX)); });
+function rectOf(id, pad = 14) { const el = $(id); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left - pad, r: r.right + pad, t: r.top - pad, b: r.bottom + pad, cx: (r.left + r.right) / 2 }; }
+const inRect = (q, x, y) => q && x >= q.l && x <= q.r && y >= q.t && y <= q.b;
+function touchZone(x, y) {
+  if (settings.ctrl === 'buttons') {
+    if (x < innerWidth / 2) { const a = rectOf('padL'), b = rectOf('padR'); return a && b ? (x < (a.cx + b.cx) / 2 ? 'L' : 'R') : 'L'; }
+    const a = rectOf('padB'), b = rectOf('padH'); return a && b ? (x > (a.cx + b.cx) / 2 ? 'B' : 'H') : 'B';
+  }
+  if (inRect(rectOf('padB'), x, y)) return 'B';
+  return x < innerWidth / 2 ? 'L' : 'R';
+}
+touchEl.addEventListener('pointerdown', e => { audioInit(); input.touches.set(e.pointerId, touchZone(e.clientX, e.clientY)); try { touchEl.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
+touchEl.addEventListener('pointermove', e => { if (input.touches.has(e.pointerId)) input.touches.set(e.pointerId, touchZone(e.clientX, e.clientY)); });
 for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) touchEl.addEventListener(ev, e => input.touches.delete(e.pointerId));
 addEventListener('keydown', e => {
   if (e.repeat) return;
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.kL = true;
   else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.kR = true;
-  else if (k === 'ArrowDown' || k === ' ' || k === 's' || k === 'S') input.kB = true;
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') input.kB = true;
+  else if (k === ' ') input.kH = true;
+  else if (k === 'c' || k === 'C') { if (game.state !== 'menu') cycleCamera(); }
   else if (k === 'p' || k === 'P' || k === 'Escape') { if (game.state === 'race' || game.state === 'countdown') pauseGame(); else if (game.state === 'paused') resumeGame(); }
   else return;
   audioInit(); e.preventDefault();
@@ -1088,13 +1159,15 @@ addEventListener('keyup', e => {
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.kL = false;
   else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.kR = false;
-  else if (k === 'ArrowDown' || k === ' ' || k === 's' || k === 'S') input.kB = false;
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') input.kB = false;
+  else if (k === ' ') input.kH = false;
 });
-addEventListener('blur', () => { input.kL = input.kR = input.kB = false; input.touches.clear(); });
+addEventListener('blur', () => { input.kL = input.kR = input.kB = input.kH = false; input.touches.clear(); });
 function readInput() {
-  let L = input.kL, Rr = input.kR;
-  for (const v of input.touches.values()) { if (v === 'L') L = true; else Rr = true; }
-  return { steer: (Rr ? 1 : 0) - (L ? 1 : 0), brake: input.kB || (L && Rr), L, R: Rr };
+  let L = input.kL, Rr = input.kR, B = input.kB, H = input.kH;
+  for (const v of input.touches.values()) { if (v === 'L') L = true; else if (v === 'R') Rr = true; else if (v === 'B') B = true; else H = true; }
+  const both = L && Rr && settings.ctrl !== 'buttons';
+  return { steer: both ? 0 : (Rr ? 1 : 0) - (L ? 1 : 0), brake: B, hand: H || both, L, R: Rr, B, H };
 }
 
 /* ============================== entities ============================== */
@@ -1125,7 +1198,9 @@ function rallyMesh(colr, acc, num) {
   const g = rallyGeo(colr, acc), gr = new THREE.Group();
   const li = new THREE.Mesh(g.lights, matLights);
   const bumper = cast(new THREE.Mesh(g.bumper, matCar)), hood = cast(new THREE.Mesh(g.hood, matCar)), spoiler = cast(new THREE.Mesh(g.spoiler, matCar));
-  gr.add(lodMesh(g, 70), li, bumper, hood, spoiler);
+  const brake = new THREE.Mesh(g.brake, matBrake); brake.visible = false; brake.userData.fx = true;
+  const pod = new THREE.Group(); pod.add(cast(new THREE.Mesh(g.podBody, matCar)), new THREE.Mesh(g.podLights, matLights));
+  gr.add(lodMesh(g, 70), li, bumper, hood, spoiler, brake, pod);
   const whl = [];
   for (const z of [1.3, -1.3]) for (const x of [-0.8, 0.8]) {
     const w = cast(new THREE.Mesh(g.wheel, matCar)); w.position.set(x, 0.36, z); w.rotation.order = 'YXZ';
@@ -1137,7 +1212,7 @@ function rallyMesh(colr, acc, num) {
   }
   const sh = shadowMesh(2.6, 5.0); gr.add(sh);
   const beam = beamMesh(2.0, 4.8); gr.add(beam);
-  gr.userData = { lights: li, shadow: sh, beam, wheels: whl, parts: [{ m: bumper, at: 0.75 }, { m: hood, at: 0.45 }, { m: spoiler, at: 0.25 }] };
+  gr.userData = { lights: li, brake, pod, shadow: sh, beam, wheels: whl, parts: [{ m: bumper, at: 0.75 }, { m: hood, at: 0.45 }, { m: spoiler, at: 0.25 }] };
   return gr;
 }
 function pedMesh(sh, sk, pa) {
@@ -1398,7 +1473,7 @@ function flingPed(ped, by, force) {
   if (ped.state === 'flung') return;
   const sd = ped.d >= by.d ? 1 : -1;
   ped.state = 'flung'; ped.vy = 4 + force * 0.25; ped.vd = sd * (3 + force * 0.25); ped.vs = (by.vs || 0) * 0.35; ped.tumble = R(6, 10) * sd; ped.solid = false;
-  if (by === player && game.state === 'race') { game.stats.peds++; addScore(-1000); msg('PEDESTRIAN! −1000', 'hot'); SFX.oof(); player.v *= 0.72; vibrate(40); }
+  if (by === player && game.state === 'race') { game.stats.peds++; addScore(-1000); msg('PEDESTRIAN! -1000', 'hot'); SFX.oof(); player.v *= 0.72; vibrate(40); }
 }
 
 /* ============================== collisions ============================== */
@@ -1511,18 +1586,21 @@ function updatePlayer(p, dt, inp) {
   if (!p.alive) vmax = 0;
   const vt = vmax * (1 - 0.05 * Math.abs(p.steer));
   if (!air) {
-    if (p.v < vt) p.v += (p.turbo > 0 ? 24 : 7 + 8 * (1 - p.v / 46)) * dt;
+    if (inp.brake && racing) p.v = Math.max(0, p.v - 21 * dt);                // foot brake: strong, keeps grip
+    else if (p.v < vt) p.v += (p.turbo > 0 ? 24 : 7 + 8 * (1 - p.v / 46)) * dt;
     else p.v -= Math.min(p.v - vt, (off ? 22 : p.alive ? 7 : 12) * dt);
-    if (inp.brake && racing) p.v = Math.max(0, p.v - 15 * dt);
+    if (inp.hand && racing) p.v = Math.max(0, p.v - 12 * dt);
   }
+  p.throttle = !inp.brake && p.v < vt + 0.6 && racing ? 1 : 0.15;
+  p.braking = (inp.brake || inp.hand) && racing;
   const vn = clamp(p.v / 46, 0, 1.3);
   const rate = (2.1 - 1.3 * Math.min(vn, 1.1)) * (air ? 0.2 : 1) * clamp(p.v / 4, 0, 1);
-  let dyaw = p.steer * rate * (inp.brake && racing ? 1.7 : 1) + tr.k * p.v * 0.55;   // the road does 45% of the cornering for you
-  if (Math.abs(steerIn) < 0.1 && !inp.brake && !air) dyaw -= p.yaw * 1.9;
+  let dyaw = p.steer * rate * (inp.hand && racing ? 1.7 : 1) + tr.k * p.v * 0.55;   // the road does 45% of the cornering for you
+  if (Math.abs(steerIn) < 0.1 && !inp.hand && !air) dyaw -= p.yaw * 1.9;
   p.yaw += dyaw * dt + p.spin * dt; p.spin *= Math.exp(-3.2 * dt);
   p.yaw = clamp(p.yaw, -1.35, 1.35);
   let grip = 7.5 - 2.6 * vn * Math.abs(p.steer);
-  if (inp.brake && racing) grip = 1.5;
+  if (inp.hand && racing) grip = 1.5;
   if (off) grip *= 0.7;
   if (p.oil > 0) { grip = 0.5; p.oil -= dt; }
   if (air) grip = 0;
@@ -1537,6 +1615,7 @@ function updatePlayer(p, dt, inp) {
   if (p.turbo > 0) p.turbo -= dt;
   else if (p.meter >= 100 && racing && p.alive) { p.turbo = 3.2; p.meter = 0; msg('TURBO!', 'blue'); SFX.turbo(); vibrate(30); }
   p.vs = p.v * Math.cos(p.vh); p.vd = p.v * Math.sin(p.vh);
+  updateGearbox(p, dt, inp, air);
 }
 function integratePlayer(p, dt) {
   const tr = trackAt(p.s, tr1);
@@ -1611,6 +1690,7 @@ function updateRival(r, dt) {
   }
   if (r.finished) target = 22;
   if (r.ttc < 0.9 && Math.abs(r.targetD - r.d) < 1) target = Math.min(target, Math.max(6, r.vs * 0.6));
+  r.braking = racing && target < r.vs - 2.5;
   let tD = r.targetD;
   if (r.ramT > 0) { r.ramT -= dt; tD = r.ramD; }
   if (r.knock > 0) { r.knock -= dt; r.vs += clamp(target - r.vs, -6, 3) * dt * 0.5; r.vd *= Math.exp(-2 * dt); }
@@ -1794,38 +1874,63 @@ function placeEnt(e, dt) {
   m.rotation.set(px, rotY, roll, 'YXZ');
   const sh = m.userData.shadow; if (sh) { sh.position.y = 0.04 - e.y; sh.visible = e.y < 6; }
   const bm = m.userData.beam; if (bm) bm.visible = matBeam.opacity > 0 && e.alive && !e.parked && e.y < 0.5 && Math.abs(e.s - player.s) < 260;
+  const bk = m.userData.brake; if (bk) bk.visible = e.alive && !!e.braking;
+  if (m.userData.pod) m.userData.pod.visible = !(e === player && (settings.cam === 'hood' || settings.cam === 'bumper'));
   const wh = m.userData.wheels;
   if (wh && e.alive) { const sp = (e === player ? e.v : e.vs) * dt / 0.36, st = e === player ? -e.steer * 0.42 : clamp(-e.vd * 0.06, -0.4, 0.4); for (let i = 0; i < 4; i++) { const w = wh[i]; w.rotation.x += w.userData.base ? -sp : sp; if (i < 2) w.rotation.y = w.userData.base + st; } }
 }
 
 /* ============================== camera ============================== */
+const CAMS = ['chase', 'far', 'hood', 'bumper'], CAM_NAMES = { chase: 'CHASE', far: 'FAR CHASE', hood: 'BONNET', bumper: 'BUMPER' };
 const camState = { s: 0, d: 0, y: 3, init: false, look: new THREE.Vector3() };
+function cycleCamera() {
+  settings.cam = CAMS[(CAMS.indexOf(settings.cam) + 1) % CAMS.length]; store.set('cam', settings.cam);
+  camState.init = false; syncToggles();
+  if (game.state === 'race' || game.state === 'countdown') msg('CAMERA: ' + CAM_NAMES[settings.cam], 'blue');
+}
 function updateCamera(dt) {
-  const p = player;
-  const dist = portrait ? 10.5 : 8.6, hgt = portrait ? 4.7 : 3.4;
+  const p = player, mode = settings.cam;
   if (game.state === 'menu') {
     const a = game.t * 0.22;
     worldPos(p.s + Math.cos(a) * 12, p.d + Math.sin(a) * 12, 3.4, camera.position);
     worldPos(p.s, p.d, 0.9, camState.look); camera.lookAt(camState.look);
-    camera.fov = portrait ? 72 : 55; camera.updateProjectionMatrix();
+    camera.fov = portrait ? 72 : 55; camera.near = 0.3; camera.updateProjectionMatrix();
     camState.init = false; return;
   }
-  const yawB = clamp(p.yaw, -0.9, 0.9) * 0.55;
-  const ts = p.s - dist * Math.cos(yawB), td = p.d - dist * Math.sin(yawB) * 1.0;
-  const k = camState.init ? 1 - Math.exp(-8 * dt) : 1;
-  camState.s = ts; camState.d = lerp(camState.d, td, k);
-  camState.y = lerp(camState.y, hgt + p.y * 0.7, camState.init ? 1 - Math.exp(-5 * dt) : 1);
-  camState.init = true;
-  worldPos(camState.s, camState.d, camState.y, camera.position);
-  const gy = trackAt(camState.s, tr1).y + 1.2; if (camera.position.y < gy) camera.position.y = gy;
-  worldPos(p.s + 6 * Math.cos(yawB * 0.5), p.d + 6 * Math.sin(yawB * 0.5), 1.1 + p.y, camState.look);
-  if (game.shake > 0) {
-    const sk = game.shake * 0.35;
-    camera.position.x += R(-sk, sk); camera.position.y += R(-sk, sk) * 0.6; camera.position.z += R(-sk, sk);
-    game.shake = Math.max(0, game.shake - dt * 2.2);
+  let fov;
+  if (mode === 'hood' || mode === 'bumper') {
+    // mounted on the car: follows the car's own heading, no lag
+    const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw), hood = mode === 'hood';
+    const fwd = hood ? 0.5 : 2.4, h = (hood ? 1.3 : 0.62) + p.y;
+    worldPos(p.s + fwd * cy, p.d + fwd * sy, h, camera.position);
+    worldPos(p.s + (fwd + 14) * cy, p.d + (fwd + 14) * sy, h - (hood ? (portrait ? 0.05 : 0.35) : 0.1) - (p.y > 0.1 && !p.onRamp ? p.vy * 0.06 : 0), camState.look);
+    if (game.shake > 0) { const sk = game.shake * 0.12; camera.position.x += R(-sk, sk); camera.position.y += R(-sk, sk); camera.position.z += R(-sk, sk); game.shake = Math.max(0, game.shake - dt * 2.2); }
+    camera.lookAt(camState.look);
+    camera.rotateZ(clamp(-(p.yaw - p.vh) * 0.25 + p.steer * 0.02, -0.12, 0.12));   // body roll
+    camera.near = 0.12;
+    fov = (portrait ? 82 : hood ? 66 : 72) + clamp(p.v / 46, 0, 1.3) * 8 + (p.turbo > 0 ? 8 : 0);
+    camState.init = false;
+  } else {
+    const far = mode === 'far';
+    const dist = (portrait ? 10.5 : 8.6) * (far ? 1.55 : 1), hgt = (portrait ? 4.7 : 3.4) * (far ? 1.65 : 1);
+    const yawB = clamp(p.yaw, -0.9, 0.9) * 0.55;
+    const ts = p.s - dist * Math.cos(yawB), td = p.d - dist * Math.sin(yawB);
+    const k = camState.init ? 1 - Math.exp(-8 * dt) : 1;
+    camState.s = ts; camState.d = lerp(camState.d, td, k);
+    camState.y = lerp(camState.y, hgt + p.y * 0.7, camState.init ? 1 - Math.exp(-5 * dt) : 1);
+    camState.init = true;
+    worldPos(camState.s, camState.d, camState.y, camera.position);
+    const gy = trackAt(camState.s, tr1).y + 1.2; if (camera.position.y < gy) camera.position.y = gy;
+    worldPos(p.s + (far ? 10 : 6) * Math.cos(yawB * 0.5), p.d + (far ? 10 : 6) * Math.sin(yawB * 0.5), 1.1 + p.y, camState.look);
+    if (game.shake > 0) {
+      const sk = game.shake * 0.35;
+      camera.position.x += R(-sk, sk); camera.position.y += R(-sk, sk) * 0.6; camera.position.z += R(-sk, sk);
+      game.shake = Math.max(0, game.shake - dt * 2.2);
+    }
+    camera.lookAt(camState.look);
+    camera.near = 0.3;
+    fov = (portrait ? 74 : 60) * (far ? 0.9 : 1) + clamp(p.v / 46, 0, 1.3) * 7 + (p.turbo > 0 ? 7 : 0);
   }
-  camera.lookAt(camState.look);
-  const fov = (portrait ? 74 : 60) + clamp(p.v / 46, 0, 1.3) * 7 + (p.turbo > 0 ? 7 : 0);
   camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-4 * dt)); camera.updateProjectionMatrix();
 }
 
@@ -1854,7 +1959,7 @@ function vehicleFx(dt) {
 }
 
 /* ============================== HUD ============================== */
-const hud = { pos: $('posN'), time: $('time'), score: $('score'), spd: $('spdN'), hp: $('hpBar'), tb: $('tbBar'), tbWrap: $('tbWrap'), bar: $('progBar'), dots: $('progDots'), padL: $('padL'), padR: $('padR'), acc: 0 };
+const hud = { gear: $('gear'), padB: $('padB'), padH: $('padH'), seg: [], lit: -1, pos: $('posN'), time: $('time'), score: $('score'), spd: $('spdN'), hp: $('hpBar'), tb: $('tbBar'), tbWrap: $('tbWrap'), bar: $('progBar'), dots: $('progDots'), padL: $('padL'), padR: $('padR'), acc: 0 };
 function buildDots() {
   hud.dots.innerHTML = '';
   for (const e of ents) if (e.kind === 'rival' || e === player) {
@@ -1868,17 +1973,29 @@ function computePlace() {
   for (const e of ents) if (e.kind === 'rival' && !e.finished && e.alive && e.s > player.s) ahead++;
   return ahead + 1;
 }
+(function buildTach() {
+  const svg = $('tachSvg'), N = 26, cx = 66, cy = 64, r0 = 47, r1 = 61, A0 = 215, A1 = -35, NS = 'http://www.w3.org/2000/svg';
+  for (let i = 0; i < N; i++) {
+    const a0 = (A0 + (A1 - A0) * i / N) * Math.PI / 180, a1 = (A0 + (A1 - A0) * (i + 0.78) / N) * Math.PI / 180;
+    const pt = (r, a) => (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy - Math.sin(a) * r).toFixed(1);
+    const g = document.createElementNS(NS, 'polygon'); g.setAttribute('points', [pt(r0, a0), pt(r1, a0), pt(r1, a1), pt(r0, a1)].join(' '));
+    g.setAttribute('class', 'seg' + (i >= N - 4 ? ' red' : i >= N - 9 ? ' mid' : '')); svg.appendChild(g); hud.seg.push(g);
+  }
+})();
 function updateHud(dt, inp) {
-  hud.padL.classList.toggle('on', inp.L); hud.padR.classList.toggle('on', inp.R);
+  hud.padL.classList.toggle('on', inp.L); hud.padR.classList.toggle('on', inp.R); hud.padB.classList.toggle('on', inp.B); hud.padH.classList.toggle('on', inp.H);
+  const lit = Math.round(clamp((player.rpm - 800) / 6800, 0, 1) * hud.seg.length);
+  if (lit !== hud.lit) { for (let i = 0; i < hud.seg.length; i++) hud.seg[i].classList.toggle('on', i < lit); hud.lit = lit; }
   hud.acc += dt; if (hud.acc < 0.08) return; hud.acc = 0;
   if (!player.finished && player.alive) game.place = computePlace();
   hud.pos.textContent = game.place;
   hud.time.textContent = fmtTime(game.raceT);
-  hud.score.textContent = game.score.toLocaleString('en-US') + ' pts';
+  hud.score.textContent = game.score.toLocaleString('en-US');
+  hud.gear.textContent = player.shiftT > 0 ? 'N' : player.gear || 'N';
   hud.spd.textContent = Math.round(player.v * 3.6);
   const hpF = Math.max(0, player.hp) / 100;
-  hud.hp.style.width = (hpF * 100) + '%';
-  hud.hp.style.background = hpF > 0.6 ? 'var(--ok)' : hpF > 0.3 ? 'var(--gold)' : 'var(--hot)';
+  hud.hp.style.width = ((1 - hpF) * 100) + '%';    // DAMAGE fills up as the car gets hurt
+  hud.hp.style.background = hpF > 0.6 ? 'linear-gradient(180deg,#a6ff8a,#20c040)' : hpF > 0.3 ? 'linear-gradient(180deg,#fff3a0,#ffb000)' : 'linear-gradient(180deg,#ffb0a0,#e01800)';
   hud.tb.style.width = (player.turbo > 0 ? player.turbo / 3.2 * 100 : player.meter) + '%';
   hud.tbWrap.classList.toggle('full', player.turbo > 0);
   hud.bar.style.width = clamp(player.s / T.len, 0, 1) * 100 + '%';
@@ -1906,10 +2023,11 @@ function loadStage(idx, forMenu = false) {
   if (!forMenu) {
     buildDots();
     game.state = 'countdown'; game.count = 3.6; game.lastBeep = 4;
-    show('hud'); $('pauseBtn').classList.remove('hidden'); hide('menu'); hide('result'); hide('pause');
-    $('padL').classList.toggle('hidden', !isTouch); $('padR').classList.toggle('hidden', !isTouch); $('keysHint').classList.toggle('hidden', isTouch);
+    show('hud'); $('pauseBtn').classList.remove('hidden'); $('camBtn').classList.remove('hidden'); hide('menu'); hide('result'); hide('pause');
+    for (const id of ['padL', 'padR', 'padB', 'padH']) $(id).classList.toggle('hidden', !isTouch); $('keysHint').classList.toggle('hidden', isTouch);
+    player.gear = 1; player.rpm = 900; player.shiftT = 0;
     const first = !store.get('seenTip', false);
-    if (first || idx === 0) { const tip = $('tip'); tip.innerHTML = isTouch ? 'Hold <b>left / right</b> side of the screen to steer.<br>Hold <b>both</b> = handbrake drift. Near misses fill TURBO.' : '<b>← →</b> steer · <b>↓ / Space</b> handbrake drift<br>Near misses, drifts & jumps fill TURBO.'; tip.classList.remove('hidden'); store.set('seenTip', true); }
+    if (first || idx === 0) { const tip = $('tip'); tip.innerHTML = !isTouch ? '<b>ARROWS</b> STEER &nbsp; <b>DOWN</b> BRAKE &nbsp; <b>SPACE</b> DRIFT<br><b>C</b> CAMERA &nbsp; NEAR MISSES FILL TURBO!' : settings.ctrl === 'buttons' ? '<b>ARROWS</b> ON THE LEFT STEER<br><b>BRAKE</b> + <b>DRIFT</b> ON THE RIGHT' : 'HOLD <b>LEFT/RIGHT</b> HALF TO STEER<br><b>RED BUTTON</b> = BRAKE &nbsp; <b>BOTH SIDES</b> = DRIFT'; tip.classList.remove('hidden'); store.set('seenTip', true); }
     try { history.pushState({ rh: 1 }, ''); } catch {}
     requestWake();
   } else game.state = 'menu';
@@ -1918,22 +2036,22 @@ const show = id => $(id).classList.remove('hidden'), hide = id => $(id).classLis
 function pauseGame() {
   if (game.state !== 'race' && game.state !== 'countdown') return;
   game.prevState = game.state; game.state = 'paused'; show('pause'); syncToggles();
-  if (AU.ctx) AU.eG.gain.value = 0, AU.sG.gain.value = 0, AU.rG.gain.value = 0;
+  audioMute();
 }
 function resumeGame() { if (game.state !== 'paused') return; game.state = game.prevState; hide('pause'); audioInit(); last = performance.now(); }
 function toMenu() {
-  hide('pause'); hide('result'); hide('hud'); hide('count'); hide('tip'); $('pauseBtn').classList.add('hidden');
+  hide('pause'); hide('result'); hide('hud'); hide('count'); hide('tip'); $('pauseBtn').classList.add('hidden'); $('camBtn').classList.add('hidden');
   loadStage(game.stageIdx, true); renderMenu(); show('menu'); releaseWake();
 }
 function finishRace(wrecked) {
   const idx = game.stageIdx, st = STAGES[idx];
   const place = wrecked ? 0 : game.place;
-  hide('hud'); $('pauseBtn').classList.add('hidden'); hide('tip');
+  hide('hud'); $('pauseBtn').classList.add('hidden'); $('camBtn').classList.add('hidden'); hide('tip');
   let bonus = 0;
   if (!wrecked) { bonus = [0, 3000, 2000, 1000][place] || 0; addScore(bonus + Math.round(player.hp * 10)); }
   const title = $('resTitle'), sub = $('resSub');
-  if (wrecked) { title.textContent = 'WRECKED'; title.style.color = 'var(--hot)'; sub.textContent = st.name + ' · DNF'; }
-  else { title.textContent = (['', '🥇 ', '🥈 ', '🥉 '][place] || '') + ord(place) + ' place'; title.style.color = place <= 3 ? 'var(--gold)' : '#fff'; sub.textContent = st.name + ' · ' + fmtTime(game.finishTime); }
+  if (wrecked) { title.textContent = 'TOTALLED!'; title.className = 'res-title hotc'; sub.textContent = st.name.toUpperCase() + ' - GAME OVER'; }
+  else { title.textContent = place === 1 ? 'YOU WIN!' : ord(place).toUpperCase() + (place <= 3 ? ' PLACE!' : ' PLACE'); title.className = 'res-title ' + (place <= 3 ? 'gold' : 'chrome'); sub.textContent = st.name.toUpperCase() + ' - ' + fmtTime(game.finishTime); }
   const rows = [['Time', wrecked ? '—' : fmtTime(game.finishTime)], ['Score', game.score.toLocaleString('en-US')], ['Near misses', game.stats.near], ['Rivals taken out', game.stats.rivals], ['Cars wrecked', game.stats.cars], ['Pedestrians hit', game.stats.peds], ['Car condition', Math.max(0, Math.round(player.hp)) + '%']];
   if (!wrecked && bonus) rows.splice(2, 0, ['Podium bonus', '+' + bonus]);
   const best = progress.best[idx] || {};
@@ -1944,8 +2062,8 @@ function finishRace(wrecked) {
   }
   if (!best.score || game.score > best.score) { best.score = game.score; rows.push(['Best score', 'NEW!']); }
   progress.best[idx] = best; store.set('progress', progress);
-  if (newBest && !wrecked) sub.textContent += ' · personal best';
-  $('resStats').innerHTML = rows.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('');
+  if (newBest && !wrecked) sub.textContent += ' - NEW RECORD!';
+  $('resStats').innerHTML = rows.map(([a, b]) => `<span>${String(a).toUpperCase()}</span><b>${String(b).toUpperCase()}</b>`).join('');
   const canNext = idx + 1 < STAGES.length && progress.unlocked > idx + 1;
   $('nextBtn').classList.toggle('hidden', !canNext);
   show('result'); game.state = 'result'; releaseWake();
@@ -1956,8 +2074,8 @@ function renderMenu() {
     const b = document.createElement('button'), best = progress.best[i];
     const locked = i + 1 > progress.unlocked;
     b.className = 'stage' + (locked ? ' locked' : '');
-    b.innerHTML = `<div class="num">${i + 1}</div><div class="info"><div class="nm">${locked ? '🔒 ' : ''}${st.name}</div><div class="sb">${st.sub} · ${(st.len / 1000).toFixed(1)} km</div></div>` +
-      `<div class="best">${best && best.place ? ord(best.place) + '<br>' + fmtTime(best.time) : locked ? 'Top 3 on<br>stage ' + i : ''}</div>`;
+    b.innerHTML = `<div class="info"><div class="snum">STAGE ${i + 1}</div><div class="nm">${st.name}</div><div class="sb">${st.sub.replace(/ · /g, ' - ').toUpperCase()} - ${(st.len / 1000).toFixed(1)} KM</div></div>` +
+      `<div class="best">${best && best.place ? 'BEST<br><b>' + ord(best.place).toUpperCase() + '</b><br>' + fmtTime(best.time) : locked ? 'LOCKED<br>TOP 3 ON<br>STAGE ' + i : 'NEW!'}</div>`;
     b.onclick = () => { audioInit(); loadStage(i); };
     el.appendChild(b);
   });
@@ -1973,15 +2091,22 @@ function swapPlayerColor() {
   if (!player) return;
   const pc = PLAYER_COLORS[settings.color]; scene.remove(player.mesh); player.mesh = rallyMesh(pc.col, pc.acc, 1); player.mesh.add(headSpot, headSpot.target); scene.add(player.mesh);
 }
+const OPT = {
+  cam: { label: () => 'CAMERA: ' + CAM_NAMES[settings.cam], click: () => cycleCamera() },
+  ctrl: { label: () => 'CONTROLS: ' + (settings.ctrl === 'buttons' ? 'BUTTONS' : 'HALVES'), touchOnly: true, click: () => { settings.ctrl = settings.ctrl === 'buttons' ? 'halves' : 'buttons'; store.set('ctrl', settings.ctrl); applyCtrl(); } },
+  retro: { label: () => 'SCREEN: ' + (settings.retro ? "90'S" : 'SHARP'), click: () => { settings.retro = !settings.retro; store.set('retro', settings.retro); applyRetro(); } },
+  gfx: { label: () => 'EFFECTS: ' + (settings.gfx === 'low' ? 'FAST' : 'HIGH'), off: () => settings.gfx === 'low', click: () => { settings.gfx = settings.gfx === 'low' ? 'high' : 'low'; store.set('gfx', settings.gfx); applyQuality(settings.gfx === 'low' ? 0 : 3); } },
+  sound: { label: () => 'SOUND: ' + (settings.sound ? 'ON' : 'OFF'), off: () => !settings.sound, click: () => setSound(!settings.sound) },
+  vibe: { label: () => 'RUMBLE: ' + (settings.vibe ? 'ON' : 'OFF'), off: () => !settings.vibe, touchOnly: true, click: () => { settings.vibe = !settings.vibe; store.set('vibe', settings.vibe); vibrate(20); } },
+};
 function syncToggles() {
-  for (const id of ['sndBtn', 'sndBtn2']) { const b = $(id); b.textContent = settings.sound ? 'Sound on' : 'Sound off'; b.classList.toggle('off', !settings.sound); }
-  for (const id of ['vibBtn', 'vibBtn2']) { const b = $(id); b.textContent = settings.vibe ? 'Vibration on' : 'Vibration off'; b.classList.toggle('off', !settings.vibe); }
-  for (const id of ['gfxBtn', 'gfxBtn2']) { const b = $(id); b.textContent = settings.gfx === 'low' ? 'Graphics: fast' : 'Graphics: high'; b.classList.toggle('off', settings.gfx === 'low'); }
+  document.querySelectorAll('[data-opt]').forEach(b => { const o = OPT[b.dataset.opt]; b.textContent = o.label(); b.classList.toggle('off', !!(o.off && o.off())); b.classList.toggle('hidden', !!(o.touchOnly && !isTouch)); });
 }
-for (const id of ['gfxBtn', 'gfxBtn2']) $(id).onclick = () => { settings.gfx = settings.gfx === 'low' ? 'high' : 'low'; store.set('gfx', settings.gfx); applyQuality(settings.gfx === 'low' ? 0 : 3); syncToggles(); };
+document.querySelectorAll('[data-opt]').forEach(b => { b.onclick = () => { audioInit(); OPT[b.dataset.opt].click(); syncToggles(); }; });
+function applyCtrl() { document.body.classList.toggle('ctrl-buttons', settings.ctrl === 'buttons'); document.body.classList.toggle('ctrl-halves', settings.ctrl !== 'buttons'); }
+function applyRetro() { document.body.classList.toggle('retro', settings.retro); applyQuality(Q.level); }
 $('howBtn').onclick = () => $('howto').classList.toggle('hidden');
-for (const id of ['sndBtn', 'sndBtn2']) $(id).onclick = () => { audioInit(); setSound(!settings.sound); syncToggles(); };
-for (const id of ['vibBtn', 'vibBtn2']) $(id).onclick = () => { settings.vibe = !settings.vibe; store.set('vibe', settings.vibe); syncToggles(); vibrate(20); };
+$('camBtn').onclick = () => cycleCamera();
 $('pauseBtn').onclick = () => game.state === 'paused' ? resumeGame() : pauseGame();
 $('resumeBtn').onclick = resumeGame;
 $('restartBtn').onclick = () => { hide('pause'); loadStage(game.stageIdx); };
@@ -2015,13 +2140,15 @@ function makeComposer() {
 function applyQuality(level) {
   Q.level = level; Q.n = 0; Q.sum = 0;
   sun.castShadow = level >= 1; matShadow.opacity = level >= 1 ? 0.45 : 1; matCar.clearcoat = level >= 2 ? 1 : 0;
-  pixelRatio = Math.min(window.devicePixelRatio || 1, level === 3 ? PR_MAX : level === 0 ? 1 : 1.25);
+  pixelRatio = settings.retro ? retroPR() : Math.min(window.devicePixelRatio || 1, level === 3 ? PR_MAX : level === 0 ? 1 : 1.25);
   renderer.setPixelRatio(pixelRatio);
   if (level >= 2 && !composer) makeComposer();
   resize();
 }
+const retroPR = () => clamp(300 / Math.min(innerWidth, innerHeight), 0.2, 1);   // ~300 lines, 90s arcade resolution
 function resize() {
   const w = innerWidth, h = innerHeight;
+  if (settings.retro) { pixelRatio = retroPR(); renderer.setPixelRatio(pixelRatio); }
   portrait = h > w * 1.05;
   renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
   if (composer) { composer.setPixelRatio(pixelRatio); composer.setSize(w, h); }
@@ -2030,7 +2157,7 @@ function resize() {
 }
 addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 200));
 
-const countEl = $('count');
+const countEl = $('count'), countN = $('countN');
 let last = performance.now(), perf = { n: 0, sum: 0, done: false };
 function step(dt, inp) {
   const st = game.state;
@@ -2040,8 +2167,8 @@ function step(dt, inp) {
     if (n !== game.lastBeep) {
       game.lastBeep = n;
       if (n <= 3) countEl.classList.remove('hidden');
-      if (n >= 1 && n <= 3) { countEl.textContent = n; countEl.className = ''; SFX.beep(false); }
-      else if (n <= 0) { countEl.textContent = 'GO!'; countEl.className = 'go'; countEl.classList.remove('hidden'); SFX.beep(true); game.state = 'race'; setTimeout(() => countEl.classList.add('hidden'), 700); }
+      if (n >= 1 && n <= 3) { countN.textContent = n; countN.className = 'gold'; SFX.beep(false); }
+      else if (n <= 0) { countN.textContent = 'GO!'; countN.className = 'gold greenc'; countEl.classList.remove('hidden'); SFX.beep(true); game.state = 'race'; setTimeout(() => countEl.classList.add('hidden'), 700); }
     }
   }
   if (game.state === 'race') { game.raceT += dt; if (game.raceT > 4 && game.raceT - dt <= 4) hide('tip'); }
@@ -2118,7 +2245,7 @@ function frame(now) {
     headSpot.intensity = player.alive ? skyCfg.spot : 0;
   }
   if (boomT > 0) { boomT -= dt; boomLight.intensity = Math.max(0, boomT) * 550; }
-  if (player) audioUpdate(player.v, player.drift * 2.5, Math.abs(player.d) > RW + 0.2 && !trackAt(player.s, tr1).town, player.turbo > 0, game.state === 'race' || game.state === 'countdown' || game.state === 'finished');
+  if (player) audioUpdate(player, player.drift * 2.5, Math.abs(player.d) > RW + 0.2 && !trackAt(player.s, tr1).town, player.alive && (game.state === 'race' || game.state === 'countdown' || game.state === 'finished'));
   if (composer && Q.level >= 2) composer.render(); else renderer.render(scene, camera);
   // adaptive quality: step down while the device cannot hold ~45 fps
   if (game.state === 'race' && !Q.lock && Q.level > 0) {
@@ -2128,8 +2255,9 @@ function frame(now) {
 }
 
 /* ============================== boot ============================== */
+applyCtrl(); document.body.classList.toggle('retro', settings.retro);
 applyQuality(settings.gfx === 'low' ? 0 : 3);
 loadStage(0, true);
 renderMenu();
 requestAnimationFrame(t => { last = t; frame(t); });
-window.__rh = { vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
+window.__rh = { input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
