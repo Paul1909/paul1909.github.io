@@ -96,16 +96,14 @@
   .pad.small { width: 70px; height: 70px; font-size: 9px; letter-spacing: 0; }
   #padB { background: radial-gradient(circle at 38% 32%, #ff9c8a, #e0200c 55%, #800c00); box-shadow: 0 6px 0 #4a0800, 0 6px 0 3px #000; }
   #padH { background: radial-gradient(circle at 38% 32%, #fff2a0, #ffb800 55%, #a05a00); box-shadow: 0 6px 0 #5a3200, 0 6px 0 3px #000; color: #fff; }
-  /* layout "halves": steer with each half of the screen, brake sits above the right arrow */
-  body.ctrl-halves #padL { left: max(14px, env(safe-area-inset-left)); }
-  body.ctrl-halves #padR { right: max(14px, env(safe-area-inset-right)); }
-  body.ctrl-halves #padB { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 104px); right: calc(max(14px, env(safe-area-inset-right)) + 7px); }
-  body.ctrl-halves #padH { display: none; }
-  /* layout "buttons": both arrows on the left, brake + drift on the right */
-  body.ctrl-buttons #padL { left: max(12px, env(safe-area-inset-left)); }
-  body.ctrl-buttons #padR { left: calc(max(12px, env(safe-area-inset-left)) + 100px); }
-  body.ctrl-buttons #padB { right: max(12px, env(safe-area-inset-right)); width: 84px; height: 84px; }
-  body.ctrl-buttons #padH { right: calc(max(12px, env(safe-area-inset-right)) + 100px); }
+  /* steering on the left, brake alone on the right */
+  #padL { left: max(12px, env(safe-area-inset-left)); }
+  #padR { left: calc(max(12px, env(safe-area-inset-left)) + 100px); }
+  #padB.small { right: max(14px, env(safe-area-inset-right)); width: 96px; height: 96px; font-size: 11px; }
+  #wanted { margin-top: 6px; padding: 4px 10px 6px; background: rgba(0,0,0,.6); border: 3px solid #ff2a1a; box-shadow: 3px 3px 0 #000; text-align: center; animation: siren .45s steps(1) infinite; }
+  #wanted .lbl { color: #fff; } #stars { font-size: 14px; color: var(--y); letter-spacing: 2px; margin-left: 6px; }
+  #bust { height: 6px; background: #000; margin-top: 4px; border: 1px solid #fff; } #bustI { display: block; height: 100%; width: 0; background: #ff2a1a; }
+  @keyframes siren { 50% { border-color: #2a5bff; } }
   #keysHint { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom)); font-size: 9px; white-space: nowrap; color: #fff; }
   #count { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; }
   #count span { font-size: min(32vw, 200px); line-height: 1; padding: 0 .1em; -webkit-text-stroke: 4px #000; filter: drop-shadow(6px 6px 0 #000); }
@@ -165,7 +163,7 @@
   @media (max-aspect-ratio: 4/5) { #hudTop { flex-wrap: wrap; justify-content: space-between; row-gap: 2px; } #mid { order: -1; flex: 0 0 calc(100% - 56px); } #time { font-size: 26px; } #right { margin-right: 54px; } .col { margin-top: 2px; } }
 </style>
 </head>
-<body class="retro ctrl-halves">
+<body class="retro">
 <canvas id="c"></canvas>
 <div id="vig"></div>
 <div id="scan"></div>
@@ -182,6 +180,7 @@
       <span class="lbl">TIME</span>
       <span id="time" class="gold">0'00"0</span>
       <div id="prog"><div id="progBar"></div><div id="progDots"></div></div>
+      <div id="wanted" class="hidden"><span class="lbl">WANTED</span><span id="stars">☆☆☆</span><div id="bust"><i id="bustI"></i></div></div>
     </div>
     <div id="right">
       <span class="lbl">SCORE</span>
@@ -193,7 +192,6 @@
   <div id="padL" class="pad">◀</div>
   <div id="padR" class="pad">▶</div>
   <div id="padB" class="pad small">BRAKE</div>
-  <div id="padH" class="pad small">DRIFT</div>
   <div id="keysHint" class="pix hidden">ARROWS STEER - DOWN BRAKE - SPACE DRIFT - C CAMERA - P PAUSE</div>
 </div>
 <button id="pauseBtn" class="icon hidden" aria-label="Pause">II</button>
@@ -212,7 +210,6 @@
     <div class="sect pix">OPTIONS</div>
     <div class="row">
       <button class="chip" data-opt="cam"></button>
-      <button class="chip" data-opt="ctrl"></button>
       <button class="chip" data-opt="retro"></button>
       <button class="chip" data-opt="gfx"></button>
       <button class="chip" data-opt="sound"></button>
@@ -222,13 +219,14 @@
     <div class="howto hidden" id="howto">
       <b>THE CAR ACCELERATES BY ITSELF.</b> YOU STEER AND BRAKE.
       <ul>
-        <li><b>PHONE/IPAD:</b> HOLD THE LEFT OR RIGHT HALF OF THE SCREEN TO STEER. RED BUTTON = BRAKE. HOLD BOTH SIDES = HANDBRAKE DRIFT. (OPTION "CONTROLS: BUTTONS" PUTS BOTH ARROWS ON THE LEFT.)</li>
+        <li><b>PHONE/IPAD:</b> ARROWS ON THE LEFT STEER. THE WHOLE RIGHT SIDE IS THE BRAKE. BRAKE + STEER AT SPEED = DRIFT.</li>
         <li><b>KEYBOARD:</b> LEFT/RIGHT ARROWS STEER, DOWN ARROW BRAKES, SPACE HANDBRAKE, C CAMERA, P PAUSE.</li>
         <li>CURVES PUSH YOU OUT: BRAKE BEFORE, STEER EARLY. HANDBRAKE + STEER = DRIFT.</li>
         <li><b>NEAR MISSES, DRIFTS, JUMPS</b> FILL TURBO. FULL BAR = BOOST.</li>
         <li>EVERY HIT COSTS DAMAGE. TOO MUCH AND YOU <b>EXPLODE</b>. WRENCHES REPAIR.</li>
         <li>RAM RIVALS INTO TRAFFIC. RED BARRELS GO BOOM.</li>
         <li>RED LIGHT = CROSS TRAFFIC + PEOPLE. PEDESTRIANS COST 1000 PTS.</li>
+        <li><b>POLICE:</b> RUN A RED, DRIVE THE WRONG WAY, HIT PEOPLE OR CARS AND THE COPS COME. EACH OFFENCE = ONE MORE STAR. IF THEY BOX YOU IN AND STOP YOU: BUSTED! LOSE THEM FOR 7 SECONDS TO ESCAPE. TAKEDOWNS PAY 1000.</li>
         <li>TOP 3 UNLOCKS THE NEXT STAGE.</li>
       </ul>
     </div>
@@ -246,7 +244,6 @@
     </div>
     <div class="row">
       <button class="chip" data-opt="cam"></button>
-      <button class="chip" data-opt="ctrl"></button>
       <button class="chip" data-opt="retro"></button>
       <button class="chip" data-opt="gfx"></button>
       <button class="chip" data-opt="sound"></button>
