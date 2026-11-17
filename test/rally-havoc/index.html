@@ -170,6 +170,22 @@
   .stats span { color: #cfe0ff; } .stats b { text-align: right; color: var(--y); font-weight: normal; }
   .btns { display: grid; gap: 12px; }
   .res-sub, .stats { text-transform: uppercase; }
+  .hs { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px 14px; font-family: var(--pix); font-size: 10px; line-height: 1.4;
+    background: rgba(0,0,0,.6); border: 3px solid var(--y); box-shadow: 4px 4px 0 #000; padding: 12px 16px; }
+  .hs span { color: #cfe0ff; } .hs b { text-align: right; color: var(--y); font-weight: normal; }
+  .hs .me { color: #fff !important; background: #d0200c; animation: hsme .5s steps(1) infinite; }
+  @keyframes hsme { 50% { background: #1a3fd0; color: var(--y) !important; } }
+  #scores { background: rgba(6, 10, 46, .97); }
+  #scoresList { display: flex; flex-direction: column; gap: 8px; }
+  #slots { display: flex; justify-content: center; gap: 18px; margin: 6px 0 4px; }
+  .slot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .slot .ch { width: 74px; height: 86px; display: grid; place-items: center; font-family: var(--pix); font-size: 44px; color: #fff; text-shadow: 3px 3px 0 #000;
+    background: #000; border: 3px solid #fff; box-shadow: 4px 4px 0 #000; cursor: pointer; }
+  .slot.cur .ch { border-color: var(--y); color: var(--y); animation: blink .8s steps(1) infinite; }
+  .arw { width: 74px; height: 44px; display: grid; place-items: center; background: linear-gradient(180deg, #3d63ff, #1028a0); border: 2px solid #fff; box-shadow: 3px 3px 0 #000; }
+  .arw:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+  .arw::after { content: ''; width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; }
+  .arw.up::after { border-bottom: 16px solid #fff; } .arw.dn::after { border-top: 16px solid #fff; }
   .foot { text-align: center; font-size: 9px; color: #9fb4ff; }
   @media (max-aspect-ratio: 4/5) { #hudTop { flex-wrap: wrap; justify-content: space-between; row-gap: 2px; } #mid { order: -1; flex: 0 0 calc(100% - 56px); } #time { font-size: 26px; } #right { margin-right: 54px; } .col { margin-top: 2px; } }
 </style>
@@ -226,6 +242,7 @@
       <button class="chip" data-opt="gfx"></button>
       <button class="chip" data-opt="sound"></button>
       <button class="chip" data-opt="vibe"></button>
+      <button class="chip alt" id="scoresBtn">HIGH SCORES</button>
       <button class="chip alt" id="howBtn">HOW TO PLAY</button>
     </div>
     <div class="howto hidden" id="howto">
@@ -269,11 +286,35 @@
     <div class="res-title gold" id="resTitle">YOU WIN!</div>
     <div class="res-sub pix" id="resSub"></div>
     <div class="stats" id="resStats"></div>
+    <div class="sect pix" id="resHSt">HIGH SCORES</div>
+    <div class="hs" id="resHS"></div>
     <div class="btns">
       <button class="big" id="nextBtn">NEXT STAGE</button>
       <button class="big alt" id="retryBtn">RETRY</button>
       <button class="big alt" id="menuBtn">MENU</button>
     </div>
+  </div>
+</div>
+
+<div id="entry" class="overlay hidden">
+  <div class="wrap" style="margin-top:4vh">
+    <div class="res-title gold">NEW HIGH SCORE!</div>
+    <div class="res-sub pix" id="entrySub"></div>
+    <div class="sect pix blink">ENTER YOUR INITIALS</div>
+    <div id="slots">
+      <div class="slot"><button class="arw up" aria-label="Next letter"></button><div class="ch">A</div><button class="arw dn" aria-label="Previous letter"></button></div>
+      <div class="slot"><button class="arw up" aria-label="Next letter"></button><div class="ch">A</div><button class="arw dn" aria-label="Previous letter"></button></div>
+      <div class="slot"><button class="arw up" aria-label="Next letter"></button><div class="ch">A</div><button class="arw dn" aria-label="Previous letter"></button></div>
+    </div>
+    <button class="big" id="entryOk">OK</button>
+  </div>
+</div>
+
+<div id="scores" class="overlay hidden">
+  <div class="wrap">
+    <div class="res-title chrome">HIGH SCORES</div>
+    <div id="scoresList"></div>
+    <button class="big alt" id="scoresBack">BACK</button>
   </div>
 </div>
 

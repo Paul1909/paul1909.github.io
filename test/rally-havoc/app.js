@@ -31,11 +31,11 @@ const $ = id => document.getElementById(id);
 
 /* ============================== stages ============================== */
 const STAGES = [
-  { name: 'Borgo Verde', dmg: 0.5, sub: 'Village & vineyards · gentle start', len: 3000, seed: 11, tb: 0.45, traffic: 0.9, oncoming: 0.66, bus: 0.12, peds: 0.78, props: 0.65, ramps: 0.9, rival: 41.5, kmax: 0.0062, hills: 4, sky: 'day' },
-  { name: 'Valle Rossa', dmg: 0.62, sub: 'Fast valley roads · jumps', len: 3500, seed: 23, tb: 0.35, traffic: 1.14, oncoming: 0.9, bus: 0.14, peds: 0.91, props: 0.8, ramps: 1.4, rival: 43, kmax: 0.0072, hills: 6, sky: 'sunset' },
-  { name: 'Città Alta', dmg: 0.74, sub: 'Rush hour downtown · buses', len: 3600, seed: 37, tb: 0.75, traffic: 1.62, oncoming: 1.14, bus: 0.24, peds: 1.56, props: 0.85, ramps: 0.7, rival: 43.5, kmax: 0.006, hills: 3, sky: 'overcast' },
-  { name: 'Passo Nebbia', dmg: 0.85, sub: 'Foggy mountain pass · rocks', len: 4200, seed: 41, tb: 0.3, traffic: 1.32, oncoming: 1.2, bus: 0.16, peds: 1.04, props: 1.15, ramps: 1.1, rival: 44.5, kmax: 0.0082, hills: 10, sky: 'fog' },
-  { name: 'Gran Finale', dmg: 0.95, sub: 'Dusk · everything, everywhere', len: 5000, seed: 53, tb: 0.5, traffic: 1.92, oncoming: 1.44, bus: 0.2, peds: 1.69, props: 1.25, ramps: 1.3, rival: 45.5, kmax: 0.0078, hills: 7, sky: 'dusk' },
+  { name: 'Borgo Verde', dmg: 0.44, sub: 'Village & vineyards · gentle start', len: 3000, seed: 11, tb: 0.45, traffic: 0.648, oncoming: 0.475, bus: 0.12, peds: 0.78, props: 0.65, ramps: 0.9, rival: 41.5, kmax: 0.0062, hills: 4, sky: 'day' },
+  { name: 'Valle Rossa', dmg: 0.546, sub: 'Fast valley roads · jumps', len: 3500, seed: 23, tb: 0.35, traffic: 0.821, oncoming: 0.648, bus: 0.14, peds: 0.91, props: 0.8, ramps: 1.4, rival: 43, kmax: 0.0072, hills: 6, sky: 'sunset' },
+  { name: 'Città Alta', dmg: 0.651, sub: 'Rush hour downtown · buses', len: 3600, seed: 37, tb: 0.75, traffic: 1.166, oncoming: 0.821, bus: 0.24, peds: 1.56, props: 0.85, ramps: 0.7, rival: 43.5, kmax: 0.006, hills: 3, sky: 'overcast' },
+  { name: 'Passo Nebbia', dmg: 0.748, sub: 'Foggy mountain pass · rocks', len: 4200, seed: 41, tb: 0.3, traffic: 0.95, oncoming: 0.864, bus: 0.16, peds: 1.04, props: 1.15, ramps: 1.1, rival: 44.5, kmax: 0.0082, hills: 10, sky: 'fog' },
+  { name: 'Gran Finale', dmg: 0.836, sub: 'Dusk · everything, everywhere', len: 5000, seed: 53, tb: 0.5, traffic: 1.382, oncoming: 1.037, bus: 0.2, peds: 1.69, props: 1.25, ramps: 1.3, rival: 45.5, kmax: 0.0078, hills: 7, sky: 'dusk' },
 ];
 const SKIES = {
   day:      { top: 0x2f7fd6, hor: 0xbfe0f4, fog: 0xcfe6f2, near: 90, far: 340, sun: 0xfff4e0, sunI: 2.7, sky: 0xdcecff, gnd: 0x6b7a4a, hemiI: 1.25, lamps: false,
@@ -781,9 +781,9 @@ function buildTrack(st) {
     for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 18 && F[k].t !== 'jay' && lanes.some(d => Math.abs(F[k].d - d) < 2.6)) F.splice(k, 1);
     for (const d of lanes) F.push({ t: 'ramp', s: q, d });
   }
-  for (let q = 200; q < st.len - 100; q += 140 + rng() * 160) {
+  for (let q = 160; q < st.len - 100; q += 85 + rng() * 105) {
     if (nearInter(q) || F.some(f => Math.abs(f.s - q) < 10)) continue;
-    F.push({ t: rng() < 0.55 ? 'turbo' : 'wrench', s: q, d: LANES[(rng() * 4) | 0] });
+    F.push({ t: rng() < 0.6 ? 'turbo' : 'wrench', s: q, d: LANES[(rng() * 4) | 0] });
   }
   F.sort((a, b) => a.s - b.s); T.feats = F; T.featIdx = 0;
 }
@@ -1161,6 +1161,7 @@ touchEl.addEventListener('pointerdown', e => { audioInit(); input.touches.set(e.
 touchEl.addEventListener('pointermove', e => { if (input.touches.has(e.pointerId)) input.touches.set(e.pointerId, touchZone(e.clientX, e.clientY)); });
 for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) touchEl.addEventListener(ev, e => input.touches.delete(e.pointerId));
 addEventListener('keydown', e => {
+  if (game.state === 'entry') { entryKey(e); return; }
   if (e.repeat) return;
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.kL = true;
@@ -1292,7 +1293,7 @@ function policeMesh() {
 function resetPolice() { Object.assign(police, { heat: 0, bust: 0, spawnT: 0, calmT: 0, cool: {}, block: false, wrongT: 0, nearest: 999 }); }
 function violation(kind, text) {
   if (game.state !== 'race' || !player.alive) return;
-  if (game.t - (police.cool[kind] ?? -99) < 6) return;
+  if (game.t - (police.cool[kind] ?? -99) < 9) return;
   police.cool[kind] = game.t;
   police.heat = Math.min(3, police.heat + 1); police.calmT = 0; police.spawnT = Math.min(police.spawnT, 0.6);
   game.stats.viol++;
@@ -1324,22 +1325,23 @@ function updatePoliceWorld(dt) {
   // traffic-rule checks
   if (game.state === 'race' && player.alive) {
     for (const I of T.inters) { const line = I.s - 12.2; if (game.prevS < line && player.s >= line && I.light === 'R') violation('red', 'RAN A RED LIGHT!'); }
-    if (player.d < -0.9 && player.v > 8) { police.wrongT += dt; if (police.wrongT > 3.2) { violation('wrong', 'WRONG WAY!'); police.wrongT = 0; } } else police.wrongT = Math.max(0, police.wrongT - dt * 2);
+    if (player.d < -0.9 && player.v > 8) { police.wrongT += dt; if (police.wrongT > 4.5) { violation('wrong', 'WRONG WAY!'); police.wrongT = 0; } } else police.wrongT = Math.max(0, police.wrongT - dt * 2);
   }
   if (police.heat <= 0 || game.state !== 'race') { police.bust = Math.max(0, police.bust - dt); return; }
   const chasers = cops.filter(c => c.alive && !c.block && !c.giveUp);
   police.spawnT -= dt;
-  if (chasers.length < police.heat && police.spawnT <= 0) police.spawnT = spawnChaser() ? 3.5 : 0.5;
+  const maxCops = police.heat >= 3 ? 2 : 1;                 // one patrol car, two at three stars
+  if (chasers.length < maxCops && police.spawnT <= 0) police.spawnT = spawnChaser() ? 7 : 0.5;
   if (police.heat >= 3 && !police.block) police.block = spawnRoadblock();
   const boxed = chasers.some(c => Math.abs(c.s - player.s) < 7 && Math.abs(c.d - player.d) < 3.6);
   if (boxed && player.v < 11) police.bust += dt; else police.bust = Math.max(0, police.bust - dt * 0.6);
-  if (police.bust > 2.6) {
+  if (police.bust > 3.2) {
     game.state = 'busted'; game.endT = 2.4; msg('BUSTED!', 'hot'); vibrate([200, 80, 200]);
     sfxTone(392, 0.4, 'square', 0.08); sfxTone(523, 0.4, 'square', 0.08, null, 0.4); return;
   }
   const close = chasers.some(c => player.s - c.s < 200);
   police.calmT = close ? 0 : police.calmT + dt;
-  if (police.calmT > 7) {
+  if (police.calmT > 6) {
     police.heat = 0; police.bust = 0; police.block = false;
     for (const c of cops) c.giveUp = true;
     addScore(1000); game.stats.escapes++; msg('ESCAPED! +1000', 'gold'); SFX.pickup();
@@ -2132,7 +2134,7 @@ function updateHud(dt, inp) {
   hud.score.textContent = game.score.toLocaleString('en-US');
   hud.wanted.classList.toggle('hidden', police.heat <= 0 && police.bust <= 0);
   hud.stars.textContent = '★'.repeat(police.heat) + '☆'.repeat(3 - police.heat);
-  hud.bustI.style.width = clamp(police.bust / 2.6, 0, 1) * 100 + '%';
+  hud.bustI.style.width = clamp(police.bust / 3.2, 0, 1) * 100 + '%';
   hud.gear.textContent = player.shiftT > 0 ? 'N' : player.gear || 'N';
   hud.spd.textContent = Math.round(player.v * 3.6);
   const hpF = Math.max(0, player.hp) / 100;
@@ -2187,7 +2189,7 @@ function pauseGame() {
 }
 function resumeGame() { if (game.state !== 'paused') return; game.state = game.prevState; hide('pause'); audioInit(); last = performance.now(); }
 function toMenu() {
-  hide('pause'); hide('result'); hide('hud'); hide('count'); hide('tip'); $('pauseBtn').classList.add('hidden'); $('camBtn').classList.add('hidden');
+  hide('pause'); hide('result'); hide('entry'); hide('hud'); hide('count'); hide('tip'); $('pauseBtn').classList.add('hidden'); $('camBtn').classList.add('hidden');
   loadStage(game.stageIdx, true); renderMenu(); show('menu'); releaseWake();
 }
 function finishRace(reason) {
@@ -2214,7 +2216,10 @@ function finishRace(reason) {
   $('resStats').innerHTML = rows.map(([a, b]) => `<span>${String(a).toUpperCase()}</span><b>${String(b).toUpperCase()}</b>`).join('');
   const canNext = idx + 1 < STAGES.length && progress.unlocked > idx + 1;
   $('nextBtn').classList.toggle('hidden', !canNext);
-  show('result'); game.state = 'result'; releaseWake();
+  releaseWake();
+  const tag = reason === 'busted' ? 'BUSTED' : reason ? 'DNF' : ord(place).toUpperCase();
+  const hl = hsList(idx), rank = hl.filter(e => e.s >= game.score).length;
+  if (rank < 5 && game.score > 0) openEntry(idx, rank, game.score, tag); else showResult(idx, -1);
 }
 function renderMenu() {
   const el = $('stages'); el.innerHTML = '';
@@ -2223,7 +2228,7 @@ function renderMenu() {
     const locked = i + 1 > progress.unlocked;
     b.className = 'stage' + (locked ? ' locked' : '');
     b.innerHTML = `<div class="info"><div class="snum">STAGE ${i + 1}</div><div class="nm">${st.name}</div><div class="sb">${st.sub.replace(/ · /g, ' - ').toUpperCase()} - ${(st.len / 1000).toFixed(1)} KM</div></div>` +
-      `<div class="best">${best && best.place ? 'BEST<br><b>' + ord(best.place).toUpperCase() + '</b><br>' + fmtTime(best.time) : locked ? 'LOCKED<br>TOP 3 ON<br>STAGE ' + i : 'NEW!'}</div>`;
+      `<div class="best">${locked ? 'LOCKED<br>TOP 3 ON<br>STAGE ' + i : (best && best.place ? 'BEST <b>' + ord(best.place).toUpperCase() + '</b><br>' + fmtTime(best.time) + '<br>' : '') + 'HI <b>' + hsList(i)[0].s.toLocaleString('en-US') + '</b> ' + hsList(i)[0].n}</div>`;
     b.onclick = () => { audioInit(); loadStage(i); };
     el.appendChild(b);
   });
@@ -2251,6 +2256,64 @@ function syncToggles() {
 }
 document.querySelectorAll('[data-opt]').forEach(b => { b.onclick = () => { audioInit(); OPT[b.dataset.opt].click(); syncToggles(); }; });
 function applyRetro() { document.body.classList.toggle('retro', settings.retro); applyQuality(Q.level); }
+/* ---------- high scores (top 5 per stage, 3-letter initials, arcade style) ---------- */
+const HS_SEED = [['PAO', 9000], ['SEG', 7000], ['NAM', 5000], ['TTO', 3000], ['ACE', 1500]];
+const HS_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function hsList(i) {
+  const all = store.get('hiscores', {});
+  return all[i] || HS_SEED.map(([n, sc]) => ({ n, s: Math.round(sc * (1 + i * 0.25) / 10) * 10, r: 'CPU' }));
+}
+function hsSave(i, list) { const all = store.get('hiscores', {}); all[i] = list; store.set('hiscores', all); }
+function hsRows(list, hi) {
+  return list.map((e, k) => `<span class="${k === hi ? 'me' : ''}">${ord(k + 1).toUpperCase()}</span><span class="${k === hi ? 'me' : ''}">${e.n}</span><span class="${k === hi ? 'me' : ''}">${e.r}</span><b class="${k === hi ? 'me' : ''}">${e.s.toLocaleString('en-US')}</b>`).join('');
+}
+const entry = { rank: -1, cur: 0, ch: [0, 0, 0], idx: 0, score: 0, tag: '' };
+function openEntry(idx, rank, score, tag) {
+  Object.assign(entry, { idx, rank, score, tag, cur: 0 });
+  const last = String(store.get('initials', 'AAA'));
+  entry.ch = [0, 1, 2].map(k => Math.max(0, HS_CHARS.indexOf(last[k] || 'A')));
+  $('entrySub').textContent = STAGES[idx].name.toUpperCase() + ' - ' + score.toLocaleString('en-US') + ' PTS - ' + ord(rank + 1).toUpperCase() + ' PLACE';
+  renderEntry(); show('entry'); game.state = 'entry'; SFX.pickup();
+}
+function renderEntry() {
+  document.querySelectorAll('#slots .slot').forEach((el, k) => { el.querySelector('.ch').textContent = HS_CHARS[entry.ch[k]]; el.classList.toggle('cur', k === entry.cur); });
+}
+function entryStep(k, dir) { entry.cur = k; entry.ch[k] = (entry.ch[k] + dir + HS_CHARS.length) % HS_CHARS.length; renderEntry(); sfxTone(dir > 0 ? 660 : 520, 0.05, 'square', 0.06); }
+function entryOk() {
+  if (game.state !== 'entry') return;
+  const name = entry.ch.map(c => HS_CHARS[c]).join('');
+  store.set('initials', name);
+  const list = hsList(entry.idx); list.splice(entry.rank, 0, { n: name, s: entry.score, r: entry.tag }); list.length = 5; hsSave(entry.idx, list);
+  hide('entry'); showResult(entry.idx, entry.rank); sfxTone(880, 0.3, 'square', 0.1);
+}
+function entryKey(e) {
+  const k = e.key;
+  if (/^[a-zA-Z0-9]$/.test(k)) { entry.ch[entry.cur] = HS_CHARS.indexOf(k.toUpperCase()); entry.cur = Math.min(2, entry.cur + 1); renderEntry(); }
+  else if (k === 'ArrowUp') entryStep(entry.cur, 1);
+  else if (k === 'ArrowDown') entryStep(entry.cur, -1);
+  else if (k === 'ArrowLeft' || k === 'Backspace') { entry.cur = Math.max(0, entry.cur - 1); renderEntry(); }
+  else if (k === 'ArrowRight') { entry.cur = Math.min(2, entry.cur + 1); renderEntry(); }
+  else if (k === 'Enter') entryOk();
+  else return;
+  e.preventDefault();
+}
+document.querySelectorAll('#slots .slot').forEach((el, k) => {
+  el.querySelector('.up').onclick = () => entryStep(k, 1);
+  el.querySelector('.dn').onclick = () => entryStep(k, -1);
+  el.querySelector('.ch').onclick = () => { entry.cur = k; renderEntry(); };
+});
+$('entryOk').onclick = entryOk;
+function showResult(idx, hi) {
+  $('resHSt').textContent = 'HIGH SCORES - ' + STAGES[idx].name.toUpperCase();
+  $('resHS').innerHTML = hsRows(hsList(idx), hi);
+  show('result'); game.state = 'result';
+}
+function showScores() {
+  $('scoresList').innerHTML = STAGES.map((st, i) => `<div class="sect pix">STAGE ${i + 1} - ${st.name.toUpperCase()}</div><div class="hs">${hsRows(hsList(i), -1)}</div>`).join('');
+  show('scores');
+}
+$('scoresBtn').onclick = showScores;
+$('scoresBack').onclick = () => hide('scores');
 $('howBtn').onclick = () => $('howto').classList.toggle('hidden');
 $('camBtn').onclick = () => cycleCamera();
 $('pauseBtn').onclick = () => game.state === 'paused' ? resumeGame() : pauseGame();
@@ -2396,10 +2459,10 @@ function frame(now) {
   const rawDt = dt; dt = Math.min(dt, 1 / 20);
   const inp = readInput();
   if (warm.length && (game.state === 'menu' || game.state === 'result' || game.state === 'paused')) { const [t, c] = warm.pop(); trafficGeo(t, c); }
-  if (game.state !== 'paused' && game.state !== 'result') {
+  if (game.state !== 'paused' && game.state !== 'result' && game.state !== 'entry') {
     step(dt, inp);
     if (game.state !== 'menu') updateHud(dt, inp);
-  } else if (game.state === 'result') { game.t += dt; }
+  } else if (game.state === 'result' || game.state === 'entry') { game.t += dt; }
   if (player) {
     { const adt = game.state === 'paused' || game.state === 'result' ? 0 : dt; for (const e of ents) if (!e.dead) placeEnt(e, adt); }
     if (!DBG.cam) updateCamera(game.state === 'paused' ? 0 : dt);
