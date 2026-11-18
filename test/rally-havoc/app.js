@@ -651,16 +651,16 @@ const PROPS = {
   rock: () => merge([P_('dode', 1.0, 0.75, 1.05, 0, 0.45, 0, 0x7b7670, 0.3, 0.5, 0), P_('dode', 0.6, 0.5, 0.6, 0.6, 0.3, 0.3, 0x6a655f, 0.7, 0, 0.2)]),
   barrier: () => { const p = []; for (let i = 0; i < 6; i++) p.push(P_('box', 0.62, 0.95, 0.55, -1.55 + i * 0.62, 0.48, 0, i % 2 ? 0xffffff : 0xd8261c)); p.push(P_('box', 3.75, 0.12, 0.62, 0, 0.06, 0, 0x555555)); p.push(P_('cyl', 0.12, 0.08, 0.12, -1.6, 1.0, 0, 0xffb000, Math.PI / 2)); p.push(P_('cyl', 0.12, 0.08, 0.12, 1.6, 1.0, 0, 0xffb000, Math.PI / 2)); return merge(p); },
   // ramp: red deck with white side rails and dark posts; the glowing parts are in rampGlow
-  ramp: () => { const a = -Math.atan2(1.15, 6.5), p = [P_('wedge', 2.7, 1.15, 6.5, 0, 0, -3.25, 0xc81a12)];
-    for (const x of [-1.3, 1.3]) p.push(P_('box', 0.14, 0.08, 6.6, x, 0.6, 0, 0xf4f4f4, a));
-    for (const x of [-1.42, 1.42]) p.push(P_('box', 0.14, 3.6, 0.14, x, 1.8, 3.15, 0x222222));
+  ramp: () => { const a = -Math.atan2(1.15, 6.5), p = [P_('wedge', 3.2, 1.15, 6.5, 0, 0, -3.25, 0xc81a12)];
+    for (const x of [-1.55, 1.55]) p.push(P_('box', 0.14, 0.08, 6.6, x, 0.6, 0, 0xf4f4f4, a));
+    for (const x of [-1.67, 1.67]) p.push(P_('box', 0.14, 3.6, 0.14, x, 1.8, 3.15, 0x222222));
     return merge(p); },
   rampGlow: () => {
     const a = -Math.atan2(1.15, 6.5), p = [], Y = 0xffc400, chev = (z, y, pitch, w = 1.25) => { for (const sd of [-1, 1]) p.push(P_('box', 0.3, 0.035, w, sd * 0.42, y, z - 0.38, Y, pitch, sd * 0.72)); };
     for (const z of [-2.1, -0.2, 1.7]) chev(z, (z + 3.25) / 6.5 * 1.15 + 0.05, a);                       // chevrons up the slope
     for (const z of [-6.5, -10.5, -14.5, -18.5]) chev(z, 0.045, 0, 1.35);                                 // arrows painted on the road
-    for (let k = 0; k < 8; k++) p.push(P_('box', 0.36, 0.42, 0.08, -1.26 + k * 0.36, 3.45, 3.15, k % 2 ? 0x101010 : 0xffc400));   // striped arch over the ramp
-    for (const x of [-1.42, 1.42]) p.push(P_('box', 0.34, 0.34, 0.34, x, 3.85, 3.15, 0xff4a00));            // marker lamps on the posts
+    for (let k = 0; k < 9; k++) p.push(P_('box', 0.36, 0.42, 0.08, -1.44 + k * 0.36, 3.45, 3.15, k % 2 ? 0x101010 : 0xffc400));   // striped arch over the ramp
+    for (const x of [-1.67, 1.67]) p.push(P_('box', 0.34, 0.34, 0.34, x, 3.85, 3.15, 0xff4a00));            // marker lamps on the posts
     return merge(p); },
   oil: () => merge([P_('cyl', 2.2, 0.02, 1.7, 0, 0.03, 0, 0x0b0b10), P_('cyl', 1.2, 0.022, 0.9, 0.5, 0.034, 0.3, 0x1a1830)]),
   wrench: () => merge([P_('torus', 0.75, 0.75, 0.9, 0, 0, 0, 0x2bff6a), P_('box', 0.9, 0.28, 0.12, 0, 0, 0, 0xffffff), P_('box', 0.28, 0.9, 0.12, 0, 0, 0, 0xffffff)]),
@@ -1266,7 +1266,7 @@ function propMesh(t) {
   const flat = t === 'oil', glow = t === 'wrench' || t === 'turbo';
   const m = new THREE.Mesh(propGeo(t), glow ? matLights : matV); if (!flat && !glow) m.castShadow = true; gr.add(m);
   if (t === 'ramp') { const g2 = new THREE.Mesh(propGeo('rampGlow'), matLights); g2.renderOrder = 1; gr.add(g2); }
-  if (!flat && !glow && t !== 'triangle') { const s = shadowMesh(t === 'barrier' ? 4.4 : t === 'ramp' ? 3.4 : t === 'rock' ? 2.8 : 1.4, t === 'ramp' ? 7.5 : t === 'rock' ? 2.8 : 1.4); gr.add(s); gr.userData.shadow = s; }
+  if (!flat && !glow && t !== 'triangle') { const s = shadowMesh(t === 'barrier' ? 4.4 : t === 'ramp' ? 3.9 : t === 'rock' ? 2.8 : 1.4, t === 'ramp' ? 7.5 : t === 'rock' ? 2.8 : 1.4); gr.add(s); gr.userData.shadow = s; }
   return gr;
 }
 
@@ -1427,7 +1427,7 @@ function makeFeature(f) {
     rock: { hs: 1.0, hd: 1.0, mass: Infinity, hard: 1.5 },
     barrier: { hs: 0.32, hd: 1.88, mass: Infinity, hard: 1.3 },
     triangle: { hs: 0.25, hd: 0.3, mass: 0.03, hard: 0, light: true },
-    ramp: { hs: 3.25, hd: 1.35, solid: false, zone: 'ramp', mass: Infinity },
+    ramp: { hs: 3.25, hd: 1.6, solid: false, zone: 'ramp', mass: Infinity },
     oil: { hs: 2.0, hd: 2.0, solid: false, zone: 'oil', mass: Infinity },
     wrench: { hs: 1.0, hd: 1.0, solid: false, zone: 'wrench', mass: Infinity, y: 1.1 },
     turbo: { hs: 1.0, hd: 1.0, solid: false, zone: 'turbo', mass: Infinity, y: 1.1 },
@@ -1685,11 +1685,9 @@ function zones(e) {
   // non-solid props: ramps, oil, pickups (rally cars only)
   for (const z of ents) {
     if (z.dead || !z.zone || Math.abs(z.s - e.s) > z.hs + 2) continue;
-    if (Math.abs(z.d - e.d) > z.hd + (z.zone === 'ramp' ? 0 : e.hd)) continue;
-    if (z.zone === 'ramp') {
-      const h = (e.s - (z.s - z.hs)) / (2 * z.hs) * 1.15;
-      if (h >= 0 && h <= 1.15 && e.y <= h + 0.25) { e.y = Math.max(e.y, h); e.vy = Math.max(e.vy, 0); e.onRamp = z; }
-    } else if (z.zone === 'oil') {
+    if (Math.abs(z.d - e.d) > z.hd + (z.zone === 'ramp' ? TRACK : e.hd)) continue;
+    if (z.zone === 'ramp') rampTouch(e, z);
+    else if (z.zone === 'oil') {
       if (e === player) { if (player.oil <= 0) { player.spin += (Math.random() < 0.5 ? -1 : 1) * R(1.8, 2.6); msg('OIL!', 'hot'); } player.oil = 1.1; }
       else if (e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
     } else if (e === player && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2) {   // one pickup per row
@@ -1703,26 +1701,84 @@ function zones(e) {
 
 /* ============================== updates ============================== */
 const tr1 = { ...tr0 };
+// Ramps, per wheel: each side of the car (left/right wheel track) sits on the ramp surface or on the road.
+// Straight on = clean jump. One side on = the car leaves tilted and keeps rolling in the air;
+// how it lands decides: shrug it off, a hard damaging landing, or a full barrel roll.
+const TRACK = 0.8;                                 // half the distance between left and right wheels
+function rampTouch(e, z) {
+  const u = e.s - (z.s - z.hs); if (u < 0 || u > 2 * z.hs) return;
+  const h = u / (2 * z.hs) * 1.15, off = e.d - z.d, a = Math.abs(off), inner = z.hd - TRACK;
+  if (a > z.hd + TRACK) return;                                   // neither wheel line reaches the ramp
+  // f = how badly off-centre: 0 = both wheel lines on the ramp, 1 = only the outermost wheel edge catches it
+  const f = a <= inner ? 0 : clamp((a - inner) / (2 * TRACK), 0.08, 1);
+  const hUp = h, hDown = h * (1 - f), side = f ? (off > 0 ? 1 : -1) : 0;   // car right of the ramp -> its left wheels ride up
+  const hL = side >= 0 ? hUp : hDown, hR = side >= 0 ? hDown : hUp, ty = (hL + hR) / 2;
+  if (e.y > ty + 0.3 && !e.onRamp) return;                       // flying over it
+  const c = e.rampC;
+  if (!c || ty > c.ty) e.rampC = { z, ty, h, roll: Math.atan2(hL - hR, 2 * TRACK), f, side };
+}
 function verticalStep(e, dt) {
-  if (e.onRamp) {
-    const z = e.onRamp;
-    if (e.s > z.s + z.hs || Math.abs(z.d - e.d) > z.hd) {
-      if (e.s > z.s + z.hs) { const sp = Math.abs(e.vs); e.vy = sp * 0.17 + 1.5; if (e === player) { msg('AIR! +200', 'blue'); addScore(200); } }
-      e.onRamp = null;
-    } else return;
+  const c = e.rampC; e.rampC = null;
+  if (c && !e.rolling) {
+    e.y = c.ty; e.vy = 0; e.rRoll = c.roll; e.onRamp = c.z; e.rampF = c.f; e.rampSide = c.side;
+    return;
   }
+  if (e.onRamp) {                                   // just left the ramp: off the end, or off its side
+    const z = e.onRamp, sp = Math.abs(e.vs), f = e.rampF || 0, side = e.rampSide, offEnd = e.s >= z.s + z.hs - 0.5;
+    e.onRamp = null;
+    e.vy = offEnd ? (sp * 0.17 + 1.5) * (1 - 0.45 * f) : 0.5;
+    e.rollV = side * (offEnd ? sp * 0.07 * f : 1.0 + e.y * 2);    // one side launched harder than the other -> rotation
+    if (side && e.inv > 0) { e.spin += side * R(0.2, 0.6); if (e !== player) e.knock = Math.max(e.knock, 0.6); }
+    if (e === player && offEnd) { if (f < 0.3) { msg('AIR! +200', 'blue'); addScore(200); } else { msg('EDGE JUMP!', 'gold'); addScore(100); } }
+  }
+  if (e.rolling) { rollStep(e, dt); return; }
   if (e.y > 0 || e.vy > 0) {
     e.vy -= 22 * dt; e.y += e.vy * dt;
+    if (e.rollV) e.rRoll = (e.rRoll || 0) + e.rollV * dt;
     if (e.y <= 0) {
       e.y = 0;
-      if (e.vy < -12 && e.vehicle) { damage(e, (-e.vy - 12) * 1.4, null); if (e === player) { SFX.land(); game.shake += 0.3; } sparks(e.s, e.d, 0.2, 6); }
+      const hard = e.vy < -12;
+      if (e.vehicle && e.rRoll) landRoll(e, hard);
+      else if (hard && e.vehicle) { damage(e, (-e.vy - 12) * 1.4, null); if (e === player) { SFX.land(); game.shake += 0.3; } sparks(e.s, e.d, 0.2, 6); }
       if (e.kind === 'prop' && e.vy < -3) e.vy = -e.vy * 0.3; else e.vy = 0;
     }
   }
+  if (e.rolling) rollStep(e, dt);
+  else if (e.y <= 0 && e.rRoll && !e.onRamp) e.rRoll *= Math.exp(-10 * dt);   // settle back onto four wheels
+}
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+function landRoll(e, hard) {
+  const r = wrapA(e.rRoll), a = Math.abs(r), me = e === player;
+  if (a < 0.55) {                                    // lands on the wheels, a bit lopsided
+    if (hard) damage(e, (-e.vy - 12) * 1.4, null);
+    if (me) { SFX.land(); game.shake += 0.25; }
+    e.rRoll = r; e.rollV = 0;
+  } else if (a < 1.25) {                             // slams down on two wheels
+    damage(e, 9 + a * 6, null); sparks(e.s, e.d, 0.3, 14);
+    if (e.inv > 0) e.spin += Math.sign(r) * R(0.8, 1.6);
+    if (me) { SFX.crash(0.5); game.shake += 0.7; msg('HARD LANDING!', 'hot'); player.v *= 0.85; }
+    else { e.vs *= 0.85; e.knock = Math.max(e.knock, 0.8); }
+    e.rRoll = r; e.rollV = 0;
+  } else {                                           // over it goes: barrel roll until back on the wheels
+    e.rolling = true; e.rollDir = Math.sign(e.rollV || r) || 1; e.rRoll = r;
+    damage(e, 20, null); sparks(e.s, e.d, 0.5, 24);
+    if (me) { SFX.crash(0.8); game.shake += 1.1; msg('BARREL ROLL!', 'hot'); vibrate([60, 40, 90]); }
+    else e.knock = Math.max(e.knock, 2);
+  }
+}
+function rollStep(e, dt) {
+  // keep rotating the same way to the next upright position, scraping along and losing speed
+  const target = e.rollDir > 0 ? Math.ceil(e.rRoll / (2 * Math.PI) - 0.02) * 2 * Math.PI : Math.floor(e.rRoll / (2 * Math.PI) + 0.02) * 2 * Math.PI;
+  const left = target - e.rRoll;
+  e.rRoll += Math.sign(left) * Math.min(Math.abs(left), 7.5 * dt);
+  e.y = Math.abs(Math.sin(e.rRoll)) * 0.75;           // body rides up when the car is on its side
+  if (e === player) player.v = Math.max(0, player.v - 9 * dt); else e.vs *= Math.exp(-0.9 * dt);
+  if (Math.random() < dt * 25) sparks(e.s, e.d, 0.4, 2);
+  if (Math.abs(left) < 0.02) { e.rolling = false; e.rRoll = 0; e.y = 0; e.vy = 0; e.rollV = 0; if (e === player) SFX.land(); }
 }
 function updatePlayer(p, dt, inp) {
   const tr = trackAt(p.s, tr1);
-  const air = p.y > 0.08 && !p.onRamp;
+  const air = (p.y > 0.08 && !p.onRamp) || p.rolling;
   const racing = game.state === 'race' || game.state === 'finished';
   const steerIn = racing || game.state === 'wrecked' ? inp.steer : 0;
   p.steer += clamp(steerIn - p.steer, -dt * 8, dt * 8);
@@ -2028,6 +2084,7 @@ function placeEnt(e, dt) {
     if (e.onRamp) px -= 0.17;
   } else if (e.onRamp) px -= 0.17;
   if (e.wreck) roll += e.roll;
+  if (e.rRoll && !e.wreck) roll += e.rRoll;
   if (e.kind === 'prop') { px += e.tumbleA || 0; }
   if (e.kind === 'ped') {
     px += e.tumbleA || 0;
@@ -2470,11 +2527,9 @@ function zonesRival(e) {
   }
 }
 function zonesOne(e, z) {
-  if (Math.abs(z.d - e.d) > z.hd + (z.zone === 'ramp' ? 0 : e.hd)) return;
-  if (z.zone === 'ramp') {
-    const h = (e.s - (z.s - z.hs)) / (2 * z.hs) * 1.15;
-    if (h >= 0 && h <= 1.15 && e.y <= h + 0.25) { e.y = Math.max(e.y, h); e.vy = Math.max(e.vy, 0); e.onRamp = z; }
-  } else if (z.zone === 'oil' && e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
+  if (Math.abs(z.d - e.d) > z.hd + (z.zone === 'ramp' ? TRACK : e.hd)) return;
+  if (z.zone === 'ramp') rampTouch(e, z);
+  else if (z.zone === 'oil' && e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
   else if ((z.zone === 'wrench' || z.zone === 'turbo') && (e.kind === 'rival' || e.kind === 'police') && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2) {
     e.rowS = z.s;
     if (z.zone === 'wrench') e.hp = Math.min(e.maxhp, e.hp + 30); else e.nos = (e.nos || 0) + 1;
