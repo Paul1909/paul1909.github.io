@@ -546,7 +546,8 @@ function buildCar(S, lo) {
   return { geo: concat(geos), lights: l.length ? merge(l) : null, B };
 }
 
-const CAR_COLORS = [0xb3201a, 0x2e6fc4, 0xecf0f1, 0x2f7d4a, 0x34495e, 0x6a3a8e, 0xd35400, 0x9aa3a8, 0x16a085, 0x5c6366, 0x1c2733, 0xf1c40f];
+// bright, saturated paint only, so every car stands out against asphalt, fog and dusk
+const CAR_COLORS = [0xff2a1a, 0x1e7bff, 0xf4f4f4, 0x2fe05a, 0xffd21a, 0xff7a10, 0x22d8ff, 0xff3fa4, 0xa04cff, 0xb6ff1a, 0x10e0b0, 0xff5a7a];
 const SOLID = new Set([0xf4f4f4, 0xecf0f1, 0xf1c40f, 0xf4c20d, 0xd35400]);
 const BUS_COLORS = [0xe8731a, 0x2b8a3e, 0x1e5fb4, 0xc0392b];
 const SPEC = {
@@ -590,7 +591,7 @@ SPEC.police = col => Object.assign(SPEC.sedan(col), { band: [0.5, 0.72], bandZ: 
 SPEC.taxi = col => Object.assign(SPEC.sedan(col), { more: (B, b, l) => { b.push(withRM(RB(0.66, 0.06, 0.3, 0.02, 0, 1.47, -0.4, TRIMC), M_TRIM.slice(1))); l.push(RB(0.6, 0.18, 0.26, 0.05, 0, 1.58, -0.4, 0xfff4c0)); } });
 function trafficGeo(type, col) {
   return cached(type + col, () => {
-    const mk = () => Object.assign(SPEC[type](col), { paint: col, metal: !SOLID.has(col) && type !== 'bus' });
+    const mk = () => Object.assign(SPEC[type](col), { paint: col, metal: false });   // solid paint reads brighter than metallic
     const hi = buildCar(mk(), false), lo = buildCar(mk(), true);
     return { hi: hi.geo, lo: lo.geo, lights: hi.lights };
   });
@@ -838,6 +839,7 @@ const SP = (i, d, y) => { const h = T.H[i]; return [T.X[i] - Math.cos(h) * d, T.
 const SW = (s, d, y) => { const v = worldPos(s, d, y, _v1); return [v.x, v.y, v.z]; };
 const col = hex => new THREE.Color(hex);
 const C = {
+  kerbR: col(0xe0201a), kerbW: col(0xf4f4f4),
   asph: col(0x4a4c50), asph2: col(0x46484c), white: col(0xeeeeee), yellow: col(0xf0c020), curb: col(0xbdb6aa), pave: col(0xa69e92),
   lot: col(0x8f897e), gravel: col(0x9a8a6a), grass1: col(0x5f8a3a), grass2: col(0x5a8236), rail: col(0xc4c8cc), post: col(0x6a6a6a),
   cross: col(0x46484c), roof: col(0x8a3b26), finW: col(0xffffff), finB: col(0x111111),
@@ -858,7 +860,8 @@ function buildTrackMeshes(st) {
       if (inter < 0) {
         rib(g, i, -0.22, -0.08, 0.015, C.white); rib(g, i, 0.08, 0.22, 0.015, C.white);
         if (i % 6 < 3) { rib(g, i, -3.57, -3.43, 0.015, C.white); rib(g, i, 3.43, 3.57, 0.015, C.white); }
-        rib(g, i, -6.8, -6.62, 0.015, C.white); rib(g, i, 6.62, 6.8, 0.015, C.white);
+        const kc = i % 2 ? C.kerbR : C.kerbW;                         // red/white racing kerbs, 2 m tiles
+        rib(g, i, -7, -6.25, 0.03, kc); rib(g, i, 6.25, 7, 0.03, kc);
       }
       for (const sd of [-1, 1]) {
         if (town) {
@@ -2572,7 +2575,7 @@ function frame(now) {
   }
   { const on = Math.floor(game.t * 7) % 2; matSirenR.color.setRGB(on ? 6 : 0.25, 0.1 * on, 0.05 * on); matSirenB.color.setRGB(0.05 * (1 - on), 0.25 * (1 - on) + 0.02, on ? 0.25 : 6); }
   if (boomT > 0) { boomT -= dt; boomLight.intensity = Math.max(0, boomT) * 550; }
-  if (player) audioUpdate(player, player.drift * 2.5, Math.abs(player.d) > RW + 0.2 && !trackAt(player.s, tr1).town, player.alive && (game.state === 'race' || game.state === 'countdown' || game.state === 'finished'));
+  if (player) audioUpdate(player, player.drift * 2.5, (Math.abs(player.d) > RW + 0.2 && !trackAt(player.s, tr1).town) || (Math.abs(Math.abs(player.d) - 6.6) < 0.9 && player.y < 0.1), player.alive && (game.state === 'race' || game.state === 'countdown' || game.state === 'finished'));
   if (composer && Q.level >= 2) composer.render(); else renderer.render(scene, camera);
   // adaptive quality: step down while the device cannot hold ~45 fps
   if (game.state === 'race' && !Q.lock && Q.level > 0) {
