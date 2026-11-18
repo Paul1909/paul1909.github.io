@@ -14,8 +14,8 @@ repair and turbo pickups. Top 3 unlocks the next stage.
 - Near misses, drifts and jumps fill the TURBO bar; when full you get a 3-second boost.
 
 ## Look and sound
-90s arcade styling (fonts in `fonts/`, Russo One and Press Start 2P, SIL Open Font License). "Screen: 90's" renders
-at ~300 lines with scanlines; "Screen: Sharp" renders at full resolution. The engine is a synth driven by a
+90s arcade styling (fonts in `fonts/`, Russo One and Press Start 2P, SIL Open Font License), rendered at full resolution.
+Power-ups come in rows of four across the road (one per lane), so each car can grab one. The engine is a synth driven by a
 6-speed automatic gearbox: rpm climbs through each gear, drops on shifts, with throttle cut, exhaust pops and blow-off.
 
 ## Graphics

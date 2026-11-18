@@ -13,7 +13,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 const settings = { sound: store.get('sound', true), vibe: store.get('vibe', true), color: store.get('color', 0), gfx: store.get('gfx', 'high'),
-  cam: store.get('cam', 'chase'), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), retro: store.get('retro', true), ctrl: store.get('ctrl', 'halves') };
+  cam: store.get('cam', 'chase'), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), ctrl: store.get('ctrl', 'halves') };
 const progress = store.get('progress', { unlocked: 1, best: {} });
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const vibrate = ms => { if (settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
@@ -771,7 +771,7 @@ function buildTrack(st) {
         else if (r < 0.5) addWorks(F, fs, lane, rng);
         else if (r < 0.62) addBreakdown(F, fs, rng);
         else if (r < 0.74) F.push({ t: 'oil', s: fs, d: lane });
-        else if (r < 0.86) F.push({ t: rng() < 0.55 ? 'wrench' : 'turbo', s: fs, d: lane });
+        else if (r < 0.86) F.push({ t: 'jay', s: fs, d: (rng() < 0.5 ? -1 : 1) * 9.3 });
         else F.push({ t: 'jay', s: fs, d: (rng() < 0.5 ? -1 : 1) * 9.3 });
       } else {
         if (r < 0.28) { for (let i = 0; i < 1 + (rng() * (st.sky === 'fog' ? 3 : 2) | 0); i++) F.push({ t: 'rock', s: fs + rng() * 8, d: lane + (rng() - 0.5) * 3 }); }
@@ -780,7 +780,7 @@ function buildTrack(st) {
         else if (r < 0.62) { for (let i = 0; i < 3 + (rng() * 3 | 0); i++) F.push({ t: rng() < 0.5 ? 'barrelR' : 'barrelB', s: fs + rng() * 4, d: lane + (rng() - 0.5) * 2.2 }); }
         else if (r < 0.72) F.push({ t: 'oil', s: fs, d: lane });
         else if (r < 0.8) addBreakdown(F, fs, rng);
-        else F.push({ t: rng() < 0.5 ? 'wrench' : 'turbo', s: fs, d: lane });
+        else { for (let i = 0; i < 2; i++) F.push({ t: 'hay', s: fs + rng() * 5, d: lane + (rng() - 0.5) * 2.5 }); }
       }
     }
     fs += (town ? 75 : 95) / st.props * (0.65 + rng() * 0.8);
@@ -793,9 +793,14 @@ function buildTrack(st) {
     for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 18 && F[k].t !== 'jay' && lanes.some(d => Math.abs(F[k].d - d) < 2.6)) F.splice(k, 1);
     for (const d of lanes) F.push({ t: 'ramp', s: q, d });
   }
-  for (let q = 160; q < st.len - 100; q += 85 + rng() * 105) {
-    if (nearInter(q) || F.some(f => Math.abs(f.s - q) < 10)) continue;
-    F.push({ t: rng() < 0.6 ? 'turbo' : 'wrench', s: q, d: LANES[(rng() * 4) | 0] });
+  // power-ups come in rows across the road, one identical pickup per lane:
+  // every car can grab one, nobody can take them all
+  for (let q = 180; q < st.len - 100; q += 210 + rng() * 140) {
+    if (nearInter(q)) continue;
+    for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 12 && F[k].t !== 'jay' && F[k].t !== 'ramp') F.splice(k, 1);
+    if (F.some(f => f.t === 'ramp' && Math.abs(f.s - q) < 25)) continue;
+    const t = rng() < 0.6 ? 'turbo' : 'wrench';
+    for (const d of LANES) F.push({ t, s: q, d });
   }
   F.sort((a, b) => a.s - b.s); T.feats = F; T.featIdx = 0;
 }
@@ -1687,7 +1692,8 @@ function zones(e) {
     } else if (z.zone === 'oil') {
       if (e === player) { if (player.oil <= 0) { player.spin += (Math.random() < 0.5 ? -1 : 1) * R(1.8, 2.6); msg('OIL!', 'hot'); } player.oil = 1.1; }
       else if (e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
-    } else if (e === player && game.state === 'race') {
+    } else if (e === player && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2) {   // one pickup per row
+      e.rowS = z.s;
       if (z.zone === 'wrench') { player.hp = Math.min(100, player.hp + 30); msg('REPAIR +30%', 'good'); }
       else { player.nos++; msg('NOS +1', 'blue'); }
       SFX.pickup(); vibrate(20); addScore(100); removeEnt(z);
@@ -2283,7 +2289,6 @@ function swapPlayerColor() {
 const ROAD_OPTS = [['traffic', 'TRAFFIC'], ['police', 'POLICE'], ['obstacles', 'OBSTACLES'], ['peds', 'PEOPLE']];
 const OPT = {
   cam: { label: () => 'CAMERA: ' + CAM_NAMES[settings.cam], click: () => cycleCamera() },
-  retro: { label: () => 'SCREEN: ' + (settings.retro ? "90'S" : 'SHARP'), click: () => { settings.retro = !settings.retro; store.set('retro', settings.retro); applyRetro(); } },
   gfx: { label: () => 'EFFECTS: ' + (settings.gfx === 'low' ? 'FAST' : 'HIGH'), off: () => settings.gfx === 'low', click: () => { settings.gfx = settings.gfx === 'low' ? 'high' : 'low'; store.set('gfx', settings.gfx); applyQuality(settings.gfx === 'low' ? 0 : 3); } },
   sound: { label: () => 'SOUND: ' + (settings.sound ? 'ON' : 'OFF'), off: () => !settings.sound, click: () => setSound(!settings.sound) },
   vibe: { label: () => 'RUMBLE: ' + (settings.vibe ? 'ON' : 'OFF'), off: () => !settings.vibe, touchOnly: true, click: () => { settings.vibe = !settings.vibe; store.set('vibe', settings.vibe); vibrate(20); } },
@@ -2294,7 +2299,6 @@ function syncToggles() {
 for (const [k, name] of ROAD_OPTS) OPT['road_' + k] = { label: () => name + ': ' + (settings.road[k] ? 'ON' : 'OFF'), off: () => !settings.road[k],
   click: () => { settings.road[k] = !settings.road[k]; store.set('road', settings.road); loadStage(game.stageIdx, true); } };
 document.querySelectorAll('[data-opt]').forEach(b => { b.onclick = () => { audioInit(); OPT[b.dataset.opt].click(); syncToggles(); }; });
-function applyRetro() { document.body.classList.toggle('retro', settings.retro); applyQuality(Q.level); }
 /* ---------- high scores (top 5 per stage, 3-letter initials, arcade style) ---------- */
 const HS_SEED = [['PAO', 9000], ['SEG', 7000], ['NAM', 5000], ['TTO', 3000], ['ACE', 1500]];
 const HS_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -2388,15 +2392,13 @@ function makeComposer() {
 function applyQuality(level) {
   Q.level = level; Q.n = 0; Q.sum = 0;
   sun.castShadow = level >= 1; matShadow.opacity = level >= 1 ? 0.45 : 1; matCar.clearcoat = level >= 2 ? 1 : 0;
-  pixelRatio = settings.retro ? retroPR() : Math.min(window.devicePixelRatio || 1, level === 3 ? PR_MAX : level === 0 ? 1 : 1.25);
+  pixelRatio = Math.min(window.devicePixelRatio || 1, level === 3 ? PR_MAX : level === 0 ? 1 : 1.25);
   renderer.setPixelRatio(pixelRatio);
   if (level >= 2 && !composer) makeComposer();
   resize();
 }
-const retroPR = () => clamp(300 / Math.min(innerWidth, innerHeight), 0.2, 1);   // ~300 lines, 90s arcade resolution
 function resize() {
   const w = innerWidth, h = innerHeight;
-  if (settings.retro) { pixelRatio = retroPR(); renderer.setPixelRatio(pixelRatio); }
   portrait = h > w * 1.05;
   renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
   if (composer) { composer.setPixelRatio(pixelRatio); composer.setSize(w, h); }
@@ -2473,7 +2475,8 @@ function zonesOne(e, z) {
     const h = (e.s - (z.s - z.hs)) / (2 * z.hs) * 1.15;
     if (h >= 0 && h <= 1.15 && e.y <= h + 0.25) { e.y = Math.max(e.y, h); e.vy = Math.max(e.vy, 0); e.onRamp = z; }
   } else if (z.zone === 'oil' && e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
-  else if ((z.zone === 'wrench' || z.zone === 'turbo') && (e.kind === 'rival' || e.kind === 'police') && game.state === 'race') {
+  else if ((z.zone === 'wrench' || z.zone === 'turbo') && (e.kind === 'rival' || e.kind === 'police') && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2) {
+    e.rowS = z.s;
     if (z.zone === 'wrench') e.hp = Math.min(e.maxhp, e.hp + 30); else e.nos = (e.nos || 0) + 1;
     const who = e.kind === 'police' ? 'POLICE' : e.name.toUpperCase();
     if (Math.abs(z.s - player.s) < 90) msg(who + (z.zone === 'wrench' ? ' REPAIRED' : ' GOT NOS'), 'hot');
@@ -2524,7 +2527,6 @@ function frame(now) {
 }
 
 /* ============================== boot ============================== */
-document.body.classList.toggle('retro', settings.retro);
 applyQuality(settings.gfx === 'low' ? 0 : 3);
 loadStage(0, true);
 renderMenu();
