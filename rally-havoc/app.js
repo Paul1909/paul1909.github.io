@@ -31,11 +31,11 @@ const $ = id => document.getElementById(id);
 
 /* ============================== stages ============================== */
 const STAGES = [
-  { name: 'Borgo Verde', dmg: 0.44, sub: 'Village & vineyards · gentle start', len: 3000, seed: 11, tb: 0.45, traffic: 0.648, oncoming: 0.475, bus: 0.12, peds: 0.78, props: 0.65, ramps: 0.9, rival: 41.5, kmax: 0.0062, hills: 4, sky: 'day' },
-  { name: 'Valle Rossa', dmg: 0.546, sub: 'Fast valley roads · jumps', len: 3500, seed: 23, tb: 0.35, traffic: 0.821, oncoming: 0.648, bus: 0.14, peds: 0.91, props: 0.8, ramps: 1.4, rival: 43, kmax: 0.0072, hills: 6, sky: 'sunset' },
-  { name: 'Città Alta', dmg: 0.651, sub: 'Rush hour downtown · buses', len: 3600, seed: 37, tb: 0.75, traffic: 1.166, oncoming: 0.821, bus: 0.24, peds: 1.56, props: 0.85, ramps: 0.7, rival: 43.5, kmax: 0.006, hills: 3, sky: 'overcast' },
-  { name: 'Passo Nebbia', dmg: 0.748, sub: 'Foggy mountain pass · rocks', len: 4200, seed: 41, tb: 0.3, traffic: 0.95, oncoming: 0.864, bus: 0.16, peds: 1.04, props: 1.15, ramps: 1.1, rival: 44.5, kmax: 0.0082, hills: 10, sky: 'fog' },
-  { name: 'Gran Finale', dmg: 0.836, sub: 'Dusk · everything, everywhere', len: 5000, seed: 53, tb: 0.5, traffic: 1.382, oncoming: 1.037, bus: 0.2, peds: 1.69, props: 1.25, ramps: 1.3, rival: 45.5, kmax: 0.0078, hills: 7, sky: 'dusk' },
+  { name: 'Borgo Verde', dmg: 0.44, sub: 'Village & vineyards · gentle start', len: 3000, seed: 11, tb: 0.45, traffic: 0.648, oncoming: 0.475, bus: 0.12, peds: 0.78, props: 0.65, ramps: 0.9, rival: 41.5, kmax: 0.0082, hills: 7, sky: 'day' },
+  { name: 'Valle Rossa', dmg: 0.546, sub: 'Fast valley roads · jumps', len: 3500, seed: 23, tb: 0.35, traffic: 0.821, oncoming: 0.648, bus: 0.14, peds: 0.91, props: 0.8, ramps: 1.4, rival: 43, kmax: 0.0092, hills: 10, sky: 'sunset' },
+  { name: 'Città Alta', dmg: 0.651, sub: 'Rush hour downtown · buses', len: 3600, seed: 37, tb: 0.75, traffic: 1.166, oncoming: 0.821, bus: 0.24, peds: 1.56, props: 0.85, ramps: 0.7, rival: 43.5, kmax: 0.0078, hills: 6, sky: 'overcast' },
+  { name: 'Passo Nebbia', dmg: 0.748, sub: 'Foggy mountain pass · rocks', len: 4200, seed: 41, tb: 0.3, traffic: 0.95, oncoming: 0.864, bus: 0.16, peds: 1.04, props: 1.15, ramps: 1.1, rival: 44.5, kmax: 0.0102, hills: 16, sky: 'fog' },
+  { name: 'Gran Finale', dmg: 0.836, sub: 'Dusk · everything, everywhere', len: 5000, seed: 53, tb: 0.5, traffic: 1.382, oncoming: 1.037, bus: 0.2, peds: 1.69, props: 1.25, ramps: 1.3, rival: 45.5, kmax: 0.0098, hills: 11, sky: 'dusk' },
 ];
 const SKIES = {
   day:      { top: 0x2f7fd6, hor: 0xbfe0f4, fog: 0xcfe6f2, near: 90, far: 340, sun: 0xfff4e0, sunI: 2.7, sky: 0xdcecff, gnd: 0x6b7a4a, hemiI: 1.25, lamps: false,
@@ -814,29 +814,37 @@ function buildTrack(st) {
   const X = new Float32Array(n), Z = new Float32Array(n), Y = new Float32Array(n), H = new Float32Array(n), K = new Float32Array(n);
   let h = 0, k = 0, target = 0, next = 0, x = 0, zz = 0;
   for (let i = 0; i < n; i++) {
-    const si = i * SEG, townSoon = townA[Math.min(n - 1, i + 70)] || townA[i];
-    if (si < 180 || townSoon || Math.abs(si - st.len) < 90) target = 0;
-    else if (si >= next) {
-      target = rng() < 0.2 ? 0 : (rng() * 2 - 1) * st.kmax;
-      if (rng() < 0.35) target = Math.sign(target || 1) * st.kmax;
-      next = si + 70 + rng() * 150;
+    // town streets bend gently, open road bends hard; straight only at the start, the finish and through crossroads
+    const si = i * SEG, townSoon = townA[Math.min(n - 1, i + 25)] || townA[i], km = townSoon ? st.kmax * 0.4 : st.kmax;
+    const nearX = inters.some(I => si > I.s - 75 && si < I.s + 25);
+    if (si < 150 || nearX || Math.abs(si - st.len) < 70) target = 0;
+    else if (si >= next || Math.abs(target) > km) {
+      target = rng() < 0.1 ? 0 : (rng() * 2 - 1) * km;
+      if (rng() < 0.45) target = Math.sign(target || 1) * km * (0.75 + rng() * 0.25);
+      next = si + 45 + rng() * 105;
     }
-    if (h > 0.75 && target > 0) target = -target;
-    if (h < -0.75 && target < 0) target = -target;
-    k += clamp(target - k, -0.00014, 0.00014);
+    if (h > 1.0 && target > 0) target = -target;
+    if (h < -1.0 && target < 0) target = -target;
+    k += clamp(target - k, -0.00018, 0.00018);
     K[i] = k; H[i] = h; X[i] = x; Z[i] = zz;
     h += k * SEG; x += Math.sin(h) * SEG; zz += Math.cos(h) * SEG;
   }
   // elevation: hills only in the countryside, blended
   const cw = new Float32Array(n), pre = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + (townA[i] ? 0 : 1);
+  for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + (townA[i] ? 0.4 : 1);   // towns sit on gentler slopes
   const rad = 45;
   for (let i = 0; i < n; i++) { const a = Math.max(0, i - rad), b = Math.min(n, i + rad + 1); cw[i] = (pre[b] - pre[a]) / (b - a); }
   const p1 = rng() * 6, p2 = rng() * 6, p3 = rng() * 6;
   for (let i = 0; i < n; i++) {
     const si = i * SEG;
-    const hill = st.hills * (Math.sin(si * 0.0042 + p1) * 0.6 + Math.sin(si * 0.011 + p2) * 0.3 + Math.sin(si * 0.027 + p3) * 0.1);
-    Y[i] = hill * smooth(0.05, 0.95, cw[i]) * smooth(150, 320, si);
+    const hill = st.hills * (Math.sin(si * 0.0042 + p1) * 0.45 + Math.sin(si * 0.0105 + p2) * 0.35 + Math.sin(si * 0.024 + p3) * 0.2);
+    Y[i] = hill * cw[i] * smooth(120, 300, si);
+  }
+  // crossroads sit on level ground: blend the road to the crossing's own height around it
+  const Y0 = Float32Array.from(Y);
+  for (const I of inters) {
+    const c = Math.round(I.s / SEG), yI = Y0[clamp(c, 0, n - 1)];
+    for (let i = Math.max(0, c - 30); i < Math.min(n, c + 31); i++) { const w = smooth(14, 60, Math.abs(i * SEG - I.s)); Y[i] = yI + (Y[i] - yI) * w; }
   }
   Object.assign(T, { X, Z, Y, H, K, town: townA, inter: interA, inters, zones });
   T.rail = new Uint8Array(n); for (let i = 0; i < n; i++) T.rail[i] = !townA[i] && Math.abs(K[i]) > 0.0032 ? 1 : 0;
@@ -995,7 +1003,7 @@ function buildTrackMeshes(st) {
   }
   // ground plane far below for the horizon
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: st.tb > 0.6 ? 0x8f897e : 0x5a7e36 }));
-  ground.position.set(T.X[T.n >> 1], -st.hills - 1.5, T.Z[T.n >> 1]); grp.add(ground);
+  ground.position.set(T.X[T.n >> 1], Math.min(...T.Y) - 2.5, T.Z[T.n >> 1]); grp.add(ground);
   // buildings, chunked
   const bchunks = {};
   for (const b of T.buildings) { const k = (b.s / (SEG * CH)) | 0; (bchunks[k] ||= []).push(b); }
