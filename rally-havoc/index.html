@@ -121,6 +121,12 @@
   .overlay { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
     padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
     background: linear-gradient(180deg, rgba(8,16,70,.82), rgba(8,16,70,.55) 40%, rgba(5,8,40,.9)); }
+  /* the menu is a dark sheet with a window cut out, where the 3D scene shows your car */
+  #menu { background: none; }
+  #menu .wrap > * { position: relative; z-index: 1; }
+  #menu .wrap > #carView { z-index: 0; }
+  #carView { height: clamp(150px, 30vh, 250px); border: 3px solid #fff; transform: skewX(-6deg);
+    box-shadow: 5px 5px 0 #000, 0 0 0 200vmax rgba(8, 14, 60, .86); }
   .overlay::before, .overlay::after { content: ''; position: fixed; left: 0; right: 0; height: 14px; pointer-events: none;
     background: conic-gradient(#000 25%, #fff 0 50%, #000 0 75%, #fff 0) 0 0 / 14px 14px; opacity: .85; }
   .overlay::before { top: 0; } .overlay::after { bottom: 0; }
@@ -227,6 +233,9 @@
   <div class="wrap">
     <div class="logo"><span class="a chrome">RALLY</span><span class="b gold">HAVOC</span></div>
     <div class="copy pix">© 1997 PAOLO'S ARCADE · FREE PLAY</div>
+    <div class="sect pix">SELECT CAR</div>
+    <div id="carView"></div>
+    <div class="row" id="swatches"></div>
     <div class="sect pix">ROAD SETUP</div>
     <div class="row">
       <button class="chip road" data-opt="road_traffic"></button>
@@ -236,8 +245,6 @@
     </div>
     <div class="sect pix blink">SELECT STAGE</div>
     <div class="stages" id="stages"></div>
-    <div class="sect pix">SELECT CAR</div>
-    <div class="row" id="swatches"></div>
     <div class="sect pix">OPTIONS</div>
     <div class="row">
       <button class="chip" data-opt="cam"></button>

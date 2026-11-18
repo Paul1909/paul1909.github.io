@@ -2189,12 +2189,23 @@ function cycleCamera() {
 function updateCamera(dt) {
   const p = player, mode = settings.cam;
   if (game.state === 'menu') {
-    const a = game.t * 0.22;
-    worldPos(p.s + Math.cos(a) * 12, p.d + Math.sin(a) * 12, 3.4, camera.position);
-    worldPos(p.s, p.d, 0.9, camState.look); camera.lookAt(camState.look);
-    camera.fov = portrait ? 72 : 55; camera.near = 0.3; camera.updateProjectionMatrix();
+    // frame the car inside the menu's car window: aim at the car, then shift the view so it lands in the box
+    const box = $('carView').getBoundingClientRect(), W = innerWidth, H = innerHeight, a = game.t * 0.3;
+    const showBox = !$('menu').classList.contains('hidden') && box.height > 20 && box.bottom > 0 && box.top < H;
+    camera.fov = showBox ? 38 : portrait ? 72 : 55;
+    const t = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    let D = 12;
+    if (showBox) D = Math.max(6.2 * W / box.width / (2 * t * W / H), 3.4 * H / box.height / (2 * t));
+    const el = 0.32;
+    worldPos(p.s + Math.cos(a) * D * Math.cos(el), p.d + Math.sin(a) * D * Math.cos(el), 0.7 + D * Math.sin(el), camera.position);
+    worldPos(p.s, p.d, 0.7, camState.look); camera.lookAt(camState.look);
+    camera.near = 0.3;
+    if (showBox) camera.setViewOffset(W, H, W / 2 - (box.left + box.width / 2), H / 2 - (box.top + box.height / 2), W, H);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
     camState.init = false; return;
   }
+  if (camera.view && camera.view.enabled) camera.clearViewOffset();
   let fov;
   if (mode === 'hood' || mode === 'bumper') {
     // mounted on the car: follows the car's own heading, no lag
@@ -2402,8 +2413,8 @@ function renderMenu() {
     const b = document.createElement('button'), best = progress.best[i];
     const locked = i + 1 > progress.unlocked;
     b.className = 'stage' + (locked ? ' locked' : '');
-    b.innerHTML = `<div class="info"><div class="snum">STAGE ${i + 1}</div><div class="nm">${st.name}</div><div class="sb">${st.sub.replace(/ · /g, ' - ').toUpperCase()} - ${(st.len / 1000).toFixed(1)} KM</div></div>` +
-      `<div class="best">${locked ? 'LOCKED<br>TOP 3 ON<br>STAGE ' + i : (best && best.place ? 'BEST <b>' + ord(best.place).toUpperCase() + '</b><br>' + fmtTime(best.time) + '<br>' : '') + 'HI <b>' + hsList(i)[0].s.toLocaleString('en-US') + '</b> ' + hsList(i)[0].n}</div>`;
+    b.innerHTML = `<div class="info"><div class="nm">${st.name}</div></div>` +
+      `<div class="best">${locked ? 'LOCKED<br>TOP 3 TO<br>UNLOCK' : (best && best.place ? 'BEST <b>' + ord(best.place).toUpperCase() + '</b><br>' + fmtTime(best.time) + '<br>' : '') + 'HI <b>' + hsList(i)[0].s.toLocaleString('en-US') + '</b> ' + hsList(i)[0].n}</div>`;
     b.onclick = () => { audioInit(); loadStage(i); };
     el.appendChild(b);
   });
