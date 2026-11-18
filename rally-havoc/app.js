@@ -13,7 +13,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 const settings = { sound: store.get('sound', true), vibe: store.get('vibe', true), color: store.get('color', 0), gfx: store.get('gfx', 'high'),
-  cam: store.get('cam', 'chase'), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), ctrl: store.get('ctrl', 'halves') };
+  cam: store.get('cam', 'chase'), model: Math.min(4, Math.max(0, store.get('model', 0) | 0)), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), ctrl: store.get('ctrl', 'halves') };
 const progress = store.get('progress', { unlocked: 1, best: {} });
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const vibrate = ms => { if (settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
@@ -50,11 +50,11 @@ const SKIES = {
               sunDir: [0.5, 0.45, 0.72], cloud: 0.4, cloudCol: 0x7a5a86, shadow: 0.55, emis: 1.9, beams: 0.55, spot: 700, glow: 3.0, env: 0.8, mt: 0.5, expo: 1.2, smoke: 0.4 },
 };
 const RIVALS = [
-  { name: 'Bianchi', col: 0x2f6fe0, acc: 0xffffff, skill: 1.0, aggr: 0.5 },
-  { name: 'Kowalski', col: 0xe8e8e8, acc: 0xd2232a, skill: 0.985, aggr: 0.8 },
-  { name: 'Müller', col: 0x1c1c1c, acc: 0xffc61a, skill: 0.97, aggr: 0.3 },
-  { name: 'Dupont', col: 0x19a35a, acc: 0xffffff, skill: 0.955, aggr: 0.6 },
-  { name: 'Svensson', col: 0xf0b400, acc: 0x1f4ea8, skill: 0.94, aggr: 0.4 },
+  { name: 'Bianchi', model: 'tempesta', col: 0x2f6fe0, acc: 0xffffff, skill: 1.0, aggr: 0.5 },
+  { name: 'Kowalski', model: 'saetta', col: 0xe8e8e8, acc: 0xd2232a, skill: 0.985, aggr: 0.8 },
+  { name: 'Müller', model: 'vento', col: 0x1c1c1c, acc: 0xffc61a, skill: 0.97, aggr: 0.3 },
+  { name: 'Dupont', model: 'fulmine', col: 0x19a35a, acc: 0xffffff, skill: 0.955, aggr: 0.6 },
+  { name: 'Svensson', model: 'duna', col: 0xf0b400, acc: 0x1f4ea8, skill: 0.94, aggr: 0.4 },
 ];
 const PLAYER_COLORS = [
   { col: 0xd8261c, acc: 0xffffff, css: '#d8261c' },
@@ -468,8 +468,8 @@ function cabinSpec(S, B) {
 function bodyCls(S, B) {
   const P = paintRM(S.paint, S.metal), SEAM = [darker(S.paint, 0.25), 0.6, 0, 0], ACC = S.acc !== undefined ? paintRM(S.acc, false) : P;
   return o => {
-    if (o.ny < -0.55) return M_UNDER;
-    if (S.hoodZ && o.z > S.hoodZ[0] + 0.03 && o.z < S.hoodZ[1] - 0.03 && o.ny > 0.45 && Math.abs(o.c) < 0.7) return M_UNDER;   // engine bay below the bonnet
+    if (o.ny < (S.flare ? -0.75 : -0.55)) return M_UNDER;
+    if (S.hoodZ && o.z > S.hoodZ[0] + 0.03 && o.z < S.hoodZ[1] - 0.03 && o.ny > 0.8 && Math.abs(o.c) < 0.6) return M_UNDER;   // engine bay below the bonnet
     if (S.extraCls) { const r = S.extraCls(o, B); if (r) return r; }
     if (Math.abs(o.nx) > 0.5) {
       if (S.seams && o.y < B.yt(o.z) - 0.05 && o.y > B.yb(o.z) + 0.03) for (const z of S.seams) if (Math.abs(o.z - z) < 0.013) return SEAM;
@@ -498,7 +498,11 @@ function cabCls(S, C) {
 function carDetails(S, B, b, l, lo) {
   const hw = S.hw, P = S.paint;
   b.push(withRM(P_('box', 2 * (hw - 0.2), 0.3, S.L - 0.9, 0, S.sill + 0.03, 0, UNDER), M_UNDER.slice(1)));
-  for (const zw of S.zs) b.push(withRM(P_('box', 2 * (B.W(zw) - 0.07), B.Ra * 0.95, B.Ra * 1.9, 0, S.r + B.Ra * 0.5, zw, UNDER), M_UNDER.slice(1)));
+  for (const zw of S.zs) {   // dark wheel wells, sized to stay inside the bodywork
+    let hwMin = B.W(zw) - 0.07;
+    for (let y = S.r + B.Ra * 0.05; y <= S.r + B.Ra * 0.95; y += 0.04) for (const dz of [-B.Ra * 0.9, 0, B.Ra * 0.9]) { const h = halfAt(B, zw + dz, y); if (h > 0) hwMin = Math.min(hwMin, h - 0.05); }
+    b.push(withRM(P_('box', 2 * hwMin, B.Ra * 0.95, B.Ra * 1.9, 0, S.r + B.Ra * 0.5, zw, UNDER), M_UNDER.slice(1)));
+  }
   const H = S.head;
   for (const sx of [-1, 1]) {
     const x = sx * H.x, z = endZ(B, x, H.y, true);
@@ -596,38 +600,138 @@ function trafficGeo(type, col) {
     return { hi: hi.geo, lo: lo.geo, lights: hi.lights };
   });
 }
-function rallyGeo(col, acc) {
-  return cached('rally' + col + '_' + acc, () => {
-    const hoodZ = [0.86, 1.82];
-    const mk = () => ({ L: 4.0, hw: 0.84, flare: 0.07, n: 4.2, taper: 0.12, E: 0.22, sill: 0.27, noseLift: 0.07, tailLift: 0.1, r: 0.36, w: 0.27, x: 0.8, zs: [1.3, -1.3], sepWheels: true,
-      paint: col, acc, metal: false, darkSill: true, band: [0.4, 0.5], hoodZ,
+/* ---------- rally car line-up: five different machines, each with its own handling ---------- */
+// st: spd = top speed, acc = acceleration, hdl = steering & grip, arm = armour (damage taken / arm), off = speed kept off-road
+// bars: what the menu shows (1-5)
+const TRIM_RM = () => M_TRIM.slice(1), UNDER_RM = () => M_UNDER.slice(1), CHROME_RM = () => M_CHROME.slice(1);
+const exhaust = (B, x, r = 0.055) => withRM(P_('cyl', r, 0.22, r, x, 0.26, endZ(B, x, 0.3, false) + 0.02, 0x666666, HPI), CHROME_RM());
+const mudflaps = (b, S, rearCol) => { for (const zw of S.zs) for (const sx of [-1, 1]) b.push(withRM(P_('box', 0.34, 0.32, 0.02, sx * S.x, 0.2, zw - S.r - 0.12, zw < 0 ? rearCol : TRIMC), [0.8, 0, 0])); };
+const CAR_MODELS = [
+  { id: 'fulmine', name: 'FULMINE HF', cls: 'GROUP A HOT HATCH', bars: [3, 4, 5, 3], st: { spd: 1.0, acc: 1.06, hdl: 1.12, arm: 1.0, mass: 1.0, off: 0.62 },
+    rim: 0xe6e6e6, spokes: 6, hoodAcc: true, pod: { z: 1.7, n: 4 }, roundelZ: -0.1,
+    spec(col, acc) { return { L: 4.0, hw: 0.84, flare: 0.07, n: 4.2, taper: 0.12, E: 0.22, sill: 0.27, noseLift: 0.07, tailLift: 0.1, r: 0.36, w: 0.27, x: 0.8, zs: [1.3, -1.3], sepWheels: true,
+      paint: col, acc, metal: false, darkSill: true, band: [0.4, 0.5], hoodZ: [0.86, 1.82],
       top: [[2.0, 0.68], [1.85, 0.83], [1.3, 0.91], [0.82, 0.96], [-1.65, 0.99], [-2.0, 0.93]],
       cab: { z1: 0.8, z0: -1.95, W: 0.72, taper: 0.26, roof: [[0.08, 1.44], [-0.3, 1.48], [-1.3, 1.46], [-1.6, 1.36]], zA: 0.12, zC: -1.52, cW: 0.82, pillars: [-0.62] },
       cabExtra: o => (o.s > 0.5 && Math.abs(o.x) < 0.2 && o.z < 0.12 && o.z > -1.52) ? paintRM(acc, false) : null,
       seams: [0.76, -0.64], head: { x: 0.6, y: 0.72, w: 0.34, h: 0.12 }, tail: { x: 0.62, y: 0.84, w: 0.34, h: 0.13, rev: true }, grille: { y: 0.58, w: 0.62, h: 0.1 },
-      more: (B, b, l, lo) => {
-        const C = cabinSpec(S0, B), roofY = z => C.yt(z);
-        b.push(RB(0.38, 0.1, 0.42, 0.04, 0, roofY(-0.25) + 0.03, -0.25, acc));                    // roof scoop
-        b.push(withRM(P_('box', 0.24, 0.06, 0.04, 0, roofY(-0.25) + 0.04, -0.03, TRIMC), M_TRIM.slice(1)));
-        b.push(withRM(P_('cyl', 0.055, 0.22, 0.055, 0.5, 0.26, endZ(B, 0.5, 0.3, false) + 0.02, 0x666666, HPI), M_CHROME.slice(1)));   // second exhaust
-        for (const zw of [1.3, -1.3]) for (const sx of [-1, 1]) b.push(withRM(P_('box', 0.32, 0.3, 0.02, sx * 0.8, 0.2, zw - 0.36 - 0.12, zw < 0 ? acc : TRIMC), [0.8, 0, 0]));   // mudflaps
-      } });
-    const S0 = mk();
-    const hi = buildCar(S0, false), lo = buildCar(mk(), true), B = hi.B;
-    // detachable parts
-    const hood = loft(B, stations(hoodZ[0], hoodZ[1], 0, [], 0.08, [], 0), 18, o => o.ny > 0 ? paintRM(acc, false) : M_UNDER, { t0: 0.2 * Math.PI, t1: 0.8 * Math.PI, lift: 0.014, both: true });
-    const zb = endZ(B, 0, 0.33, true);
-    const bumper = merge([withRM(RB(1.76, 0.16, 0.26, 0.05, 0, 0.3, zb - 0.06, TRIMC), M_TRIM.slice(1)), withRM(P_('box', 0.06, 0.06, 0.1, 0.45, 0.32, zb + 0.06, 0xd8261c), [0.5, 0, 0.5])]);
-    const C = cabinSpec(S0, B), ry = C.yt(-1.5) + 0.05;
-    const spoiler = merge([RB(1.62, 0.05, 0.42, 0.02, 0, ry + 0.04, -1.72, acc, -0.12), RB(0.04, 0.16, 0.44, 0.015, -0.8, ry + 0.06, -1.72, col), RB(0.04, 0.16, 0.44, 0.015, 0.8, ry + 0.06, -1.72, col),
-      withRM(P_('box', 0.05, 0.1, 0.2, -0.45, ry - 0.02, -1.6, TRIMC), M_TRIM.slice(1)), withRM(P_('box', 0.05, 0.1, 0.2, 0.45, ry - 0.02, -1.6, TRIMC), M_TRIM.slice(1))], true);
-    const brk = []; for (const sx of [-1, 1]) { const zt = endZ(B, sx * 0.62, 0.84, false); brk.push(RB(0.37, 0.15, 0.03, 0.02, sx * 0.62, 0.84, zt - 0.008, 0xffffff)); }
-    brk.push(RB(0.5, 0.045, 0.03, 0.012, 0, ry + 0.02, -1.935, 0xffffff));
-    const pb = [], pl = [], zp = 1.7, yp = B.yt(zp) + 0.13;   // bonnet light pod (hidden in the onboard cameras)
-    pb.push(withRM(RB(1.5, 0.06, 0.08, 0.02, 0, yp - 0.1, zp, TRIMC), M_TRIM.slice(1)));
-    for (const x of [-0.6, -0.2, 0.2, 0.6]) { pb.push(withRM(P_('cyl', 0.13, 0.14, 0.13, x, yp, zp, TRIMC, HPI), M_TRIM.slice(1))); pl.push(P_('cyl', 0.11, 0.04, 0.11, x, yp, zp + 0.06, 0xfff3c8, HPI)); }
-    const yr = 0.7; let xr = 0; for (let y = yr - 0.26; y <= yr + 0.26; y += 0.02) xr = Math.max(xr, halfAt(B, -0.1, y));
-    return { hi: hi.geo, lo: lo.geo, lights: hi.lights, brake: merge(brk), podBody: merge(pb), podLights: merge(pl), hood, bumper, spoiler, wheel: wheelGeo(0.36, 0.27, false, 0xe6e6e6, 6), roundel: { x: xr + 0.006, y: yr, z: -0.1 } };
+      more(B, b) {
+        const C = cabinSpec(this, B);
+        b.push(RB(0.38, 0.1, 0.42, 0.04, 0, C.yt(-0.25) + 0.03, -0.25, acc));                       // roof scoop
+        b.push(withRM(P_('box', 0.24, 0.06, 0.04, 0, C.yt(-0.25) + 0.04, -0.03, TRIMC), TRIM_RM()));
+        b.push(exhaust(B, 0.5)); mudflaps(b, this, acc);
+      } }; },
+    spoiler(B, C, col, acc) { const ry = C.yt(-1.5) + 0.05; return [RB(1.62, 0.05, 0.42, 0.02, 0, ry + 0.04, -1.72, acc, -0.12), RB(0.04, 0.16, 0.44, 0.015, -0.8, ry + 0.06, -1.72, col), RB(0.04, 0.16, 0.44, 0.015, 0.8, ry + 0.06, -1.72, col),
+      withRM(P_('box', 0.05, 0.1, 0.2, -0.45, ry - 0.02, -1.6, TRIMC), TRIM_RM()), withRM(P_('box', 0.05, 0.1, 0.2, 0.45, ry - 0.02, -1.6, TRIMC), TRIM_RM())]; } },
+
+  { id: 'vento', name: 'VENTO GT-4', cls: 'TURBO COUPE', bars: [5, 3, 3, 3], st: { spd: 1.07, acc: 0.96, hdl: 0.96, arm: 0.95, mass: 1.0, off: 0.6 },
+    rim: 0xd8b03a, spokes: 5, hoodAcc: false, pod: { z: 1.88, n: 2 }, roundelZ: -0.15,
+    spec(col, acc) { return { L: 4.4, hw: 0.86, flare: 0.06, n: 4.4, taper: 0.12, E: 0.28, sill: 0.24, noseLift: 0.06, tailLift: 0.1, r: 0.35, w: 0.27, x: 0.79, zs: [1.38, -1.32], sepWheels: true,
+      paint: col, acc, metal: false, darkSill: true, band: [0.36, 0.44], hoodZ: [0.8, 1.95],
+      top: [[2.2, 0.58], [2.05, 0.72], [1.55, 0.8], [0.8, 0.87], [-1.5, 0.92], [-2.0, 0.96], [-2.2, 0.9]],
+      cab: { z1: 0.72, z0: -2.0, W: 0.71, taper: 0.32, roof: [[-0.05, 1.27], [-0.45, 1.3], [-1.0, 1.24], [-1.55, 1.08]], zA: 0.0, zC: -1.0, cW: 0.86, pillars: [-0.72] },
+      cabExtra: o => (o.s > 0.5 && Math.abs(o.x) < 0.12 && o.z < 0 && o.z > -1.0) ? paintRM(acc, false) : null,
+      seams: [0.68, -0.7], head: { x: 0.56, y: 0.5, w: 0.44, h: 0.08 }, tail: { x: 0.5, y: 0.82, w: 0.56, h: 0.1, rev: true }, grille: { y: 0.37, w: 1.1, h: 0.08 },
+      more(B, b) {
+        const zf = endZ(B, 0, 0.3, true); b.push(withRM(RB(1.66, 0.035, 0.22, 0.015, 0, 0.255, zf - 0.03, TRIMC), TRIM_RM()));   // front splitter
+        for (const sx of [-1, 1]) { const xh = halfAt(B, -0.4, 0.64); if (xh > 0) b.push(withRM(RB(0.03, 0.11, 0.34, 0.02, sx * (xh + 0.004), 0.64, -0.4, UNDER), UNDER_RM())); }   // side intakes
+        const zr = endZ(B, 0, 0.32, false); b.push(withRM(RB(1.2, 0.08, 0.16, 0.02, 0, 0.3, zr + 0.06, UNDER), UNDER_RM()));   // diffuser
+        b.push(exhaust(B, 0.42, 0.06)); b.push(exhaust(B, 0.56, 0.06));
+      } }; },
+    hoodExtra(B) { const p = []; for (const sx of [-1, 1]) p.push(withRM(RB(0.26, 0.03, 0.42, 0.015, sx * 0.3, B.yt(1.35) + 0.015, 1.35, UNDER), UNDER_RM())); return p; },
+    spoiler(B, C, col, acc) { const y = B.yt(-1.95) + 0.17; return [RB(1.6, 0.045, 0.32, 0.02, 0, y, -1.98, acc, -0.08), RB(0.04, 0.14, 0.34, 0.015, -0.78, y + 0.03, -1.98, col), RB(0.04, 0.14, 0.34, 0.015, 0.78, y + 0.03, -1.98, col),
+      withRM(P_('box', 0.05, 0.16, 0.14, -0.5, y - 0.09, -1.95, TRIMC), TRIM_RM()), withRM(P_('box', 0.05, 0.16, 0.14, 0.5, y - 0.09, -1.95, TRIMC), TRIM_RM())]; } },
+
+  { id: 'tempesta', name: 'TEMPESTA EVO', cls: '4WD RALLY SEDAN', bars: [4, 4, 4, 4], st: { spd: 1.03, acc: 1.02, hdl: 1.05, arm: 1.1, mass: 1.05, off: 0.66 },
+    rim: 0xc9a227, spokes: 6, hoodAcc: false, pod: { z: 1.88, n: 4 }, roundelZ: 0.1,
+    spec(col, acc) { return { L: 4.4, hw: 0.87, flare: 0.08, n: 4.4, taper: 0.11, E: 0.25, sill: 0.27, noseLift: 0.08, tailLift: 0.12, r: 0.35, w: 0.27, x: 0.8, zs: [1.4, -1.25], sepWheels: true,
+      paint: col, acc, metal: false, darkSill: true, band: [0.42, 0.52], hoodZ: [0.92, 1.95],
+      top: [[2.2, 0.66], [2.05, 0.79], [1.6, 0.87], [0.9, 0.94], [-1.3, 1.0], [-1.8, 1.02], [-2.2, 0.95]],
+      cab: { z1: 0.86, z0: -1.45, W: 0.74, taper: 0.27, roof: [[0.15, 1.43], [-0.2, 1.47], [-0.85, 1.46], [-1.1, 1.38]], zA: 0.18, zC: -1.0, cW: 0.8, pillars: [-0.4] },
+      cabExtra: o => (o.s > 0.5 && Math.abs(o.x) < 0.16 && o.z < 0.18 && o.z > -1.0) ? paintRM(acc, false) : null,
+      seams: [0.82, -0.38, -1.15], head: { x: 0.6, y: 0.66, w: 0.4, h: 0.13 }, tail: { x: 0.62, y: 0.88, w: 0.38, h: 0.13, rev: true }, grille: { y: 0.5, w: 0.74, h: 0.12 },
+      more(B, b) {
+        const C = cabinSpec(this, B);
+        b.push(withRM(RB(0.5, 0.05, 0.3, 0.02, 0, C.yt(-0.5) + 0.02, -0.5, TRIMC), TRIM_RM()));        // roof vent
+        const zf = endZ(B, 0, 0.32, true); for (const sx of [-1, 1]) b.push(withRM(RB(0.22, 0.12, 0.06, 0.03, sx * 0.55, 0.38, zf - 0.02, 0xfff3c8), [0.3, 0, 0.5]));   // fog lamps
+        b.push(exhaust(B, 0.5, 0.07)); mudflaps(b, this, acc);
+      } }; },
+    hoodExtra(B, col) { const y = B.yt(1.3); return [RB(0.62, 0.11, 0.5, 0.04, 0, y + 0.05, 1.3, col), withRM(RB(0.5, 0.07, 0.03, 0.01, 0, y + 0.06, 1.56, UNDER), UNDER_RM())]; },   // bonnet scoop
+    spoiler(B, C, col, acc) { const y = B.yt(-1.95) + 0.34; return [RB(1.66, 0.05, 0.36, 0.02, 0, y, -1.98, col, -0.1), RB(1.66, 0.04, 0.03, 0.01, 0, y + 0.03, -2.16, acc),
+      RB(0.05, 0.36, 0.2, 0.02, -0.62, y - 0.17, -1.95, col), RB(0.05, 0.36, 0.2, 0.02, 0.62, y - 0.17, -1.95, col)]; } },
+
+  { id: 'saetta', name: 'SAETTA B', cls: 'GROUP B MONSTER', bars: [5, 5, 2, 2], st: { spd: 1.09, acc: 1.14, hdl: 0.9, arm: 0.8, mass: 0.9, off: 0.58 },
+    rim: 0xb8bcc0, spokes: 5, hoodAcc: true, pod: { z: 1.62, n: 2 }, roundelZ: 0.15,
+    spec(col, acc) {
+      const st = []; for (let z = -1.85; z <= -1.0; z += 1 / 14) st.push(z);
+      return { L: 4.0, hw: 0.94, flare: 0.08, n: 4.2, taper: 0.15, E: 0.22, sill: 0.24, noseLift: 0.05, tailLift: 0.08, r: 0.37, w: 0.31, x: 0.86, zs: [1.3, -1.22], sepWheels: true,
+      paint: col, acc, metal: false, darkSill: true, band: [0.38, 0.46], hoodZ: [0.82, 1.75], extraSt: st,
+      top: [[2.0, 0.55], [1.85, 0.69], [1.3, 0.77], [0.75, 0.82], [-0.9, 0.93], [-1.6, 1.0], [-2.0, 0.97]],
+      extraCls: o => {
+        if (o.ny > 0.55 && o.z < -1.0 && o.z > -1.85 && Math.abs(o.x) < 0.62 && Math.floor((o.z + 2) * 14) % 2 === 0) return M_UNDER;   // engine cover louvres
+        return null; },
+      cab: { z1: 0.72, z0: -0.98, W: 0.72, taper: 0.34, roof: [[0.0, 1.22], [-0.35, 1.25], [-0.72, 1.18]], zA: 0.06, zC: -0.74, cW: 0.9, pillars: [], sideGlass: o => o.z > -0.62 },
+      cabExtra: o => (o.s > 0.5 && Math.abs(o.x) < 0.14 && o.z < 0.06 && o.z > -0.74) ? paintRM(acc, false) : null,
+      seams: [0.7, -0.6], head: { x: 0.62, y: 0.47, w: 0.3, h: 0.09 }, tail: { x: 0.66, y: 0.86, w: 0.3, h: 0.14, rev: true }, grille: { y: 0.34, w: 1.1, h: 0.1 },
+      more(B, b) {
+        const zf = endZ(B, 0, 0.3, true); b.push(withRM(RB(1.8, 0.035, 0.26, 0.015, 0, 0.255, zf - 0.04, TRIMC), TRIM_RM()));
+        for (const sx of [-1, 1]) { const xh = halfAt(B, -0.62, 0.66); if (xh > 0) b.push(withRM(RB(0.04, 0.2, 0.4, 0.03, sx * (xh + 0.004), 0.66, -0.62, UNDER), UNDER_RM())); }   // side air intakes
+        const zr = endZ(B, 0, 0.32, false); b.push(withRM(RB(1.5, 0.1, 0.18, 0.02, 0, 0.32, zr + 0.07, UNDER), UNDER_RM()));
+        for (const x of [-0.4, -0.25]) b.push(exhaust(B, x, 0.06));
+      } }; },
+    spoiler(B, C, col, acc) { const y = B.yt(-1.85) + 0.42; return [RB(1.92, 0.06, 0.48, 0.02, 0, y, -1.85, acc, -0.14), RB(0.05, 0.3, 0.56, 0.015, -0.95, y + 0.04, -1.85, col), RB(0.05, 0.3, 0.56, 0.015, 0.95, y + 0.04, -1.85, col),
+      withRM(P_('box', 0.06, 0.42, 0.18, -0.45, y - 0.22, -1.82, TRIMC), TRIM_RM()), withRM(P_('box', 0.06, 0.42, 0.18, 0.45, y - 0.22, -1.82, TRIMC), TRIM_RM())]; } },
+
+  { id: 'duna', name: 'DUNA 4X4', cls: 'DESERT RAID TRUCK', bars: [2, 2, 3, 5], st: { spd: 0.95, acc: 0.9, hdl: 0.92, arm: 1.6, mass: 1.6, off: 0.86 },
+    rim: 0x2c2c2c, spokes: 6, hoodAcc: false, pod: { z: -0.05, n: 4, roof: true }, roundelZ: 0.25, bullBar: true,
+    spec(col, acc) { return { L: 4.7, hw: 0.95, flare: 0.09, n: 5.5, taper: 0.06, E: 0.24, sill: 0.52, noseLift: 0.08, tailLift: 0.06, r: 0.47, w: 0.34, x: 0.84, zs: [1.5, -1.45], arch: 0.08, sepWheels: true,
+      paint: col, acc, metal: false, darkSill: true, hoodZ: [0.86, 2.15],
+      top: [[2.35, 1.0], [2.2, 1.12], [1.7, 1.2], [0.85, 1.25], [-0.5, 1.27], [-2.35, 1.25]],
+      extraCls: o => (o.ny > 0.6 && o.z < -0.62 && o.z > -2.25) ? [0x1c1d20, 0.85, 0, 0.1] : null,     // bed cover
+      cab: { z1: 0.76, z0: -0.56, W: 0.86, n: 6, taper: 0.14, roof: [[0.12, 1.96], [-0.12, 2.0], [-0.42, 1.97]], zA: 0.14, zC: -0.5, cW: 0.86, pillars: [-0.17] },
+      seams: [0.7, -0.58], head: { x: 0.62, y: 0.9, w: 0.32, h: 0.15 }, tail: { x: 0.82, y: 0.98, w: 0.12, h: 0.34 }, grille: { y: 0.8, w: 1.1, h: 0.2 }, plateY: 0.7,
+      more(B, b, l, lo) {
+        const C = cabinSpec(this, B);
+        for (const sx of [-1, 1]) b.push(withRM(P_('cyl', 0.045, 0.72, 0.045, sx * 0.72, B.yt(-0.7) + 0.34, -0.7, 0x222222), TRIM_RM()));   // roll bar behind the cab
+        b.push(withRM(P_('cyl', 0.045, 1.48, 0.045, 0, B.yt(-0.7) + 0.7, -0.7, 0x222222, 0, 0, HPI), TRIM_RM()));
+        const ys = B.yt(-1.6) + 0.16; b.push(withRM(P_('cyl', 0.44, 0.3, 0.44, 0, ys, -1.6, TYRE), [0.9, 0, 0]), withRM(P_('cyl', 0.29, 0.31, 0.29, 0, ys, -1.6, 0x2c2c2c), [0.35, 0.3, 1]));   // spare wheel on the bed
+        const xs = halfAt(B, 0.55, 1.1); if (xs > 0) {   // snorkel
+          b.push(withRM(P_('cyl', 0.06, 1.0, 0.06, xs + 0.05, 1.55, 0.6, 0x222222), TRIM_RM()));
+          b.push(withRM(P_('cyl', 0.065, 0.2, 0.065, xs + 0.05, 2.05, 0.66, 0x222222, HPI), TRIM_RM())); }
+        b.push(withRM(RB(1.4, 0.06, 1.2, 0.02, 0, 0.4, 1.4, 0x888888), [0.5, 0.8, 0]));            // skid plate
+        b.push(exhaust(B, 0.55, 0.07)); mudflaps(b, this, acc);
+      } }; },
+    hoodExtra(B) { const p = []; for (const sx of [-1, 1]) p.push(withRM(RB(0.34, 0.035, 0.24, 0.015, sx * 0.38, B.yt(1.4) + 0.02, 1.4, UNDER), UNDER_RM())); return p; },
+    spoiler(B, C, col, acc) { const y = C.yt(-0.2) + 0.08, p = [];   // roof rack
+      for (const sx of [-1, 1]) p.push(withRM(P_('box', 0.05, 0.06, 0.95, sx * 0.62, y, -0.15, 0x222222), TRIM_RM()));
+      for (const z of [-0.5, -0.15, 0.2]) p.push(withRM(P_('box', 1.28, 0.04, 0.05, 0, y + 0.02, z, 0x222222), TRIM_RM()));
+      return p; } },
+];
+const modelIdx = id => Math.max(0, CAR_MODELS.findIndex(m => m.id === id));
+function rallyGeo(mi, col, acc) {
+  return cached('rally' + mi + '_' + col + '_' + acc, () => {
+    const M = CAR_MODELS[mi], S = M.spec(col, acc);
+    const hi = buildCar(S, false), lo = buildCar(M.spec(col, acc), true), B = hi.B, C = cabinSpec(S, B);
+    // detachable parts: bonnet, front bumper, wing
+    const hz = S.hoodZ, hcol = M.hoodAcc ? acc : col;
+    let hood = loft(B, stations(hz[0], hz[1], 0, [], 0.08, [], 0), 18, o => o.ny > -0.4 ? paintRM(hcol, false) : M_UNDER, { t0: 0.2 * Math.PI, t1: 0.8 * Math.PI, lift: 0.014, both: true });
+    if (M.hoodExtra) hood = concat([hood, merge(M.hoodExtra(B, col, acc), true)]);
+    const yb = S.sill + 0.06, zb = endZ(B, 0, yb, true);
+    const bp = M.bullBar
+      ? [withRM(P_('cyl', 0.05, 1.7, 0.05, 0, yb + 0.05, zb + 0.12, 0x2a2a2a, 0, 0, HPI), TRIM_RM()), withRM(P_('cyl', 0.05, 1.3, 0.05, 0, yb + 0.42, zb + 0.12, 0x2a2a2a, 0, 0, HPI), TRIM_RM()),
+         ...[-0.6, -0.2, 0.2, 0.6].map(x => withRM(P_('cyl', 0.045, 0.42, 0.045, x, yb + 0.23, zb + 0.12, 0x2a2a2a), TRIM_RM()))]
+      : [withRM(RB(1.76, 0.16, 0.26, 0.05, 0, yb, zb - 0.06, TRIMC), TRIM_RM())];
+    bp.push(withRM(P_('box', 0.06, 0.06, 0.1, 0.45, yb + 0.02, zb + (M.bullBar ? 0.05 : 0.06), 0xd8261c), [0.5, 0, 0.5]));   // tow hook
+    const bumper = merge(bp, true), spoiler = merge(M.spoiler(B, C, col, acc), true);
+    const T_ = S.tail, brk = [];
+    for (const sx of [-1, 1]) { const zt = endZ(B, sx * T_.x, T_.y, false); brk.push(RB(T_.w + 0.03, T_.h + 0.02, 0.03, 0.02, sx * T_.x, T_.y, zt - 0.008, 0xffffff)); }
+    // light pod on the bonnet (or the roof bar on the truck)
+    const pb = [], pl = [], P = M.pod, yp = P.roof ? C.yt(P.z) + 0.14 : B.yt(P.z) + 0.13, sp = P.roof ? 0.36 : 0.4;
+    pb.push(withRM(RB(sp * P.n + 0.1, 0.06, 0.08, 0.02, 0, yp - 0.1, P.z, TRIMC), TRIM_RM()));
+    for (let k = 0; k < P.n; k++) { const x = (k - (P.n - 1) / 2) * sp; pb.push(withRM(P_('cyl', 0.13, 0.14, 0.13, x, yp, P.z, TRIMC, HPI), TRIM_RM())); pl.push(P_('cyl', 0.11, 0.04, 0.11, x, yp, P.z + 0.06, 0xfff3c8, HPI)); }
+    const yr = S.sill + 0.43; let xr = 0; for (let y = yr - 0.26; y <= yr + 0.26; y += 0.02) xr = Math.max(xr, halfAt(B, M.roundelZ, y));
+    return { hi: hi.geo, lo: lo.geo, lights: hi.lights, brake: merge(brk), podBody: merge(pb), podLights: merge(pl), hood, bumper, spoiler,
+      wheel: wheelGeo(S.r, S.w, false, M.rim, M.spokes), roundel: { x: xr + 0.006, y: yr, z: M.roundelZ }, dims: { L: S.L, hw: S.hw + (S.flare || 0) * 0.5, x: S.x, r: S.r, zs: S.zs } };
   });
 }
 const SKIN = [0xf0c8a0, 0xd8a47a, 0xa86a42, 0x6b4428, 0xf5d5b8];
@@ -1240,25 +1344,25 @@ function vehicleMesh(type, color) {
   return gr;
 }
 const geoRoundel = new THREE.PlaneGeometry(0.5, 0.5), numMat = {};
-function rallyMesh(colr, acc, num) {
-  const g = rallyGeo(colr, acc), gr = new THREE.Group();
+function rallyMesh(mi, colr, acc, num) {
+  const g = rallyGeo(mi, colr, acc), gr = new THREE.Group(), D = g.dims;
   const li = new THREE.Mesh(g.lights, matLights);
   const bumper = cast(new THREE.Mesh(g.bumper, matCar)), hood = cast(new THREE.Mesh(g.hood, matCar)), spoiler = cast(new THREE.Mesh(g.spoiler, matCar));
   const brake = new THREE.Mesh(g.brake, matBrake); brake.visible = false; brake.userData.fx = true;
   const pod = new THREE.Group(); pod.add(cast(new THREE.Mesh(g.podBody, matCar)), new THREE.Mesh(g.podLights, matLights));
   gr.add(lodMesh(g, 70), li, bumper, hood, spoiler, brake, pod);
   const whl = [];
-  for (const z of [1.3, -1.3]) for (const x of [-0.8, 0.8]) {
-    const w = cast(new THREE.Mesh(g.wheel, matCar)); w.position.set(x, 0.36, z); w.rotation.order = 'YXZ';
+  for (const z of D.zs) for (const x of [-D.x, D.x]) {
+    const w = cast(new THREE.Mesh(g.wheel, matCar)); w.position.set(x, D.r, z); w.rotation.order = 'YXZ';
     w.userData.base = x < 0 ? Math.PI : 0; w.rotation.y = w.userData.base; gr.add(w); whl.push(w);
   }
   for (const sd of [-1, 1]) {
     const nm = new THREE.Mesh(geoRoundel, numMat[num] ||= new THREE.MeshLambertMaterial({ map: numTex(num), transparent: true }));
     nm.position.set(sd * g.roundel.x, g.roundel.y, g.roundel.z); nm.rotation.y = sd * Math.PI / 2; gr.add(nm);
   }
-  const sh = shadowMesh(2.6, 5.0); gr.add(sh);
-  const beam = beamMesh(2.0, 4.8); gr.add(beam);
-  gr.userData = { lights: li, brake, pod, shadow: sh, beam, wheels: whl, parts: [{ m: bumper, at: 0.75 }, { m: hood, at: 0.45 }, { m: spoiler, at: 0.25 }] };
+  const sh = shadowMesh(2 * D.hw + 0.9, D.L + 1); gr.add(sh);
+  const beam = beamMesh(D.L / 2, 4.8); gr.add(beam);
+  gr.userData = { dims: D, lights: li, brake, pod, shadow: sh, beam, wheels: whl, parts: [{ m: bumper, at: 0.75 }, { m: hood, at: 0.45 }, { m: spoiler, at: 0.25 }] };
   return gr;
 }
 function pedMesh(sh, sk, pa) {
@@ -1298,12 +1402,14 @@ function spawnRallyCars(colorIdx) {
   const grid = [[58, 1.75], [51, 5.25], [44, 1.75], [37, 5.25], [30, 1.75], [19, 3.5]];
   RIVALS.forEach((r, i) => {
     const st = T.stage;
-    addEnt('rival', { name: r.name, s: grid[i][0], d: grid[i][1], hs: 2.05, hd: 0.92, mass: 1, hp: 100, maxhp: 100, vehicle: true,
-      mesh: rallyMesh(r.col, r.acc, i + 2), colorCss: '#' + new THREE.Color(r.col).getHexString(), noPool: true,
+    const rm = modelIdx(r.model), RM = CAR_MODELS[rm], rg = rallyGeo(rm, r.col, r.acc).dims;
+    addEnt('rival', { name: r.name, s: grid[i][0], d: grid[i][1], hs: rg.L / 2 + 0.05, hd: rg.hw + 0.04, mass: RM.st.mass, hp: 100 * RM.st.arm, maxhp: 100 * RM.st.arm, vehicle: true,
+      mesh: rallyMesh(rm, r.col, r.acc, i + 2), colorCss: '#' + new THREE.Color(r.col).getHexString(), noPool: true,
       base: st.rival * r.skill, nos: 2, boostT: 0, aggr: r.aggr, look: 55 + r.skill * 30, think: Math.random() * 0.3, targetD: grid[i][1], ramT: 0, finished: false });
   });
-  player = addEnt('player', { s: grid[5][0], d: grid[5][1], hs: 2.05, hd: 0.92, mass: 1, hp: 100, maxhp: 100, vehicle: true,
-    mesh: rallyMesh(pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, nos: 2, oil: 0, onRamp: false, drift: 0, finished: false });
+  const pm = settings.model, PM = CAR_MODELS[pm], pg = rallyGeo(pm, pc.col, pc.acc).dims;
+  player = addEnt('player', { M: PM.st, s: grid[5][0], d: grid[5][1], hs: pg.L / 2 + 0.05, hd: pg.hw + 0.04, mass: PM.st.mass, hp: 100, maxhp: 100, vehicle: true,
+    mesh: rallyMesh(pm, pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, nos: 2, oil: 0, onRamp: false, drift: 0, finished: false });
   player.mesh.add(headSpot, headSpot.target);
 }
 
@@ -1613,7 +1719,7 @@ function addScore(n) { game.score = Math.max(0, game.score + n); }
 function damage(e, amt, by) {
   if (!e.alive || !e.vehicle || amt <= 0) return;
   if (by === player && e !== player) { amt *= 1.35; e.lastByPlayer = game.t; addScore(Math.round(amt * 3)); }
-  if (e === player) amt *= T.stage.dmg * (game.state === 'finished' ? 0.3 : 1);
+  if (e === player) amt *= T.stage.dmg * (game.state === 'finished' ? 0.3 : 1) / (player.M ? player.M.arm : 1);
   e.hp -= amt;
   if (DBG.on && (e === player || e.kind === 'rival')) DBG.log.push([game.raceT.toFixed(2), e.kind, e.name || '', Math.round(amt), by ? by.kind + ':' + (by.sub || '') : 'wall/fall', Math.round(e.s), e.d.toFixed(1)].join(' '));
   if (e === player) { game.shake = Math.min(1.4, game.shake + amt * 0.03); vibrate(Math.min(80, 15 + amt * 2)); if (amt > 12) msg('-' + Math.round(amt) + '% CAR', 'hot'); }
@@ -1860,8 +1966,9 @@ function updatePlayer(p, dt, inp) {
   const steerIn = racing || game.state === 'wrecked' ? inp.steer : 0;
   p.steer += clamp(steerIn - p.steer, -dt * 8, dt * 8);
   const off = Math.abs(p.d) > RW + 0.2;
-  let vmax = 46 * (0.78 + 0.22 * Math.max(0, p.hp) / p.maxhp);
-  if (off) vmax *= tr.town ? 0.82 : 0.62;
+  const M = p.M || CAR_MODELS[0].st;
+  let vmax = 46 * M.spd * (0.78 + 0.22 * Math.max(0, p.hp) / p.maxhp);
+  if (off) vmax *= tr.town ? Math.max(0.82, M.off) : M.off;
   if (p.jumpBoost > 0) { p.jumpBoost -= dt; if (!air) vmax = Math.max(vmax, 55); }
   if (p.turbo > 0) vmax = 58;
   if (game.state === 'countdown' || game.state === 'menu') vmax = 0;
@@ -1871,19 +1978,19 @@ function updatePlayer(p, dt, inp) {
   const vt = vmax * (1 - 0.05 * Math.abs(p.steer));
   if (!air) {
     if (inp.brake && racing) p.v = Math.max(0, p.v - 21 * dt);                // foot brake: strong, keeps grip
-    else if (p.v < vt) p.v += (p.turbo > 0 || p.jumpBoost > 0 ? 24 : 7 + 8 * (1 - p.v / 46)) * dt;
+    else if (p.v < vt) p.v += (p.turbo > 0 || p.jumpBoost > 0 ? 24 : (7 + 8 * (1 - p.v / 46)) * M.acc) * dt;
     else p.v -= Math.min(p.v - vt, (off ? 22 : p.alive ? 7 : 12) * dt);
     if (inp.hand && racing) p.v = Math.max(0, p.v - 12 * dt);
   }
   p.throttle = !inp.brake && p.v < vt + 0.6 && racing ? 1 : 0.15;
   p.braking = (inp.brake || inp.hand) && racing;
   const vn = clamp(p.v / 46, 0, 1.3);
-  const rate = (2.1 - 1.3 * Math.min(vn, 1.1)) * (air ? 0.2 : 1) * clamp(p.v / 4, 0, 1);
+  const rate = (2.1 - 1.3 * Math.min(vn, 1.1)) * M.hdl * (air ? 0.2 : 1) * clamp(p.v / 4, 0, 1);
   let dyaw = p.steer * rate * (inp.hand && racing ? 1.7 : 1) + tr.k * p.v * 0.55;   // the road does 45% of the cornering for you
   if (Math.abs(steerIn) < 0.1 && !inp.hand && !air) dyaw -= p.yaw * 1.9;
   p.yaw += dyaw * dt + p.spin * dt; p.spin *= Math.exp(-3.2 * dt);
   p.yaw = clamp(p.yaw, -1.35, 1.35);
-  let grip = 7.5 - 2.6 * vn * Math.abs(p.steer);
+  let grip = 7.5 * M.hdl - 2.6 * vn * Math.abs(p.steer);
   if (inp.hand && racing) grip = 1.5;
   if (off) grip *= 0.7;
   if (p.oil > 0) { grip = 0.5; p.oil -= dt; }
@@ -2408,6 +2515,7 @@ function finishRace(reason) {
   if (rank < 5 && game.score > 0) openEntry(idx, rank, game.score, tag); else showResult(idx, -1);
 }
 function renderMenu() {
+  renderModel();
   const el = $('stages'); el.innerHTML = '';
   STAGES.forEach((st, i) => {
     const b = document.createElement('button'), best = progress.best[i];
@@ -2426,9 +2534,31 @@ function renderMenu() {
   });
   syncToggles();
 }
+function setModel(k) {
+  settings.model = (k + CAR_MODELS.length) % CAR_MODELS.length; store.set('model', settings.model);
+  swapPlayerColor(); renderModel(); sfxTone(520 + settings.model * 60, 0.06, 'square', 0.06);
+}
+function renderModel() {
+  const M = CAR_MODELS[settings.model];
+  $('carName').textContent = M.name; $('carCls').textContent = M.cls + '  ' + (settings.model + 1) + '/' + CAR_MODELS.length;
+  $('carStats').innerHTML = ['SPEED', 'ACCEL', 'HANDLING', 'ARMOUR'].map((n, i) => `<span>${n}</span><i>${'<b class="on"></b>'.repeat(M.bars[i])}${'<b></b>'.repeat(5 - M.bars[i])}</i>`).join('');
+}
+(function carSwipe() {
+  const el = $('carView'); let x0 = null, y0 = 0, id = null;
+  el.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; x0 = e.clientX; y0 = e.clientY; id = e.pointerId; });
+  el.addEventListener('pointerup', e => {
+    if (x0 === null || e.pointerId !== id) return;
+    const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy) * 1.2) { audioInit(); setModel(settings.model + (dx < 0 ? 1 : -1)); }
+  });
+  el.addEventListener('pointercancel', () => { x0 = null; });
+  $('carPrev').onclick = () => { audioInit(); setModel(settings.model - 1); };
+  $('carNext').onclick = () => { audioInit(); setModel(settings.model + 1); };
+})();
 function swapPlayerColor() {
   if (!player) return;
-  const pc = PLAYER_COLORS[settings.color]; scene.remove(player.mesh); player.mesh = rallyMesh(pc.col, pc.acc, 1); player.mesh.add(headSpot, headSpot.target); scene.add(player.mesh);
+  const pc = PLAYER_COLORS[settings.color]; scene.remove(player.mesh); player.mesh = rallyMesh(settings.model, pc.col, pc.acc, 1); player.mesh.add(headSpot, headSpot.target); scene.add(player.mesh);
+  const PM = CAR_MODELS[settings.model], D = player.mesh.userData.dims; Object.assign(player, { M: PM.st, hs: D.L / 2 + 0.05, hd: D.hw + 0.04, mass: PM.st.mass, inv: 1 / PM.st.mass });
 }
 const ROAD_OPTS = [['traffic', 'TRAFFIC'], ['police', 'POLICE'], ['obstacles', 'OBSTACLES'], ['peds', 'PEOPLE']];
 const OPT = {
