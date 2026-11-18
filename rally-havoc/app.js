@@ -2365,7 +2365,7 @@ function vehicleFx(dt) {
     }
     if (e.burnT > 0) {   // flames licking over the bonnet + black smoke
       e.burnT -= step; worldPos(e.s + (e.kind === 'cross' ? 0 : Math.cos(e.ang) * e.hs * 0.5), e.d, 1.0 + e.y, _w);
-      for (let i = 0; i < 4; i++) emit(FX, _w.x + R(-0.7, 0.7), _w.y + R(-0.2, 0.2), _w.z + R(-0.7, 0.7), R(-0.4, 0.4), R(2.5, 4.5), R(-0.4, 0.4), R(0.3, 0.55), 1.1, 0.4, -1, COL.fire0, COL.fire1, 0.95, 1);
+      for (let i = 0; i < 4; i++) emit(FX, _w.x + R(-0.7, 0.7), _w.y + R(-0.2, 0.2), _w.z + R(-0.7, 0.7), R(-0.4, 0.4), R(2.5, 4.5), R(-0.4, 0.4), R(0.3, 0.5), 0.9, 0.35, -1, COL.fire0, COL.fire1, 0.6, 1);
       if (Math.random() < 0.7) puff(SMK, e.s, e.d, 1.6 + e.y, 1, COL.smokeB0, COL.smokeB1, 1.6, 1.8, 2.2, 0.7, 0.6);
     }
     if (frac < 0.6 && Math.random() < (0.9 - frac)) puff(SMK, e.s + front, e.d + side, 1.0 + e.y, 1, frac < 0.3 ? COL.smokeB0 : COL.smokeG0, frac < 0.3 ? COL.smokeB1 : COL.smokeG1, 1.0, 1.4, 1.5, 0.55, 0.6);
@@ -2411,16 +2411,16 @@ function nosTrail(e, yaw, big, step = 1 / 30, flame = false) {
     if (prev[k].distanceToSquared(now[k]) > 64) continue;
     if (flame) {   // the flame jet itself: shoots ~3-4 m out of each exhaust
       _v1.subVectors(now[k], prev[k]); const sp = _v1.length() / step; _v1.normalize();
-      for (let i = 0; i < (big ? 4 : 3); i++) {
+      for (let i = 0; i < 2; i++) {
         const j = R(18, 26), u = R(0, 1);
         emit(FX, now[k].x - _v1.x * u * 0.3, now[k].y, now[k].z - _v1.z * u * 0.3, _v1.x * (sp - j) + R(-0.6, 0.6), R(-0.2, 0.5), _v1.z * (sp - j) + R(-0.6, 0.6),
-          R(0.1, 0.17), big ? 0.75 : 0.55, big ? 1.5 : 1.1, 0, COL.fire0, [1, 0.35, 0.04], 0.9, 0);
+          R(0.08, 0.13), big ? 0.5 : 0.4, big ? 0.95 : 0.75, 0, [0.85, 0.55, 0.22], [0.7, 0.18, 0.02], 0.4, 0);
       }
     }
     for (let i = 0; i < n; i++) {
       _t1.copy(prev[k]).lerp(now[k], i / n);
-      emit(FX, _t1.x, _t1.y, _t1.z, R(-0.12, 0.12), R(0.05, 0.3), R(-0.12, 0.12), R(0.5, 0.75), big ? 0.6 : 0.45, big ? 1.25 : 0.9, -0.3, NOS0, NOS1, 0.8, 0.4);
-      if (i % 3 === 0) emit(FX, _t1.x, _t1.y, _t1.z, 0, R(0, 0.2), 0, 0.16, 0.4, 0.2, 0, COL.blue0, NOS0, 0.9, 0);   // hot core at the nozzle
+      emit(FX, _t1.x, _t1.y, _t1.z, R(-0.12, 0.12), R(0.05, 0.3), R(-0.12, 0.12), R(0.05, 0.07), big ? 0.45 : 0.35, big ? 0.6 : 0.5, -0.3, NOS0, NOS1, 0.6, 0.4);
+      if (i % 3 === 0) emit(FX, _t1.x, _t1.y, _t1.z, 0, R(0, 0.2), 0, 0.05, 0.3, 0.15, 0, COL.blue0, NOS0, 0.7, 0);   // hot core at the nozzle
     }
   }
 }
