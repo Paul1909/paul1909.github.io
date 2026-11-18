@@ -650,7 +650,18 @@ const PROPS = {
   hay: () => merge([P_('cyl', 0.62, 1.3, 0.62, 0, 0.62, 0, 0xd9b44a, 0, 0, Math.PI / 2), P_('cyl', 0.5, 1.32, 0.5, 0, 0.62, 0, 0xc49a36, 0, 0, Math.PI / 2)]),
   rock: () => merge([P_('dode', 1.0, 0.75, 1.05, 0, 0.45, 0, 0x7b7670, 0.3, 0.5, 0), P_('dode', 0.6, 0.5, 0.6, 0.6, 0.3, 0.3, 0x6a655f, 0.7, 0, 0.2)]),
   barrier: () => { const p = []; for (let i = 0; i < 6; i++) p.push(P_('box', 0.62, 0.95, 0.55, -1.55 + i * 0.62, 0.48, 0, i % 2 ? 0xffffff : 0xd8261c)); p.push(P_('box', 3.75, 0.12, 0.62, 0, 0.06, 0, 0x555555)); p.push(P_('cyl', 0.12, 0.08, 0.12, -1.6, 1.0, 0, 0xffb000, Math.PI / 2)); p.push(P_('cyl', 0.12, 0.08, 0.12, 1.6, 1.0, 0, 0xffb000, Math.PI / 2)); return merge(p); },
-  ramp: () => { const p = [P_('wedge', 2.7, 1.15, 6.5, 0, 0, -3.25, 0xf2c21a)]; for (let i = 0; i < 4; i++) p.push(P_('box', 2.72, 0.04, 0.45, 0, 0.09 + i * 0.27, -2.45 + i * 1.55, 0x1a1a1a, -Math.atan2(1.15, 6.5))); p.push(P_('box', 0.26, 1.2, 0.26, -1.22, 0.6, 3.1, 0x444444)); p.push(P_('box', 0.26, 1.2, 0.26, 1.22, 0.6, 3.1, 0x444444)); return merge(p); },
+  // ramp: red deck with white side rails and dark posts; the glowing parts are in rampGlow
+  ramp: () => { const a = -Math.atan2(1.15, 6.5), p = [P_('wedge', 2.7, 1.15, 6.5, 0, 0, -3.25, 0xc81a12)];
+    for (const x of [-1.3, 1.3]) p.push(P_('box', 0.14, 0.08, 6.6, x, 0.6, 0, 0xf4f4f4, a));
+    for (const x of [-1.42, 1.42]) p.push(P_('box', 0.14, 3.6, 0.14, x, 1.8, 3.15, 0x222222));
+    return merge(p); },
+  rampGlow: () => {
+    const a = -Math.atan2(1.15, 6.5), p = [], Y = 0xffc400, chev = (z, y, pitch, w = 1.25) => { for (const sd of [-1, 1]) p.push(P_('box', 0.3, 0.035, w, sd * 0.42, y, z - 0.38, Y, pitch, sd * 0.72)); };
+    for (const z of [-2.1, -0.2, 1.7]) chev(z, (z + 3.25) / 6.5 * 1.15 + 0.05, a);                       // chevrons up the slope
+    for (const z of [-6.5, -10.5, -14.5, -18.5]) chev(z, 0.045, 0, 1.35);                                 // arrows painted on the road
+    for (let k = 0; k < 8; k++) p.push(P_('box', 0.36, 0.42, 0.08, -1.26 + k * 0.36, 3.45, 3.15, k % 2 ? 0x101010 : 0xffc400));   // striped arch over the ramp
+    for (const x of [-1.42, 1.42]) p.push(P_('box', 0.34, 0.34, 0.34, x, 3.85, 3.15, 0xff4a00));            // marker lamps on the posts
+    return merge(p); },
   oil: () => merge([P_('cyl', 2.2, 0.02, 1.7, 0, 0.03, 0, 0x0b0b10), P_('cyl', 1.2, 0.022, 0.9, 0.5, 0.034, 0.3, 0x1a1830)]),
   wrench: () => merge([P_('torus', 0.75, 0.75, 0.9, 0, 0, 0, 0x2bff6a), P_('box', 0.9, 0.28, 0.12, 0, 0, 0, 0xffffff), P_('box', 0.28, 0.9, 0.12, 0, 0, 0, 0xffffff)]),
   turbo: () => merge([P_('torus', 0.8, 0.8, 0.9, 0, 0, 0, 0x3db7ff), P_('cyl', 0.26, 0.8, 0.26, 0, -0.05, 0, 0x1a5cff), P_('cyl', 0.27, 0.12, 0.27, 0, 0.05, 0, 0xffffff), P_('cone', 0.26, 0.2, 0.26, 0, 0.45, 0, 0x1a5cff), P_('cyl', 0.08, 0.16, 0.08, 0, 0.6, 0, 0xff2a1a)]),
@@ -1249,6 +1260,7 @@ function propMesh(t) {
   const gr = new THREE.Group();
   const flat = t === 'oil', glow = t === 'wrench' || t === 'turbo';
   const m = new THREE.Mesh(propGeo(t), glow ? matLights : matV); if (!flat && !glow) m.castShadow = true; gr.add(m);
+  if (t === 'ramp') { const g2 = new THREE.Mesh(propGeo('rampGlow'), matLights); g2.renderOrder = 1; gr.add(g2); }
   if (!flat && !glow && t !== 'triangle') { const s = shadowMesh(t === 'barrier' ? 4.4 : t === 'ramp' ? 3.4 : t === 'rock' ? 2.8 : 1.4, t === 'ramp' ? 7.5 : t === 'rock' ? 2.8 : 1.4); gr.add(s); gr.userData.shadow = s; }
   return gr;
 }
