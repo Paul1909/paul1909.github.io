@@ -654,14 +654,11 @@ const PROPS = {
   // ramp: red deck with white side rails and dark posts; the glowing parts are in rampGlow
   ramp: () => { const a = -Math.atan2(1.15, 6.5), p = [P_('wedge', 3.2, 1.15, 6.5, 0, 0, -3.25, 0xc81a12)];
     for (const x of [-1.55, 1.55]) p.push(P_('box', 0.14, 0.08, 6.6, x, 0.6, 0, 0xf4f4f4, a));
-    for (const x of [-1.67, 1.67]) p.push(P_('box', 0.14, 3.6, 0.14, x, 1.8, 3.15, 0x222222));
     return merge(p); },
   rampGlow: () => {
     const a = -Math.atan2(1.15, 6.5), p = [], Y = 0xffc400, chev = (z, y, pitch, w = 1.25) => { for (const sd of [-1, 1]) p.push(P_('box', 0.3, 0.035, w, sd * 0.42, y, z - 0.38, Y, pitch, sd * 0.72)); };
     for (const z of [-2.1, -0.2, 1.7]) chev(z, (z + 3.25) / 6.5 * 1.15 + 0.05, a);                       // chevrons up the slope
     for (const z of [-6.5, -10.5, -14.5, -18.5]) chev(z, 0.045, 0, 1.35);                                 // arrows painted on the road
-    for (let k = 0; k < 9; k++) p.push(P_('box', 0.36, 0.42, 0.08, -1.44 + k * 0.36, 3.45, 3.15, k % 2 ? 0x101010 : 0xffc400));   // striped arch over the ramp
-    for (const x of [-1.67, 1.67]) p.push(P_('box', 0.34, 0.34, 0.34, x, 3.85, 3.15, 0xff4a00));            // marker lamps on the posts
     return merge(p); },
   oil: () => merge([P_('cyl', 2.2, 0.02, 1.7, 0, 0.03, 0, 0x0b0b10), P_('cyl', 1.2, 0.022, 0.9, 0.5, 0.034, 0.3, 0x1a1830)]),
   wrench: () => merge([P_('torus', 0.75, 0.75, 0.9, 0, 0, 0, 0x2bff6a), P_('box', 0.9, 0.28, 0.12, 0, 0, 0, 0xffffff), P_('box', 0.28, 0.9, 0.12, 0, 0, 0, 0xffffff)]),
@@ -754,7 +751,7 @@ function buildTrack(st) {
   // trees & lamps
   T.trees = []; T.lamps = [];
   for (let si = 0; si < total; si += 7) {
-    if (isTownAt(si)) { if (si % 28 < 7) for (const side of [-1, 1]) T.lamps.push({ s: si + 3, d: side * 10.9 }); continue; }
+    if (isTownAt(si)) { if (si % 28 < 7 && !inters.some(I => Math.abs(I.s - si - 3) < 15)) for (const side of [-1, 1]) T.lamps.push({ s: si + 3, d: side * 10.9 }); continue; }
     for (const side of [-1, 1]) {
       if (rng() < 0.75) T.trees.push({ s: si + rng() * 7, d: side * (12.5 + Math.pow(rng(), 1.6) * 62), sc: 0.7 + rng() * 0.8, round: rng() < 0.4, c: rng() });
     }
@@ -922,6 +919,7 @@ function buildTrackMeshes(st) {
     const im = new THREE.InstancedMesh(geo, mat, list.length);
     list.forEach((t, i) => { place(t, dummy); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); if (colFn) im.setColorAt(i, colFn(t)); });
     im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.castShadow = cast; im.userData.shared = true; grp.add(im);
+    return im;
   };
   const trunkGeo = cached('g_trunk', () => new THREE.CylinderGeometry(0.16, 0.26, 1, 6).translate(0, 0.5, 0));
   const W = 0xffffff;
@@ -937,18 +935,24 @@ function buildTrackMeshes(st) {
     mkInst(roundGeo, matTree, list.filter(t => t.round), t => _c.set(0x4f7d2e).offsetHSL((t.c - 0.5) * 0.04, 0, (t.c - 0.5) * 0.1), placeT);
   }
   // roadside marker posts in the countryside
+  // (kept off the shoulder: they stand at the grass edge, where you can still clip them)
   const posts = [];
-  for (let s = 20; s < T.n * SEG - 20; s += 24) if (!isTownAt(s) && !T.rail[(s / SEG) | 0]) for (const sd of [-1, 1]) posts.push({ s, d: sd * 8.1 });
-  mkInst(cached('g_post', () => merge([P_('box', 0.11, 0.95, 0.11, 0, 0.47, 0, 0xf2f2f2), P_('box', 0.115, 0.16, 0.115, 0, 0.72, 0, 0x151515), P_('box', 0.12, 0.09, 0.02, 0, 0.72, -0.055, 0xff5a1a)])), matV, posts, null,
+  for (let s = 20; s < T.n * SEG - 20; s += 24) if (!isTownAt(s) && !T.rail[(s / SEG) | 0]) for (const sd of [-1, 1]) posts.push({ s, d: sd * 9.85 });
+  T.postIM = mkInst(cached('g_post', () => merge([P_('box', 0.11, 0.95, 0.11, 0, 0.47, 0, 0xf2f2f2), P_('box', 0.115, 0.16, 0.115, 0, 0.72, 0, 0x151515), P_('box', 0.12, 0.09, 0.02, 0, 0.72, -0.055, 0xff5a1a)])), matV, posts, null,
     (p, o) => { worldPos(p.s, p.d, -0.03, o.position); o.rotation.set(0, trackAt(p.s).h, 0); o.scale.setScalar(1); }, false);
   // street lamps
   if (T.lamps.length) {
     const lampAt = (l, o, dIn, y) => { worldPos(l.s, l.d - Math.sign(l.d) * dIn, y, o.position); o.rotation.set(0, trackAt(l.s).h, 0); o.scale.setScalar(1); };
-    mkInst(cached('g_lpole', () => new THREE.CylinderGeometry(0.07, 0.1, 6.5, 6).translate(0, 3.25, 0)), matPole, T.lamps, null, (l, o) => lampAt(l, o, 0, 0.15));
-    mkInst(cached('g_larm', () => new THREE.BoxGeometry(1.6, 0.08, 0.08).translate(0, 6.42, 0)), matPole, T.lamps, null, (l, o) => lampAt(l, o, 0.75, 0.15), false);
-    mkInst(cached('g_lhead', () => new THREE.BoxGeometry(0.7, 0.1, 0.32).translate(0, 6.34, 0)), matLampHead, T.lamps, null, (l, o) => lampAt(l, o, 1.35, 0.15), false);
-    if (SKIES[st.sky].lamps) mkInst(geoPlane, matPool, T.lamps, null, (l, o) => { lampAt(l, o, 2.6, 0.2); o.scale.set(13, 1, 13); }, false);
+    T.lampIM = [];
+    T.lampIM.push(mkInst(cached('g_lpole', () => new THREE.CylinderGeometry(0.07, 0.1, 6.5, 6).translate(0, 3.25, 0)), matPole, T.lamps, null, (l, o) => lampAt(l, o, 0, 0.15)));
+    T.lampIM.push(mkInst(cached('g_larm', () => new THREE.BoxGeometry(1.6, 0.08, 0.08).translate(0, 6.42, 0)), matPole, T.lamps, null, (l, o) => lampAt(l, o, 0.75, 0.15), false));
+    T.lampIM.push(mkInst(cached('g_lhead', () => new THREE.BoxGeometry(0.7, 0.1, 0.32).translate(0, 6.34, 0)), matLampHead, T.lamps, null, (l, o) => lampAt(l, o, 1.35, 0.15), false));
+    if (SKIES[st.sky].lamps) T.lampIM.push(mkInst(geoPlane, matPool, T.lamps, null, (l, o) => { lampAt(l, o, 2.6, 0.2); o.scale.set(13, 1, 13); }, false));
   }
+  // the pole register: everything a car can hit
+  T.falls = [];
+  T.poles = posts.map((p, i) => ({ s: p.s, d: p.d, r: 0.1, big: false, kind: 'post', i, up: true }));
+  T.lamps.forEach((l, i) => T.poles.push({ s: l.s, d: l.d, r: 0.16, big: true, kind: 'lamp', i, up: true }));
   // traffic lights
   for (const I of T.inters) {
     I.objs = [];
@@ -965,8 +969,10 @@ function buildTrackMeshes(st) {
       });
       worldPos(I.s - dir * 12.6, 0, 0.15, gr.position); gr.rotation.y = trackAt(I.s).h + (dir < 0 ? Math.PI : 0);
       grp.add(gr); I.objs.push(lamps);
+      T.poles.push({ s: I.s - dir * 12.6, d: dir * 8.2, r: 0.18, big: true, kind: 'tl', obj: gr, up: true });
     }
   }
+  T.poles.sort((a, b) => a.s - b.s);
   // start & finish gantries
   for (const [L, txt, bg] of [[64, 'START', '#d8261c'], [T.len, 'FINISH', '#1f4ea8']]) {
     const gr = new THREE.Group();
@@ -1401,6 +1407,70 @@ function updatePolice(e, dt) {
   e.braking = target < e.vs - 2;
 }
 
+/* ---------- poles: solid street furniture ---------- */
+// Small marker posts get knocked flying like pedestrians. Lamp posts and traffic lights are heavy:
+// they hurt the car and stop it hard, then topple over.
+const _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _pm = new THREE.Matrix4(), ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+function poleIndex(s) { let lo = 0, hi = T.poles.length; while (lo < hi) { const m = (lo + hi) >> 1; if (T.poles[m].s < s) lo = m + 1; else hi = m; } return lo; }
+function worldVel(e, out) {   // the entity's velocity as a world-space vector
+  const h = trackAt(e.s, tr1).h; _fw.set(Math.sin(h), 0, Math.cos(h)); _rt.set(-Math.cos(h), 0, Math.sin(h));
+  return out.copy(_fw).multiplyScalar(e.vs).addScaledVector(_rt, e.vd);
+}
+function hideInst(im, i) { if (im) { im.setMatrixAt(i, ZERO_M); im.instanceMatrix.needsUpdate = true; } }
+function pokePoles(e) {
+  if (!T.poles || e.y > 1.2) return;
+  const sp = e === player ? player.v : Math.hypot(e.vs, e.vd);
+  for (let i = poleIndex(e.s - e.hs - 0.4); i < T.poles.length; i++) {
+    const P = T.poles[i]; if (P.s > e.s + e.hs + 0.4) break;
+    if (!P.up || Math.abs(P.d - e.d) > e.hd + P.r || Math.abs(P.s - e.s) > e.hs + P.r) continue;
+    if (!P.big) { if (sp > 1) knockPost(P, e, sp); continue; }
+    if (sp > 4) topplePole(P, e, sp);
+    else { e.s = P.s - Math.sign(P.s - e.s || 1) * (e.hs + P.r); e.vs = 0; if (e === player) player.v *= 0.3; }   // crawled into it: it holds
+  }
+}
+function knockPost(P, e, sp) {
+  P.up = false; hideInst(T.postIM, P.i);
+  const m = new THREE.Mesh(T.postIM.geometry, matV); m.castShadow = true;
+  worldPos(P.s, P.d, 0, m.position); m.rotation.y = trackAt(P.s, tr1).h; scene.add(m);
+  worldVel(e, _v1).multiplyScalar(0.75); const side = Math.sign(P.d - e.d) || 1;
+  _v1.addScaledVector(_rt, side * R(2, 4));
+  debris.push({ m, vx: _v1.x, vy: 3 + sp * 0.12, vz: _v1.z, rx: R(-9, 9), rz: R(-9, 9), life: 12, s: P.s });
+  e.vs *= 0.97;
+  if (e === player) { player.v *= 0.97; sfxTone(180, 0.08, 'triangle', 0.12, 90); sparks(P.s, P.d, 0.6, 4); vibrate(10); }
+}
+function topplePole(P, e, sp) {
+  P.up = false;
+  const me = e === player;
+  damage(e, 6 + sp * 0.55, null);
+  e.vs *= 0.5; e.vd *= 0.5;
+  if (me) { player.v *= 0.5; game.shake = Math.min(2, game.shake + 0.9); SFX.crash(clamp(sp / 30, 0.3, 1)); msg(P.kind === 'tl' ? 'TRAFFIC LIGHT DOWN!' : 'LAMP POST DOWN!', 'hot'); }
+  else if (Math.abs(P.s - player.s) < 120) SFX.crash(0.3);
+  if (e.inv > 0) e.spin += (Math.sign(P.d - e.d) || 1) * R(0.3, 0.8) * (me ? 1 : 0);
+  sparks(P.s, P.d, 1.2, 18);
+  // pivot at the base, everything above it falls in the direction the car was going
+  const pivot = new THREE.Object3D(); worldPos(P.s, P.d, 0.15, pivot.position); T.group.add(pivot); pivot.updateMatrixWorld();
+  if (P.kind === 'tl') { P.obj.updateMatrixWorld(); pivot.attach(P.obj); }
+  else for (const im of T.lampIM) {
+    if (!im) continue;
+    if (im.material === matPool) { hideInst(im, P.i); continue; }
+    im.getMatrixAt(P.i, _pm); const m = new THREE.Mesh(im.geometry, im.material); m.applyMatrix4(_pm); m.castShadow = true;
+    T.group.add(m); m.updateMatrixWorld(); pivot.attach(m); hideInst(im, P.i);
+  }
+  worldVel(e, _v1); _v1.y = 0; if (_v1.lengthSq() < 0.01) _v1.set(1, 0, 0); _v1.normalize();
+  T.falls.push({ pivot, axis: new THREE.Vector3(0, 1, 0).cross(_v1).normalize(), ang: 0.05, w: 0.6 + sp * 0.03, s: P.s, d: P.d, done: false });
+}
+function updateFalls(dt) {
+  for (const F of T.falls) {
+    if (F.done) continue;
+    F.w += (3 + 9 * Math.sin(F.ang)) * dt; F.ang += F.w * dt;
+    if (F.ang >= Math.PI / 2 - 0.04) {
+      F.ang = Math.PI / 2 - 0.04; if (F.w > 1.5) F.w = -F.w * 0.18; else F.done = true;
+      if (Math.abs(F.s - player.s) < 80) { sfxNoise(0.25, 260, 0.35, 'lowpass'); sparks(F.s, F.d, 0.2, 6); }
+    }
+    F.pivot.quaternion.setFromAxisAngle(F.axis, F.ang);
+  }
+}
+
 /* ---------- static features ---------- */
 function activateFeatures() {
   const ahead = player.s + 560;
@@ -1732,7 +1802,11 @@ function verticalStep(e, dt) {
     e.vy = offEnd ? (sp * 0.17 + 1.5) * (1 - 0.45 * f) : 0.5;
     e.rollV = side * (offEnd ? sp * 0.07 * f : 1.0 + e.y * 2);    // one side launched harder than the other -> rotation
     if (side && e.inv > 0) { e.spin += side * R(0.2, 0.6); if (e !== player) e.knock = Math.max(e.knock, 0.6); }
-    if (e === player && offEnd) { if (f < 0.3) { msg('AIR! +200', 'blue'); addScore(200); } else { msg('EDGE JUMP!', 'gold'); addScore(100); } }
+    if (e === player && offEnd) {
+      player.jumpBoost = 2.8; player.v = Math.min(60, player.v + 6 * (1 - 0.5 * f));   // launch boost, carried on landing
+      sfxNoise(0.6, 500, 0.22, 'bandpass', 2600);
+      if (f < 0.3) { msg('JUMP BOOST! +200', 'blue'); addScore(200); } else { msg('EDGE JUMP! BOOST', 'gold'); addScore(100); }
+    }
   }
   if (e.rolling) { rollStep(e, dt); return; }
   if (e.y > 0 || e.vy > 0) {
@@ -1788,6 +1862,7 @@ function updatePlayer(p, dt, inp) {
   const off = Math.abs(p.d) > RW + 0.2;
   let vmax = 46 * (0.78 + 0.22 * Math.max(0, p.hp) / p.maxhp);
   if (off) vmax *= tr.town ? 0.82 : 0.62;
+  if (p.jumpBoost > 0) { p.jumpBoost -= dt; if (!air) vmax = Math.max(vmax, 55); }
   if (p.turbo > 0) vmax = 58;
   if (game.state === 'countdown' || game.state === 'menu') vmax = 0;
   if (game.state === 'finished') vmax = 24;
@@ -1796,7 +1871,7 @@ function updatePlayer(p, dt, inp) {
   const vt = vmax * (1 - 0.05 * Math.abs(p.steer));
   if (!air) {
     if (inp.brake && racing) p.v = Math.max(0, p.v - 21 * dt);                // foot brake: strong, keeps grip
-    else if (p.v < vt) p.v += (p.turbo > 0 ? 24 : 7 + 8 * (1 - p.v / 46)) * dt;
+    else if (p.v < vt) p.v += (p.turbo > 0 || p.jumpBoost > 0 ? 24 : 7 + 8 * (1 - p.v / 46)) * dt;
     else p.v -= Math.min(p.v - vt, (off ? 22 : p.alive ? 7 : 12) * dt);
     if (inp.hand && racing) p.v = Math.max(0, p.v - 12 * dt);
   }
@@ -2179,7 +2254,7 @@ function vehicleFx(dt) {
   if (p.drift > 0.12 && p.y < 0.1) for (const sd of [-0.8, 0.8]) puff(SMK, p.s + back, p.d + sd, 0.25, 1, COL.tyre0, COL.tyre1, 1.0, 1.1, 0.6, clamp(p.drift * 1.6, 0.2, 0.7), 0.8);
   if (Math.abs(p.d) > RW + 0.2 && p.v > 8 && !trackAt(p.s, tr1).town && p.y < 0.1) puff(SMK, p.s + back, p.d, 0.3, 2, COL.dust0, COL.dust1, 1.4, 1.2, 1, 0.55, 1.2);
   for (const e of ents) { if (e === p) continue; if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) nosTrail(e, e.ang, false); else if (e.trail) e.trail = null; }
-  if (p.turbo > 0) nosTrail(p, p.yaw, true); else p.trail = null;
+  if (p.turbo > 0 || p.jumpBoost > 0 && p.y < 0.2) nosTrail(p, p.yaw, p.turbo > 0); else p.trail = null;
 }
 
 // NOS: two fat blue contrails from the twin exhausts. Particles are laid along the path travelled
@@ -2277,8 +2352,6 @@ function loadStage(idx, forMenu = false) {
     show('hud'); $('pauseBtn').classList.remove('hidden'); $('camBtn').classList.remove('hidden'); hide('menu'); hide('result'); hide('pause');
     for (const id of ['padL', 'padR', 'padB', 'padN']) $(id).classList.toggle('hidden', !isTouch); $('keysHint').classList.toggle('hidden', isTouch);
     player.gear = 1; player.rpm = 900; player.shiftT = 0; hud.lastNos = -1; game.nosHeld = false;
-    const first = !store.get('seenTip', false);
-    if (first || idx === 0) { const tip = $('tip'); tip.innerHTML = !isTouch ? '<b>ARROWS</b> STEER &nbsp; <b>DOWN</b> BRAKE &nbsp; <b>UP/SHIFT</b> NOS<br>2 NOS TO START - GRAB MORE ON THE ROAD!' : '<b>ARROWS</b> ON THE LEFT STEER<br><b>BRAKE</b> + <b>NOS</b> ON THE RIGHT - 2 NOS TO START!'; tip.classList.remove('hidden'); store.set('seenTip', true); }
     try { history.pushState({ rh: 1 }, ''); } catch {}
     requestWake();
   } else game.state = 'menu';
@@ -2504,11 +2577,14 @@ function step(dt, inp) {
     integratePlayer(player, h);
     verticalStep(player, h);
     collisions();
+    for (const e of ents) if (!e.dead && e.vehicle && e !== player && Math.abs(e.s - player.s) < 300) pokePoles(e);
+    if (player.alive) { pokePoles(player); }
     syncPlayerFromVel(player);
   }
   nearMisses();
   updateWorld(dt);
   updatePoliceWorld(dt); game.prevS = player.s;
+  updateFalls(dt);
   // finish / despawn
   if (game.state === 'race' && player.s >= T.len) {
     game.place = computePlace(); player.finished = true; game.finishTime = game.raceT; game.state = 'finished'; game.endT = 2.4;
