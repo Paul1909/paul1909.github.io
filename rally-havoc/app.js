@@ -2363,6 +2363,11 @@ function vehicleFx(dt) {
       if (Math.random() < 0.6) puff(SMK, e.s, e.d, 1.5 + e.y, 1, COL.smokeB0, COL.smokeB1, 2.2, 3, 2.5, 0.6);
       continue;
     }
+    if (e.burnT > 0) {   // flames licking over the bonnet + black smoke
+      e.burnT -= step; worldPos(e.s + (e.kind === 'cross' ? 0 : Math.cos(e.ang) * e.hs * 0.5), e.d, 1.0 + e.y, _w);
+      for (let i = 0; i < 4; i++) emit(FX, _w.x + R(-0.7, 0.7), _w.y + R(-0.2, 0.2), _w.z + R(-0.7, 0.7), R(-0.4, 0.4), R(2.5, 4.5), R(-0.4, 0.4), R(0.3, 0.55), 1.1, 0.4, -1, COL.fire0, COL.fire1, 0.95, 1);
+      if (Math.random() < 0.7) puff(SMK, e.s, e.d, 1.6 + e.y, 1, COL.smokeB0, COL.smokeB1, 1.6, 1.8, 2.2, 0.7, 0.6);
+    }
     if (frac < 0.6 && Math.random() < (0.9 - frac)) puff(SMK, e.s + front, e.d + side, 1.0 + e.y, 1, frac < 0.3 ? COL.smokeB0 : COL.smokeG0, frac < 0.3 ? COL.smokeB1 : COL.smokeG1, 1.0, 1.4, 1.5, 0.55, 0.6);
     if (frac < 0.3 && Math.random() < 0.5) { worldPos(e.s + front, e.d + side, 1.0 + e.y, _w); emit(FX, _w.x, _w.y, _w.z, R(-0.4, 0.4), R(1, 2.5), R(-0.4, 0.4), 0.4, 0.8, 0.3, -1, COL.fire0, COL.fire1, 0.9, 1); }
   }
@@ -2371,14 +2376,32 @@ function vehicleFx(dt) {
   const back = -1.9;
   if (p.drift > 0.12 && p.y < 0.1) for (const sd of [-0.8, 0.8]) puff(SMK, p.s + back, p.d + sd, 0.25, 1, COL.tyre0, COL.tyre1, 1.0, 1.1, 0.6, clamp(p.drift * 1.6, 0.2, 0.7), 0.8);
   if (Math.abs(p.d) > RW + 0.2 && p.v > 8 && !trackAt(p.s, tr1).town && p.y < 0.1) puff(SMK, p.s + back, p.d, 0.3, 2, COL.dust0, COL.dust1, 1.4, 1.2, 1, 0.55, 1.2);
-  for (const e of ents) { if (e === p) continue; if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) nosTrail(e, e.ang, false); else if (e.trail) e.trail = null; }
-  if (p.turbo > 0 || p.jumpBoost > 0 && p.y < 0.2) nosTrail(p, p.yaw, p.turbo > 0); else p.trail = null;
+  for (const e of ents) { if (e === p) continue; if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) nosTrail(e, e.ang, false, step, true); else if (e.trail) e.trail = null; }
+  if (p.turbo > 0 || p.jumpBoost > 0 && p.y < 0.2) nosTrail(p, p.yaw, p.turbo > 0, step, p.turbo > 0); else p.trail = null;
 }
 
 // NOS: two fat blue contrails from the twin exhausts. Particles are laid along the path travelled
 // since the last tick, so the trails stay continuous at 200 km/h, and they hang in the air behind the car.
-const _t0 = new THREE.Vector3(), _t1 = new THREE.Vector3(), NOS0 = [0.15, 0.45, 1], NOS1 = [0.02, 0.12, 0.85];
-function nosTrail(e, yaw, big) {
+const _t0 = new THREE.Vector3(), _t1 = new THREE.Vector3(), NOS0 = [0.15, 0.45, 1], NOS1 = [0.02, 0.12, 0.85], FLAME0 = [0.45, 0.7, 1];
+// NOS flames scorch whatever sits behind the exhausts: cars catch fire and can blow up, red barrels go off.
+function nosBurn(src, dt) {
+  const mine = src === player, reach = 9;
+  for (const e of ents) {
+    if (e === src || e.dead) continue;
+    const gap = (src.s - src.hs) - (e.s + (e.hs || 0.5));        // distance from the exhausts to the front of the target
+    if (gap < -1.2 || gap > reach || Math.abs(e.d - src.d) > (e.hd || 0.5) + 0.9 || Math.abs(e.y - src.y) > 2) continue;
+    const f = 1 - Math.max(0, gap) / reach;
+    if (e.vehicle && e.alive) {
+      damage(e, (18 + 46 * f) * dt, mine ? player : null);
+      if (!e.burnT || e.burnT <= 0) {
+        if (mine) msg(e.kind === 'police' ? 'COPS ON FIRE!' : e.kind === 'rival' ? e.name.toUpperCase() + ' TOASTED!' : 'SCORCHED!', 'gold');
+        else if (e === player) msg('NOS BURN!', 'hot');
+      }
+      e.burnT = 0.5;
+    } else if (e.kind === 'prop' && e.explosive && e.alive && f > 0.3) { e.lastByPlayer = mine ? game.t : -99; e.alive = false; explodeBarrel(e); }
+  }
+}
+function nosTrail(e, yaw, big, step = 1 / 30, flame = false) {
   const c = Math.cos(yaw), sn = Math.sin(yaw), z = -2.15, now = [];
   for (const x of [-0.5, 0.5]) worldPos(e.s + z * c + x * sn, e.d + z * sn - x * c, 0.3 + e.y, _t0), now.push(_t0.clone());
   const prev = e.trail; e.trail = now;
@@ -2386,6 +2409,14 @@ function nosTrail(e, yaw, big) {
   const n = big ? 9 : 5;
   for (let k = 0; k < 2; k++) {
     if (prev[k].distanceToSquared(now[k]) > 64) continue;
+    if (flame) {   // the flame jet itself: shoots ~3-4 m out of each exhaust
+      _v1.subVectors(now[k], prev[k]); const sp = _v1.length() / step; _v1.normalize();
+      for (let i = 0; i < (big ? 4 : 3); i++) {
+        const j = R(18, 26), u = R(0, 1);
+        emit(FX, now[k].x - _v1.x * u * 0.3, now[k].y, now[k].z - _v1.z * u * 0.3, _v1.x * (sp - j) + R(-0.6, 0.6), R(-0.2, 0.5), _v1.z * (sp - j) + R(-0.6, 0.6),
+          R(0.1, 0.17), big ? 0.75 : 0.55, big ? 1.5 : 1.1, 0, COL.fire0, [1, 0.35, 0.04], 0.9, 0);
+      }
+    }
     for (let i = 0; i < n; i++) {
       _t1.copy(prev[k]).lerp(now[k], i / n);
       emit(FX, _t1.x, _t1.y, _t1.z, R(-0.12, 0.12), R(0.05, 0.3), R(-0.12, 0.12), R(0.5, 0.75), big ? 0.6 : 0.45, big ? 1.25 : 0.9, -0.3, NOS0, NOS1, 0.8, 0.4);
@@ -2726,6 +2757,7 @@ function step(dt, inp) {
   updateWorld(dt);
   updatePoliceWorld(dt); game.prevS = player.s;
   updateFalls(dt);
+  if (game.state === 'race' || game.state === 'finished') { if (player.alive && player.turbo > 0) nosBurn(player, dt); for (const e of ents) if (!e.dead && e.alive && e.boostT > 0) nosBurn(e, dt); }
   // finish / despawn
   if (game.state === 'race' && player.s >= T.len) {
     game.place = computePlace(); player.finished = true; game.finishTime = game.raceT; game.state = 'finished'; game.endT = 2.4;
@@ -2806,4 +2838,4 @@ applyQuality(settings.gfx === 'low' ? 0 : 3);
 loadStage(0, true);
 renderMenu();
 requestAnimationFrame(t => { last = t; frame(t); });
-window.__rh = { policeMesh, input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
+window.__rh = { spawnCop, policeMesh, input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
