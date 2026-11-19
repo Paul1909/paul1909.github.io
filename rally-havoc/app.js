@@ -2089,7 +2089,7 @@ function updateRival(r, dt) {
   let target = racing ? r.base * (0.8 + 0.2 * r.hp / r.maxhp) : 0;
   // rivals fire their NOS on a clear straight, mostly when the player is close or late in the stage
   if (r.boostT > 0) r.boostT -= dt;
-  else if (r.nos > 0 && game.state === 'race' && game.raceT > 6 && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
+  else if (r.nos > 0 && game.state === 'race' && game.raceT > NOS_LOCK && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
     ((Math.abs(player.s - r.s) < 60 && Math.random() < dt * 0.6) || (r.s > T.len * 0.7 && Math.random() < dt * 0.3))) {
     r.nos--; r.boostT = 3.5; if (Math.abs(r.s - player.s) < 90) msg(r.name.toUpperCase() + ' NOS!', 'hot');
   }
@@ -2475,11 +2475,13 @@ function updateHud(dt, inp) {
   const hpF = Math.max(0, player.hp) / 100;
   hud.hp.style.width = ((1 - hpF) * 100) + '%';    // DAMAGE fills up as the car gets hurt
   hud.hp.style.background = hpF > 0.6 ? 'linear-gradient(180deg,#a6ff8a,#20c040)' : hpF > 0.3 ? 'linear-gradient(180deg,#fff3a0,#ffb000)' : 'linear-gradient(180deg,#ffb0a0,#e01800)';
-  const nk = player.nos + (player.turbo > 0 ? 100 : 0);
+  const lock = game.state === 'race' || game.state === 'countdown' ? Math.ceil(NOS_LOCK - game.raceT) : 0;
+  const nk = player.nos + (player.turbo > 0 ? 100 : 0) + (lock > 0 ? 1000 * lock : 0);
   if (nk !== hud.lastNos) {
     hud.lastNos = nk; const n = player.nos;
     hud.nos.innerHTML = n === 0 ? '<span class="none">EMPTY</span>' : n <= 6 ? '<i></i>'.repeat(n) : '<i></i><b>×' + n + '</b>';
-    hud.padNc.textContent = '×' + n; hud.padN.classList.toggle('empty', n === 0);
+    hud.padNc.textContent = lock > 0 ? lock + 'S' : '×' + n; hud.padN.classList.toggle('empty', n === 0 || lock > 0);
+    hud.nos.classList.toggle('locked', lock > 0);
   }
   hud.nos.classList.toggle('burn', player.turbo > 0); hud.padN.classList.toggle('burn', player.turbo > 0);
   hud.bar.style.width = clamp(player.s / T.len, 0, 1) * 100 + '%';
@@ -2804,8 +2806,10 @@ function pickupAhead(e, L, want) {
   for (const z of ents) if (!z.dead && (z.zone === 'turbo' || (z.zone === 'wrench' && want)) && Math.abs(z.d - L) < 1.2 && z.s - e.s > 12 && z.s - e.s < 90) return 1;
   return 0;
 }
+const NOS_LOCK = 6;   // nobody can fire NOS in the first seconds after GO
 function useNos() {
   if (game.state !== 'race' || !player.alive || player.turbo > 0) return;
+  if (game.raceT < NOS_LOCK) { msg('NOS READY IN ' + Math.ceil(NOS_LOCK - game.raceT) + 'S', 'hot'); return; }
   if (player.nos <= 0) { msg('NO NOS LEFT', 'hot'); return; }
   player.nos--; player.turbo = 3.5; msg('NOS!', 'blue'); SFX.turbo(); vibrate(30);
 }
