@@ -1430,12 +1430,12 @@ function spawnRallyCars(colorIdx) {
   RIVALS.forEach((r, i) => {
     const st = T.stage;
     const rm = modelIdx(r.model), RM = CAR_MODELS[rm], rg = rallyGeo(rm, r.col, r.acc).dims;
-    addEnt('rival', { name: r.name, s: grid[i][0], d: grid[i][1], hs: rg.L / 2 + 0.05, hd: rg.hw + 0.04, mass: RM.st.mass, hp: 100 * RM.st.arm, maxhp: 100 * RM.st.arm, vehicle: true,
+    addEnt('rival', { h: RM.id === 'duna' ? 2.0 : 1.5, name: r.name, s: grid[i][0], d: grid[i][1], hs: rg.L / 2 + 0.05, hd: rg.hw + 0.04, mass: RM.st.mass, hp: 100 * RM.st.arm, maxhp: 100 * RM.st.arm, vehicle: true,
       mesh: rallyMesh(rm, r.col, r.acc, i + 2), colorCss: '#' + new THREE.Color(r.col).getHexString(), noPool: true,
       base: st.rival * r.skill, nos: 0, boostT: 0, aggr: r.aggr, look: 55 + r.skill * 30, think: Math.random() * 0.3, targetD: grid[i][1], ramT: 0, finished: false });
   });
   const pm = settings.model, PM = CAR_MODELS[pm], pg = rallyGeo(pm, pc.col, pc.acc).dims;
-  player = addEnt('player', { M: PM.st, s: grid[5][0], d: grid[5][1], hs: pg.L / 2 + 0.05, hd: pg.hw + 0.04, mass: PM.st.mass, hp: 100, maxhp: 100, vehicle: true,
+  player = addEnt('player', { h: PM.id === 'duna' ? 2.0 : 1.5, M: PM.st, s: grid[5][0], d: grid[5][1], hs: pg.L / 2 + 0.05, hd: pg.hw + 0.04, mass: PM.st.mass, hp: 100, maxhp: 100, vehicle: true,
     mesh: rallyMesh(pm, pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, nos: 0, oil: 0, onRamp: false, drift: 0, finished: false });
   player.mesh.add(headSpot, headSpot.target);
 }
@@ -1551,11 +1551,11 @@ function worldVel(e, out) {   // the entity's velocity as a world-space vector
 }
 function hideInst(im, i) { if (im) { im.setMatrixAt(i, ZERO_M); im.instanceMatrix.needsUpdate = true; } }
 function pokePoles(e) {
-  if (!T.poles || e.y > 1.2) return;
+  if (!T.poles) return;
   const sp = e === player ? player.v : Math.hypot(e.vs, e.vd);
   for (let i = poleIndex(e.s - e.hs - 0.4); i < T.poles.length; i++) {
     const P = T.poles[i]; if (P.s > e.s + e.hs + 0.4) break;
-    if (!P.up || Math.abs(P.d - e.d) > e.hd + P.r || Math.abs(P.s - e.s) > e.hs + P.r) continue;
+    if (!P.up || e.y + CLEAR > (P.big ? (P.kind === 'tl' ? 5.6 : 6.5) : 0.95) || Math.abs(P.d - e.d) > e.hd + P.r || Math.abs(P.s - e.s) > e.hs + P.r) continue;
     if (!P.big) { if (sp > 1) knockPost(P, e, sp); continue; }
     if (sp > 4) topplePole(P, e, sp);
     else { e.s = P.s - Math.sign(P.s - e.s || 1) * (e.hs + P.r); e.vs = 0; if (e === player) player.v *= 0.3; }   // crawled into it: it holds
@@ -1829,11 +1829,15 @@ function flingPed(ped, by, force) {
 
 /* ============================== collisions ============================== */
 let sorted = [];
+// heights (m) for vertical overlap: a car in the air only hits what is actually tall enough to reach it
+const CLEAR = 0.28;   // ground clearance: the body starts this far above the wheels' contact point
+const H_SUB = { sedan: 1.47, taxi: 1.6, hatch: 1.5, van: 2.1, bus: 3.1, police: 1.65, cone: 0.75, barrelR: 0.95, barrelB: 0.95, hay: 1.25, rock: 1.1, barrier: 1.05, triangle: 0.45 };
+const hOf = e => e.h || H_SUB[e.sub] || (e.kind === 'ped' ? 1.9 : 1.5);
 function collide(a, b) {
   const dsv = b.s - a.s, ddv = b.d - a.d;
   const os = a.hs + b.hs - Math.abs(dsv); if (os <= 0) return;
   const od = a.hd + b.hd - Math.abs(ddv); if (od <= 0) return;
-  if (Math.abs(a.y - b.y) > 1.5) return;
+  if (a.y + CLEAR > b.y + hOf(b) || b.y + CLEAR > a.y + hOf(a)) return;   // one passes over the other
   if (a.kind === 'ped' || b.kind === 'ped') {
     const ped = a.kind === 'ped' ? a : b, o = ped === a ? b : a;
     if (o.vehicle && Math.hypot(o.vs, o.vd) > 2) flingPed(ped, o, Math.hypot(o.vs, o.vd));
@@ -1887,10 +1891,17 @@ function collisions() {
     }
   }
 }
+// can this car touch that zone from the height it's at? (ramps handle their own height)
+function zoneReach(e, z) {
+  if (z.zone === 'ramp') return true;
+  if (z.zone === 'oil') return e.y < 0.25;
+  return e.y + CLEAR < (z.y || 0) + 0.85;   // pickups float at ~1.1 m: fly over them and you miss them
+}
 function zones(e) {
   // non-solid props: ramps, oil, pickups (rally cars only)
   for (const z of ents) {
     if (z.dead || !z.zone || Math.abs(z.s - e.s) > z.hs + 2) continue;
+    if (!zoneReach(e, z)) continue;
     if (Math.abs(z.d - e.d) > z.hd + (z.zone === 'ramp' ? TRACK : e.hd)) continue;
     if (z.zone === 'ramp') rampTouch(e, z);
     else if (z.zone === 'oil') {
@@ -2634,7 +2645,7 @@ function renderModel() {
 function swapPlayerColor() {
   if (!player) return;
   const pc = PLAYER_COLORS[settings.color]; scene.remove(player.mesh); player.mesh = rallyMesh(settings.model, pc.col, pc.acc, 1); player.mesh.add(headSpot, headSpot.target); scene.add(player.mesh);
-  const PM = CAR_MODELS[settings.model], D = player.mesh.userData.dims; Object.assign(player, { M: PM.st, hs: D.L / 2 + 0.05, hd: D.hw + 0.04, mass: PM.st.mass, inv: 1 / PM.st.mass });
+  const PM = CAR_MODELS[settings.model], D = player.mesh.userData.dims; Object.assign(player, { h: PM.id === 'duna' ? 2.0 : 1.5, M: PM.st, hs: D.L / 2 + 0.05, hd: D.hw + 0.04, mass: PM.st.mass, inv: 1 / PM.st.mass });
 }
 const ROAD_OPTS = [['traffic', 'TRAFFIC'], ['police', 'POLICE'], ['obstacles', 'OBSTACLES'], ['peds', 'PEOPLE']];
 const OPT = {
@@ -2824,6 +2835,7 @@ function zonesRival(e) {
   }
 }
 function zonesOne(e, z) {
+  if (!zoneReach(e, z)) return;
   if (Math.abs(z.d - e.d) > z.hd + (z.zone === 'ramp' ? TRACK : e.hd)) return;
   if (z.zone === 'ramp') rampTouch(e, z);
   else if (z.zone === 'oil' && e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
@@ -2881,4 +2893,4 @@ applyQuality(settings.gfx === 'low' ? 0 : 3);
 loadStage(0, true);
 renderMenu();
 requestAnimationFrame(t => { last = t; frame(t); });
-window.__rh = { AU, audioInit, audioReset() { AU.ctx = null; }, spawnCop, policeMesh, input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
+window.__rh = { makeFeature, spawnTrafficAt(s, d, type = 'sedan') { const c = 0xff2a1a; return addEnt('traffic', { sub: type, s, d, dir: 1, hs: type === 'bus' ? 5.6 : 2.2, hd: type === 'bus' ? 1.25 : 0.9, mass: type === 'bus' ? 6 : 1.2, hp: 60, maxhp: 60, vehicle: true, key: type + c, mesh: getMesh(type + c, () => vehicleMesh(type, c)), tSpeed: 0, parked: true, laneD: d, ang: 0 }); }, AU, audioInit, audioReset() { AU.ctx = null; }, spawnCop, policeMesh, input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
