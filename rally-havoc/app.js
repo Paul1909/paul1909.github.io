@@ -787,7 +787,7 @@ function worldPos(s, d, y, out) {
   return out.set(t.x - c * d, t.y + y, t.z + sn * d);
 }
 const isTownAt = s => T.town[clamp(Math.floor(s / SEG), 0, T.n - 1)] === 1;
-const wallAt = s => isTownAt(s) ? 11.2 : 10.2;
+const wallAt = s => isTownAt(s) ? 11.2 : 18.5;   // outer limit (props); cars use wallCheck, which also knows the guard rails
 
 function buildTrack(st) {
   const rng = mulberry32(st.seed);
@@ -865,7 +865,7 @@ function buildTrack(st) {
   for (let si = 0; si < total; si += 7) {
     if (isTownAt(si)) { if (si % 28 < 7 && !inters.some(I => Math.abs(I.s - si - 3) < 15)) for (const side of [-1, 1]) T.lamps.push({ s: si + 3, d: side * 10.9 }); continue; }
     for (const side of [-1, 1]) {
-      if (rng() < 0.75) T.trees.push({ s: si + rng() * 7, d: side * (12.5 + Math.pow(rng(), 1.6) * 62), sc: 0.7 + rng() * 0.8, round: rng() < 0.4, c: rng() });
+      if (rng() < 0.75) T.trees.push({ s: si + rng() * 7, d: side * (20 + Math.pow(rng(), 1.6) * 56), sc: 0.7 + rng() * 0.8, round: rng() < 0.4, c: rng() });
     }
   }
   // static features: obstacles, pickups, ramps, jaywalkers, breakdowns
@@ -905,11 +905,11 @@ function buildTrack(st) {
   }
   // power-ups come in rows across the road, one identical pickup per lane:
   // every car can grab one, nobody can take them all
-  for (let q = 180; q < st.len - 100; q += 210 + rng() * 140) {
+  for (let q = 300; q < st.len - 100; q += 140 + rng() * 90) {
     if (nearInter(q)) continue;
     for (let k = F.length - 1; k >= 0; k--) if (Math.abs(F[k].s - q) < 12 && F[k].t !== 'jay' && F[k].t !== 'ramp') F.splice(k, 1);
     if (F.some(f => f.t === 'ramp' && Math.abs(f.s - q) < 25)) continue;
-    const t = rng() < 0.6 ? 'turbo' : 'wrench';
+    const t = rng() < 0.75 ? 'turbo' : 'wrench';
     for (const d of LANES) F.push({ t, s: q, d });
   }
   F.sort((a, b) => a.s - b.s); T.feats = F; T.featIdx = 0;
@@ -1414,11 +1414,11 @@ function spawnRallyCars(colorIdx) {
     const rm = modelIdx(r.model), RM = CAR_MODELS[rm], rg = rallyGeo(rm, r.col, r.acc).dims;
     addEnt('rival', { name: r.name, s: grid[i][0], d: grid[i][1], hs: rg.L / 2 + 0.05, hd: rg.hw + 0.04, mass: RM.st.mass, hp: 100 * RM.st.arm, maxhp: 100 * RM.st.arm, vehicle: true,
       mesh: rallyMesh(rm, r.col, r.acc, i + 2), colorCss: '#' + new THREE.Color(r.col).getHexString(), noPool: true,
-      base: st.rival * r.skill, nos: 2, boostT: 0, aggr: r.aggr, look: 55 + r.skill * 30, think: Math.random() * 0.3, targetD: grid[i][1], ramT: 0, finished: false });
+      base: st.rival * r.skill, nos: 0, boostT: 0, aggr: r.aggr, look: 55 + r.skill * 30, think: Math.random() * 0.3, targetD: grid[i][1], ramT: 0, finished: false });
   });
   const pm = settings.model, PM = CAR_MODELS[pm], pg = rallyGeo(pm, pc.col, pc.acc).dims;
   player = addEnt('player', { M: PM.st, s: grid[5][0], d: grid[5][1], hs: pg.L / 2 + 0.05, hd: pg.hw + 0.04, mass: PM.st.mass, hp: 100, maxhp: 100, vehicle: true,
-    mesh: rallyMesh(pm, pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, nos: 2, oil: 0, onRamp: false, drift: 0, finished: false });
+    mesh: rallyMesh(pm, pc.col, pc.acc, 1), noPool: true, v: 0, vh: 0, yaw: 0, steer: 0, turbo: 0, nos: 0, oil: 0, onRamp: false, drift: 0, finished: false });
   player.mesh.add(headSpot, headSpot.target);
 }
 
@@ -1467,7 +1467,7 @@ function updatePoliceWorld(dt) {
   // traffic-rule checks
   if (game.state === 'race' && player.alive) {
     for (const I of T.inters) { const line = I.s - 12.2; if (game.prevS < line && player.s >= line && I.light === 'R') violation('red', 'RAN A RED LIGHT!'); }
-    if (player.d < -0.9 && player.v > 8) { police.wrongT += dt; if (police.wrongT > 4.5) { violation('wrong', 'WRONG WAY!'); police.wrongT = 0; } } else police.wrongT = Math.max(0, police.wrongT - dt * 2);
+    if (player.d < -0.9 && player.d > -RW && player.v > 8) { police.wrongT += dt; if (police.wrongT > 4.5) { violation('wrong', 'WRONG WAY!'); police.wrongT = 0; } } else police.wrongT = Math.max(0, police.wrongT - dt * 2);
   }
   if (police.heat <= 0 || game.state !== 'race') { police.bust = Math.max(0, police.bust - dt); return; }
   const chasers = cops.filter(c => c.alive && !c.block && !c.giveUp);
@@ -1498,7 +1498,7 @@ function updatePolice(e, dt) {
   if (!chasing) target = e.giveUp ? 12 : 0;
   else if (ds > 20) {                                          // catching up: fast, weaving through traffic
     target = Math.min(56, p.v + 14);
-    if (e.boostT > 0) { e.boostT -= dt; target = 66; } else if (e.nos > 0 && ds > 45) { e.nos--; e.boostT = 3; if (ds < 120) msg('POLICE NOS!', 'blue'); }
+    if (e.boostT > 0) { e.boostT -= dt; target = 66; } else if (e.nos > 0 && ds > 45) { e.nos--; e.boostT = 3; }
     if (e.think <= 0) {
       e.think = 0.25; let best = e.targetD, bs = -1e9;
       for (const L of [...LANES, p.d]) { const sc = Math.min(4, blockersAhead(e, L, 60, 1)) - Math.abs(L - p.d) * 0.12 - Math.abs(L - e.d) * 0.05; if (sc > bs) { bs = sc; best = L; } }
@@ -1785,7 +1785,7 @@ function explode(e) {
   if (e === player) { game.state = 'wrecked'; game.endT = 2.6; msg('WRECKED!', 'hot'); vibrate([150, 60, 250]); }
   else if (game.state === 'race' || game.state === 'finished') {
     const mine = game.t - e.lastByPlayer < 4;
-    if (e.kind === 'rival') { msg(e.name.toUpperCase() + (mine ? ' TAKEN OUT!' : ' IS OUT!'), mine ? 'gold' : 'hot'); if (mine) { game.stats.rivals++; addScore(1500); } }
+    if (e.kind === 'rival') { if (mine) { msg(e.name.toUpperCase() + ' TAKEN OUT! +1500', 'gold'); game.stats.rivals++; addScore(1500); } }
     else if (e.kind === 'police') { if (mine) { game.stats.cops++; addScore(1000); msg('POLICE TAKEDOWN +1000', 'gold'); police.spawnT = Math.max(police.spawnT, 8); } }
     else if (mine && e.vehicle) { violation('wreck', 'HIT AND RUN!'); game.stats.cars++; addScore(e.sub === 'bus' ? 800 : 300); msg(e.sub === 'bus' ? 'BUS WRECKED +800' : 'WRECKED +300', 'gold'); }
   }
@@ -1978,6 +1978,7 @@ function updatePlayer(p, dt, inp) {
   const M = p.M || CAR_MODELS[0].st;
   let vmax = 46 * M.spd * (0.78 + 0.22 * Math.max(0, p.hp) / p.maxhp);
   if (off) vmax *= tr.town ? Math.max(0.82, M.off) : M.off;
+  if (!tr.town && Math.abs(p.d) > 10.3) vmax *= 0.72;          // grass: slower still than the gravel shoulder
   if (p.jumpBoost > 0) { p.jumpBoost -= dt; if (!air) vmax = Math.max(vmax, 55); }
   if (p.turbo > 0) vmax = 58;
   if (game.state === 'countdown' || game.state === 'menu') vmax = 0;
@@ -2028,20 +2029,35 @@ function syncPlayerFromVel(p) {
   p.v = Math.hypot(fs, p.vd); p.vh = Math.atan2(p.vd, Math.max(fs, 0.5));
   if (Math.abs(p.vh) > 1.4) p.vh = Math.sign(p.vh) * 1.4;
 }
+const RAIL_D = 10.5, GRASS_MAX = 18.5;
+const railAt = s => !isTownAt(s) && T.rail && T.rail[clamp(Math.floor(s / SEG), 0, T.n - 1)];
 function wallCheck(e) {
-  const W = wallAt(e.s) - e.hd;
-  if (Math.abs(e.d) > W) {
-    const sd = Math.sign(e.d), vdOut = e.vd * sd;
-    e.d = sd * W;
-    if (vdOut > 0) {
-      e.vd = -sd * vdOut * 0.35; e.vs *= 0.94;
-      if (vdOut > 3.5 && e.vehicle) {
-        damage(e, (vdOut - 3) * 0.9, null);
-        sparks(e.s, e.d + sd * e.hd, 0.6, 10);
-        if (e === player) { SFX.crash(clamp(vdOut / 25, 0.1, 0.7)); p_spinWall(e, sd, vdOut); }
-      } else if (e === player && vdOut > 1) { SFX.scrape(); sparks(e.s, e.d + sd * e.hd, 0.6, 3); }
-      if (e === player) e.yaw *= 0.6;
+  // town: buildings. Countryside: open grass out to GRASS_MAX; guard rails are a barrier from both sides.
+  const a = Math.abs(e.d), sd = Math.sign(e.d) || 1;
+  let lim = null, inward = false;
+  if (isTownAt(e.s)) {
+    if (a > 12.2) {   // came in off the grass: slam into the first building
+      if (e.vehicle && e.alive) { const v = e === player ? player.v : Math.abs(e.vs); damage(e, 5 + v * 0.5, null); sparks(e.s, e.d, 0.8, 16); if (e === player) { player.v *= 0.35; SFX.crash(0.7); game.shake += 0.8; } }
+      e.vs *= 0.35; e.d = sd * (11.2 - e.hd); e.vd = 0; return;
     }
+    if (a > 11.2 - e.hd) lim = 11.2 - e.hd;
+  }
+  else if (railAt(e.s)) {
+    if (a <= RAIL_D) { if (a > RAIL_D - 0.3 - e.hd) lim = RAIL_D - 0.3 - e.hd; }        // road side of the rail
+    else if (a < RAIL_D + 0.3 + e.hd) { lim = RAIL_D + 0.3 + e.hd; inward = true; }      // grass side of the rail
+    else if (a > GRASS_MAX - e.hd) lim = GRASS_MAX - e.hd;
+  } else if (a > GRASS_MAX - e.hd) lim = GRASS_MAX - e.hd;
+  if (lim === null) return;
+  const dir = inward ? -sd : sd, vdOut = e.vd * dir;      // dir: the way the barrier pushes back against
+  e.d = sd * lim;
+  if (vdOut > 0) {
+    e.vd = -dir * vdOut * 0.35; e.vs *= 0.94;
+    if (vdOut > 3.5 && e.vehicle) {
+      damage(e, (vdOut - 3) * 0.9, null);
+      sparks(e.s, e.d + dir * e.hd, 0.6, 10);
+      if (e === player) { SFX.crash(clamp(vdOut / 25, 0.1, 0.7)); p_spinWall(e, dir, vdOut); }
+    } else if (e === player && vdOut > 1) { SFX.scrape(); sparks(e.s, e.d + dir * e.hd, 0.6, 3); }
+    if (e === player) e.yaw *= 0.6;
   }
 }
 function p_spinWall(e, sd, v) { e.spin -= sd * v * 0.04; }
@@ -2089,9 +2105,9 @@ function updateRival(r, dt) {
   let target = racing ? r.base * (0.8 + 0.2 * r.hp / r.maxhp) : 0;
   // rivals fire their NOS on a clear straight, mostly when the player is close or late in the stage
   if (r.boostT > 0) r.boostT -= dt;
-  else if (r.nos > 0 && game.state === 'race' && game.raceT > NOS_LOCK && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
+  else if (r.nos > 0 && game.state === 'race' && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
     ((Math.abs(player.s - r.s) < 60 && Math.random() < dt * 0.6) || (r.s > T.len * 0.7 && Math.random() < dt * 0.3))) {
-    r.nos--; r.boostT = 3.5; if (Math.abs(r.s - player.s) < 90) msg(r.name.toUpperCase() + ' NOS!', 'hot');
+    r.nos--; r.boostT = 3.5;
   }
   if (r.boostT > 0 && racing) target *= 1.3;
   const gap = r.s - player.s;
@@ -2475,7 +2491,7 @@ function updateHud(dt, inp) {
   const hpF = Math.max(0, player.hp) / 100;
   hud.hp.style.width = ((1 - hpF) * 100) + '%';    // DAMAGE fills up as the car gets hurt
   hud.hp.style.background = hpF > 0.6 ? 'linear-gradient(180deg,#a6ff8a,#20c040)' : hpF > 0.3 ? 'linear-gradient(180deg,#fff3a0,#ffb000)' : 'linear-gradient(180deg,#ffb0a0,#e01800)';
-  const lock = game.state === 'race' || game.state === 'countdown' ? Math.ceil(NOS_LOCK - game.raceT) : 0;
+  const lock = 0;
   const nk = player.nos + (player.turbo > 0 ? 100 : 0) + (lock > 0 ? 1000 * lock : 0);
   if (nk !== hud.lastNos) {
     hud.lastNos = nk; const n = player.nos;
@@ -2796,8 +2812,6 @@ function zonesOne(e, z) {
   else if ((z.zone === 'wrench' || z.zone === 'turbo') && (e.kind === 'rival' || e.kind === 'police') && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2) {
     e.rowS = z.s;
     if (z.zone === 'wrench') e.hp = Math.min(e.maxhp, e.hp + 30); else e.nos = (e.nos || 0) + 1;
-    const who = e.kind === 'police' ? 'POLICE' : e.name.toUpperCase();
-    if (Math.abs(z.s - player.s) < 90) msg(who + (z.zone === 'wrench' ? ' REPAIRED' : ' GOT NOS'), 'hot');
     removeEnt(z);
   }
 }
@@ -2806,11 +2820,9 @@ function pickupAhead(e, L, want) {
   for (const z of ents) if (!z.dead && (z.zone === 'turbo' || (z.zone === 'wrench' && want)) && Math.abs(z.d - L) < 1.2 && z.s - e.s > 12 && z.s - e.s < 90) return 1;
   return 0;
 }
-const NOS_LOCK = 6;   // nobody can fire NOS in the first seconds after GO
 function useNos() {
   if (game.state !== 'race' || !player.alive || player.turbo > 0) return;
-  if (game.raceT < NOS_LOCK) { msg('NOS READY IN ' + Math.ceil(NOS_LOCK - game.raceT) + 'S', 'hot'); return; }
-  if (player.nos <= 0) { msg('NO NOS LEFT', 'hot'); return; }
+  if (player.nos <= 0) { msg('NO NOS - GRAB A BOTTLE', 'hot'); return; }
   player.nos--; player.turbo = 3.5; msg('NOS!', 'blue'); SFX.turbo(); vibrate(30);
 }
 const warm = []; for (const c of CAR_COLORS) for (const t of ['sedan', 'hatch', 'van']) warm.push([t, c]); warm.push(['taxi', 0xf4c20d]); for (const c of BUS_COLORS) warm.push(['bus', c]);
