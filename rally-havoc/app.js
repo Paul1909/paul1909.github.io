@@ -772,7 +772,7 @@ const PROPS = {
 const propGeo = t => cached('prop_' + t, PROPS[t]);
 
 /* ============================== track ============================== */
-const SEG = 2, CH = 50, RW = 7;
+const START_S = 104, SEG = 2, CH = 50, RW = 7;
 const LANES = [-5.25, -1.75, 1.75, 5.25];
 const T = { n: 0, len: 0, X: null, Z: null, Y: null, H: null, K: null, town: null, inter: null, rail: null, inters: [], feats: [], buildings: [], trees: [], lamps: [], group: null, stage: null };
 const tr0 = { x: 0, y: 0, z: 0, h: 0, k: 0, slope: 0, town: 0 }, trW = { ...tr0 };
@@ -817,7 +817,7 @@ function buildTrack(st) {
     // town streets bend gently, open road bends hard; straight only at the start, the finish and through crossroads
     const si = i * SEG, townSoon = townA[Math.min(n - 1, i + 25)] || townA[i], km = townSoon ? st.kmax * 0.4 : st.kmax;
     const nearX = inters.some(I => si > I.s - 75 && si < I.s + 25);
-    if (si < 150 || nearX || Math.abs(si - st.len) < 70) target = 0;
+    if (si < 190 || nearX || Math.abs(si - st.len) < 70) target = 0;
     else if (si >= next || Math.abs(target) > km) {
       target = rng() < 0.1 ? 0 : (rng() * 2 - 1) * km;
       if (rng() < 0.45) target = Math.sign(target || 1) * km * (0.75 + rng() * 0.25);
@@ -838,7 +838,7 @@ function buildTrack(st) {
   for (let i = 0; i < n; i++) {
     const si = i * SEG;
     const hill = st.hills * (Math.sin(si * 0.0042 + p1) * 0.45 + Math.sin(si * 0.0105 + p2) * 0.35 + Math.sin(si * 0.024 + p3) * 0.2);
-    Y[i] = hill * cw[i] * smooth(120, 300, si);
+    Y[i] = hill * cw[i] * smooth(160, 340, si);
   }
   // crossroads sit on level ground: blend the road to the crossing's own height around it
   const Y0 = Float32Array.from(Y);
@@ -996,7 +996,7 @@ function buildTrackMeshes(st) {
       for (let d = -6.4; d < 6.4; d += 1.1) { rect(g, I.s - 10.6, I.s - 7.6, d, d + 0.55, 0.02, C.white); rect(g, I.s + 7.6, I.s + 10.6, d, d + 0.55, 0.02, C.white); }
       rect(g, I.s - 12.4, I.s - 11.9, 0, RW, 0.02, C.white); rect(g, I.s + 11.9, I.s + 12.4, -RW, 0, 0.02, C.white);
     }
-    for (const L of [64, T.len]) if (L >= i0 * SEG && L < i1 * SEG) {
+    for (const L of [START_S, T.len]) if (L >= i0 * SEG && L < i1 * SEG) {
       for (let a = 0; a < 2; a++) for (let d = -RW; d < RW - 0.01; d += 1) rect(g, L + a, L + a + 1, d, d + 1, 0.02, ((d + RW + a) | 0) % 2 ? C.finW : C.finB);
     }
     const m = g.mesh(matTrack); if (m) { m.receiveShadow = true; grp.add(m); }
@@ -1086,7 +1086,7 @@ function buildTrackMeshes(st) {
   }
   T.poles.sort((a, b) => a.s - b.s);
   // start & finish gantries
-  for (const [L, txt, bg] of [[64, 'START', '#d8261c'], [T.len, 'FINISH', '#1f4ea8']]) {
+  for (const [L, txt, bg] of [[START_S, 'START', '#d8261c'], [T.len, 'FINISH', '#1f4ea8']]) {
     const gr = new THREE.Group();
     gr.add(new THREE.Mesh(cached('gantry', () => merge([P_('box', 0.5, 6.5, 0.5, -8.3, 3.25, 0, 0xdddddd), P_('box', 0.5, 6.5, 0.5, 8.3, 3.25, 0, 0xdddddd), P_('box', 17, 0.3, 0.6, 0, 6.6, 0, 0x333333)])), matV));
     const ban = new THREE.Mesh(new THREE.PlaneGeometry(16, 2.4), new THREE.MeshBasicMaterial({ map: bannerTex(txt, bg, '#fff'), side: THREE.DoubleSide }));
@@ -1407,7 +1407,8 @@ const game = { state: 'menu', stageIdx: 0, t: 0, raceT: 0, count: 0, endT: 0, sh
 
 function spawnRallyCars(colorIdx) {
   const pc = PLAYER_COLORS[colorIdx] || PLAYER_COLORS[0];
-  const grid = [[58, 1.75], [51, 5.25], [44, 1.75], [37, 5.25], [30, 1.75], [19, 3.5]];
+  // 14 m between rival rows (~10 m bumper to bumper, more than a NOS flame reaches), you 20 m behind the last one
+  const grid = [[98, 1.75], [84, 5.25], [70, 1.75], [56, 5.25], [42, 1.75], [22, 3.5]];
   RIVALS.forEach((r, i) => {
     const st = T.stage;
     const rm = modelIdx(r.model), RM = CAR_MODELS[rm], rg = rallyGeo(rm, r.col, r.acc).dims;
@@ -2088,7 +2089,7 @@ function updateRival(r, dt) {
   let target = racing ? r.base * (0.8 + 0.2 * r.hp / r.maxhp) : 0;
   // rivals fire their NOS on a clear straight, mostly when the player is close or late in the stage
   if (r.boostT > 0) r.boostT -= dt;
-  else if (r.nos > 0 && game.state === 'race' && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
+  else if (r.nos > 0 && game.state === 'race' && game.raceT > 6 && r.ttc > 2.5 && Math.abs(trackAt(r.s + 40, tr1).k) < 0.004 &&
     ((Math.abs(player.s - r.s) < 60 && Math.random() < dt * 0.6) || (r.s > T.len * 0.7 && Math.random() < dt * 0.3))) {
     r.nos--; r.boostT = 3.5; if (Math.abs(r.s - player.s) < 90) msg(r.name.toUpperCase() + ' NOS!', 'hot');
   }
@@ -2482,7 +2483,7 @@ function updateHud(dt, inp) {
   }
   hud.nos.classList.toggle('burn', player.turbo > 0); hud.padN.classList.toggle('burn', player.turbo > 0);
   hud.bar.style.width = clamp(player.s / T.len, 0, 1) * 100 + '%';
-  for (const e of ents) if (e.dot) { e.dot.style.left = clamp((e.s - 44) / (T.len - 44), 0, 1) * 100 + '%'; e.dot.classList.toggle('dead', !e.alive); }
+  for (const e of ents) if (e.dot) { e.dot.style.left = clamp((e.s - 20) / (T.len - 20), 0, 1) * 100 + '%'; e.dot.classList.toggle('dead', !e.alive); }
 }
 
 /* ============================== game flow ============================== */
