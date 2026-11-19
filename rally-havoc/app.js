@@ -31,11 +31,11 @@ const $ = id => document.getElementById(id);
 
 /* ============================== stages ============================== */
 const STAGES = [
-  { name: 'Borgo Verde', dmg: 0.44, sub: 'Village & vineyards · gentle start', len: 3000, seed: 11, tb: 0.45, traffic: 0.648, oncoming: 0.475, bus: 0.12, peds: 0.78, props: 0.65, ramps: 0.9, rival: 41.5, kmax: 0.0082, hills: 7, sky: 'day' },
-  { name: 'Valle Rossa', dmg: 0.546, sub: 'Fast valley roads · jumps', len: 3500, seed: 23, tb: 0.35, traffic: 0.821, oncoming: 0.648, bus: 0.14, peds: 0.91, props: 0.8, ramps: 1.4, rival: 43, kmax: 0.0092, hills: 10, sky: 'sunset' },
-  { name: 'Città Alta', dmg: 0.651, sub: 'Rush hour downtown · buses', len: 3600, seed: 37, tb: 0.75, traffic: 1.166, oncoming: 0.821, bus: 0.24, peds: 1.56, props: 0.85, ramps: 0.7, rival: 43.5, kmax: 0.0078, hills: 6, sky: 'overcast' },
-  { name: 'Passo Nebbia', dmg: 0.748, sub: 'Foggy mountain pass · rocks', len: 4200, seed: 41, tb: 0.3, traffic: 0.95, oncoming: 0.864, bus: 0.16, peds: 1.04, props: 1.15, ramps: 1.1, rival: 44.5, kmax: 0.0102, hills: 16, sky: 'fog' },
-  { name: 'Gran Finale', dmg: 0.836, sub: 'Dusk · everything, everywhere', len: 5000, seed: 53, tb: 0.5, traffic: 1.382, oncoming: 1.037, bus: 0.2, peds: 1.69, props: 1.25, ramps: 1.3, rival: 45.5, kmax: 0.0098, hills: 11, sky: 'dusk' },
+  { name: 'Borgo Verde', dmg: 0.44, sub: 'Village & vineyards · gentle start', len: 3000, seed: 11, tb: 0.45, traffic: 0.648, oncoming: 0.475, bus: 0.12, peds: 0.78, props: 0.65, ramps: 0.9, rival: 41.5, kmax: 0.0105, hills: 11, sky: 'day' },
+  { name: 'Valle Rossa', dmg: 0.546, sub: 'Fast valley roads · jumps', len: 3500, seed: 23, tb: 0.35, traffic: 0.821, oncoming: 0.648, bus: 0.14, peds: 0.91, props: 0.8, ramps: 1.4, rival: 43, kmax: 0.0118, hills: 16, sky: 'sunset' },
+  { name: 'Città Alta', dmg: 0.651, sub: 'Rush hour downtown · buses', len: 3600, seed: 37, tb: 0.75, traffic: 1.166, oncoming: 0.821, bus: 0.24, peds: 1.56, props: 0.85, ramps: 0.7, rival: 43.5, kmax: 0.01, hills: 10, sky: 'overcast' },
+  { name: 'Passo Nebbia', dmg: 0.748, sub: 'Foggy mountain pass · rocks', len: 4200, seed: 41, tb: 0.3, traffic: 0.95, oncoming: 0.864, bus: 0.16, peds: 1.04, props: 1.15, ramps: 1.1, rival: 44.5, kmax: 0.0128, hills: 24, sky: 'fog' },
+  { name: 'Gran Finale', dmg: 0.836, sub: 'Dusk · everything, everywhere', len: 5000, seed: 53, tb: 0.5, traffic: 1.382, oncoming: 1.037, bus: 0.2, peds: 1.69, props: 1.25, ramps: 1.3, rival: 45.5, kmax: 0.0122, hills: 17, sky: 'dusk' },
 ];
 const SKIES = {
   day:      { top: 0x2f7fd6, hor: 0xbfe0f4, fog: 0xcfe6f2, near: 90, far: 340, sun: 0xfff4e0, sunI: 2.7, sky: 0xdcecff, gnd: 0x6b7a4a, hemiI: 1.25, lamps: false,
@@ -815,23 +815,23 @@ function buildTrack(st) {
   let h = 0, k = 0, target = 0, next = 0, x = 0, zz = 0;
   for (let i = 0; i < n; i++) {
     // town streets bend gently, open road bends hard; straight only at the start, the finish and through crossroads
-    const si = i * SEG, townSoon = townA[Math.min(n - 1, i + 25)] || townA[i], km = townSoon ? st.kmax * 0.4 : st.kmax;
+    const si = i * SEG, townSoon = townA[Math.min(n - 1, i + 25)] || townA[i], km = townSoon ? st.kmax * 0.55 : st.kmax;
     const nearX = inters.some(I => si > I.s - 75 && si < I.s + 25);
     if (si < 190 || nearX || Math.abs(si - st.len) < 70) target = 0;
     else if (si >= next || Math.abs(target) > km) {
       target = rng() < 0.1 ? 0 : (rng() * 2 - 1) * km;
       if (rng() < 0.45) target = Math.sign(target || 1) * km * (0.75 + rng() * 0.25);
-      next = si + 45 + rng() * 105;
+      next = si + 35 + rng() * 85;
     }
     if (h > 1.0 && target > 0) target = -target;
     if (h < -1.0 && target < 0) target = -target;
-    k += clamp(target - k, -0.00018, 0.00018);
+    k += clamp(target - k, -0.00022, 0.00022);
     K[i] = k; H[i] = h; X[i] = x; Z[i] = zz;
     h += k * SEG; x += Math.sin(h) * SEG; zz += Math.cos(h) * SEG;
   }
   // elevation: hills only in the countryside, blended
   const cw = new Float32Array(n), pre = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + (townA[i] ? 0.4 : 1);   // towns sit on gentler slopes
+  for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + (townA[i] ? 0.55 : 1);   // towns sit on gentler slopes
   const rad = 45;
   for (let i = 0; i < n; i++) { const a = Math.max(0, i - rad), b = Math.min(n, i + rad + 1); cw[i] = (pre[b] - pre[a]) / (b - a); }
   const p1 = rng() * 6, p2 = rng() * 6, p3 = rng() * 6;
@@ -1168,22 +1168,21 @@ function audioInit() {
   const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0);
   for (let i = 0; i < len; i++) dd[i] = Math.random() * 2 - 1;
   AU.noise = buf;
-  // engine voice: saw + detuned 2nd harmonic + sub square, soft-clipped, low-passed
-  const shaper = ctx.createWaveShaper(), curveN = 1024, cv = new Float32Array(curveN);
-  for (let i = 0; i < curveN; i++) { const x = i / (curveN - 1) * 2 - 1; cv[i] = Math.tanh(x * 2.4) / Math.tanh(2.4); }
-  shaper.curve = cv;
-  AU.eF = ctx.createBiquadFilter(); AU.eF.type = 'lowpass'; AU.eF.frequency.value = 600; AU.eF.Q.value = 2.2;
+  // engine voice: one recorded-style engine cycle (4 cylinder firings, each a short exhaust pulse with its own
+  // strength) looped and pitched by rpm, then through a drive stage and fixed exhaust/body resonances.
+  // Pulses stay separate at idle (lumpy burble) and blur into a howl at high rpm, like a real 4-cylinder.
+  AU.eSrc = ctx.createBufferSource(); AU.eSrc.buffer = engineCycle(ctx); AU.eSrc.loop = true;
+  AU.drive = ctx.createGain(); AU.drive.gain.value = 1;
+  const shaper = ctx.createWaveShaper(), curveN = 2048, cv = new Float32Array(curveN);
+  for (let i = 0; i < curveN; i++) { const x = i / (curveN - 1) * 2 - 1; cv[i] = Math.tanh(x * 1.8) / Math.tanh(1.8); }
+  shaper.curve = cv; shaper.oversample = '2x';
+  AU.eF = ctx.createBiquadFilter(); AU.eF.type = 'lowpass'; AU.eF.frequency.value = 900; AU.eF.Q.value = 0.9;
+  const boom = ctx.createBiquadFilter(); boom.type = 'peaking'; boom.frequency.value = 95; boom.Q.value = 1.1; boom.gain.value = 7;     // exhaust boom
+  const pipe = ctx.createBiquadFilter(); pipe.type = 'peaking'; pipe.frequency.value = 480; pipe.Q.value = 1.6; pipe.gain.value = 4;    // pipe resonance
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 35;
   AU.eG = ctx.createGain(); AU.eG.gain.value = 0;
-  const pre = ctx.createGain(); pre.gain.value = 0.55;
-  AU.o1 = ctx.createOscillator(); AU.o1.type = 'sawtooth';
-  AU.o2 = ctx.createOscillator(); AU.o2.type = 'sawtooth'; AU.o2.detune.value = 9;
-  AU.o3 = ctx.createOscillator(); AU.o3.type = 'square';
-  const g2 = ctx.createGain(), g3 = ctx.createGain(); g2.gain.value = 0.32; g3.gain.value = 0.5;
-  AU.o1.connect(pre); AU.o2.connect(g2); g2.connect(pre); AU.o3.connect(g3); g3.connect(pre);
-  pre.connect(shaper); shaper.connect(AU.eF); AU.eF.connect(AU.eG); AU.eG.connect(AU.master);
-  // firing-pulse wobble: an LFO at half the firing rate shakes the volume (lumpy at idle, smooth at high rpm)
-  AU.lfo = ctx.createOscillator(); AU.lfoG = ctx.createGain(); AU.lfoG.gain.value = 0; AU.lfo.connect(AU.lfoG); AU.lfoG.connect(AU.eG.gain);
-  for (const o of [AU.o1, AU.o2, AU.o3, AU.lfo]) o.start();
+  AU.eSrc.connect(AU.drive); AU.drive.connect(shaper); shaper.connect(AU.eF); AU.eF.connect(boom); boom.connect(pipe); pipe.connect(hp); hp.connect(AU.eG); AU.eG.connect(AU.master);
+  AU.eSrc.start();
   const loopNoise = () => { const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true; n.start(); return n; };
   // intake / exhaust roar
   const bpI = ctx.createBiquadFilter(); bpI.type = 'bandpass'; bpI.Q.value = 1.4; AU.iF = bpI;
@@ -1200,18 +1199,37 @@ function audioInit() {
   // turbo whistle
   AU.tw = ctx.createOscillator(); AU.tw.type = 'sine'; AU.tG = ctx.createGain(); AU.tG.gain.value = 0; AU.tw.connect(AU.tG); AU.tG.connect(AU.master); AU.tw.start();
 }
+const ENGINE_BASE_RPM = 1000;
+function engineCycle(ctx) {
+  // one full 4-stroke cycle (2 revolutions) at ENGINE_BASE_RPM: firings at uneven strength and slightly uneven timing
+  const sr = ctx.sampleRate, n = Math.round(sr * 120 / ENGINE_BASE_RPM), b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0), rnd = mulberry32(1997);
+  const amp = [1, 0.8, 0.93, 0.74], off = [0, 0.2535, 0.4975, 0.7515];
+  for (let k = 0; k < 4; k++) {
+    const t0 = Math.round(off[k] * n), a = amp[k], ph = rnd() * 6;
+    for (let j = 0; j < Math.min(n, sr * 0.06); j++) {
+      const t = j / sr, i = (t0 + j) % n;
+      const env = Math.exp(-t / 0.0055) - Math.exp(-t / 0.0005);
+      d[i] += a * env * (Math.sin(2 * Math.PI * 118 * t + ph) * 0.9 + Math.sin(2 * Math.PI * 263 * t + ph * 2) * 0.4 + (rnd() * 2 - 1) * 0.55)
+            + a * Math.exp(-t / 0.016) * Math.sin(2 * Math.PI * 47 * t) * 0.55;          // low thump of each firing
+    }
+  }
+  let m = 0; for (let i = 0; i < n; i++) m += d[i]; m /= n;
+  let pk = 0; for (let i = 0; i < n; i++) { d[i] -= m; pk = Math.max(pk, Math.abs(d[i])); }
+  for (let i = 0; i < n; i++) d[i] *= 0.9 / pk;
+  return b;
+}
 function setSound(on) { settings.sound = on; store.set('sound', on); if (AU.master) AU.master.gain.value = on ? 0.75 : 0; }
-function audioMute() { if (AU.ctx) for (const g of [AU.eG, AU.iG, AU.sG, AU.rG, AU.tG, AU.lfoG, AU.sirG]) { g.gain.cancelScheduledValues(0); g.gain.value = 0; } }
+function audioMute() { if (AU.ctx) for (const g of [AU.eG, AU.iG, AU.sG, AU.rG, AU.tG, AU.sirG]) { g.gain.cancelScheduledValues(0); g.gain.value = 0; } }
 function audioUpdate(p, drift, off, active) {
   if (!AU.ctx) return;
   const t = AU.ctx.currentTime, rpm = p.rpm, rn = clamp((rpm - 800) / 6800, 0, 1), th = active ? p.throttle : 0;
   const f = rpm / 30;                                   // firing frequency of a 4-cylinder (2 pulses per rev)
-  AU.o1.frequency.setTargetAtTime(f, t, 0.012); AU.o2.frequency.setTargetAtTime(f * 2, t, 0.012); AU.o3.frequency.setTargetAtTime(f * 0.5, t, 0.012);
-  AU.lfo.frequency.setTargetAtTime(f * 0.5, t, 0.02);
-  AU.eF.frequency.setTargetAtTime(260 + rn * 2300 + th * 900 + (p.turbo > 0 ? 500 : 0), t, 0.03);
-  const base = active ? 0.045 + th * 0.05 + rn * 0.035 : 0.03;
-  AU.eG.gain.setTargetAtTime(base, t, 0.03);
-  AU.lfoG.gain.setTargetAtTime(base * (0.55 - rn * 0.45), t, 0.05);
+  AU.eSrc.playbackRate.setTargetAtTime(rpm / ENGINE_BASE_RPM, t, 0.012);
+  AU.drive.gain.setTargetAtTime(0.7 + th * 1.6 + (p.turbo > 0 ? 0.5 : 0), t, 0.03);                // load: harder, rougher
+  AU.eF.frequency.setTargetAtTime(500 + rn * 2400 + th * 1500 + (p.turbo > 0 ? 700 : 0), t, 0.03);  // off throttle = muffled
+  AU.eG.gain.setTargetAtTime(active ? 0.12 - th * 0.03 + rn * 0.045 : 0.07, t, 0.03);
+  // lifting off at high rpm: overrun crackle from the exhaust
+  if (active && th < 0.3 && rpm > 3800 && Math.random() < 0.09) sfxNoise(0.03 + Math.random() * 0.04, 700 + Math.random() * 900, 0.08 + Math.random() * 0.1, 'lowpass');
   AU.iF.frequency.setTargetAtTime(f * 4 + 300, t, 0.03);
   AU.iG.gain.setTargetAtTime(active ? th * (0.015 + rn * 0.05) : 0, t, 0.04);
   AU.sG.gain.setTargetAtTime(clamp(drift, 0, 1) * 0.11, t, 0.05);
@@ -2863,4 +2881,4 @@ applyQuality(settings.gfx === 'low' ? 0 : 3);
 loadStage(0, true);
 renderMenu();
 requestAnimationFrame(t => { last = t; frame(t); });
-window.__rh = { spawnCop, policeMesh, input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
+window.__rh = { AU, audioInit, audioReset() { AU.ctx = null; }, spawnCop, policeMesh, input, settings, cycleCamera, vehicleMesh, rallyMesh, renderer, DBG, Q, applyQuality, scene, camera, sim(sec, dt = 1 / 60) { for (let t = 0; t < sec; t += dt) { const inp = readInput(); step(dt, inp); vehicleFx(dt); updatePS(FX, dt); updatePS(SMK, dt); updateDebris(dt); if (game.state === 'result') break; } }, game, get player() { return player; }, get ents() { return ents; }, input, loadStage, T, STAGES };
