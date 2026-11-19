@@ -7415,28 +7415,143 @@ function bessFarmland(size, half) {
   t.needsUpdate = !0;
   return t;
 }
-// one lumpy canopy blob, vertex-coloured darker underneath
-function bessCanopyGeo(seed) {
-  let geo = new Gi(1, 9, 7),
-    p = geo.attributes.position,
-    col = new Float32Array(p.count * 3),
-    v = new K();
-  for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i);
-    let n = 0.78 + 0.5 * bessFbm(v.x * 1.7 + seed, v.y * 1.7 + v.z * 1.3 + seed, 7, 3);
-    v.multiplyScalar(n);
-    v.y *= 0.82;
-    p.setXYZ(i, v.x, v.y, v.z);
-    let sh = 0.5 + 0.5 * Math.max(0, Math.min(1, v.y * 0.7 + 0.55)),
-      sp = 0.88 + 0.24 * bessHash(i, seed, 3);
-    col[i * 3] = sh * sp;
-    col[i * 3 + 1] = sh * sp;
-    col[i * 3 + 2] = sh * sp;
+// leaf clumps painted on one canvas: grey leaves on transparent, tinted per instance; alpha-tested on the cards
+function bessLeafTexture(size) {
+  let c = document.createElement("canvas");
+  c.width = c.height = size;
+  let g = c.getContext("2d"),
+    rnd = bessRng(7741),
+    k = size / 256;
+  // a few twigs first, so leaves sit on top of them
+  g.lineCap = "round";
+  for (let i = 0; i < 7; i++) {
+    let a = rnd() * 6.283,
+      l = (60 + rnd() * 50) * k;
+    g.strokeStyle = "rgb(60,52,44)";
+    g.lineWidth = (1.2 + rnd()) * k;
+    g.beginPath();
+    g.moveTo(128 * k, 128 * k);
+    g.quadraticCurveTo(128 * k + Math.cos(a + 0.4) * l * 0.5, 128 * k + Math.sin(a + 0.4) * l * 0.5, 128 * k + Math.cos(a) * l, 128 * k + Math.sin(a) * l);
+    g.stroke();
   }
-  geo.setAttribute("color", new nt(col, 3));
-  geo.computeVertexNormals();
+  // leaves: denser and brighter towards the middle, ragged at the rim
+  for (let i = 0; i < 2600; i++) {
+    let a = rnd() * 6.283,
+      rim = 0.82 + 0.18 * Math.sin(a * 5 + 1.3) * Math.sin(a * 3),
+      r = Math.pow(rnd(), 0.62) * 108 * rim * k,
+      x = 128 * k + Math.cos(a) * r,
+      y = 128 * k + Math.sin(a) * r,
+      len = (3.6 + rnd() * 3.6) * k,
+      wid = len * (0.42 + rnd() * 0.2),
+      v = Math.round(130 + rnd() * 125 - (r / k / 108) * 40);
+    g.save();
+    g.translate(x, y);
+    g.rotate(rnd() * 6.283);
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.beginPath();
+    g.moveTo(-len, 0);
+    g.quadraticCurveTo(0, -wid, len, 0);
+    g.quadraticCurveTo(0, wid, -len, 0);
+    g.fill();
+    // midrib
+    g.strokeStyle = `rgba(0,0,0,0.18)`;
+    g.lineWidth = 0.7 * k;
+    g.beginPath();
+    g.moveTo(-len * 0.8, 0);
+    g.lineTo(len * 0.8, 0);
+    g.stroke();
+    g.restore();
+  }
+  let t = new Rs(c);
+  t.colorSpace = In;
+  t.anisotropy = 4;
+  t.generateMipmaps = !0;
+  t.minFilter = yn;
+  t.needsUpdate = !0;
+  return t;
+}
+// vertical bark furrows, tiled around the trunk
+function bessBarkTexture() {
+  let c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 256;
+  let g = c.getContext("2d"),
+    img = g.createImageData(128, 256),
+    d = img.data;
+  for (let y = 0; y < 256; y++)
+    for (let x = 0; x < 128; x++) {
+      let f = bessFbm(x / 9, y / 46, 51, 4, 0),
+        ridge = 1 - Math.abs(Math.sin((x / 128) * 6.283 * 6 + f * 5)),
+        n = 0.45 + 0.4 * Math.pow(ridge, 0.6) + 0.25 * (bessHash(x, y, 5) - 0.5),
+        i = (y * 128 + x) * 4;
+      d[i] = 84 * n;
+      d[i + 1] = 76 * n;
+      d[i + 2] = 66 * n;
+      d[i + 3] = 255;
+    }
+  g.putImageData(img, 0, 0);
+  let t = new Rs(c);
+  t.colorSpace = In;
+  t.wrapS = t.wrapT = 1e3;
+  t.generateMipmaps = !0;
+  t.minFilter = yn;
+  t.needsUpdate = !0;
+  return t;
+}
+// one foliage clump: leaf cards scattered through a unit sphere. Normals point away from the clump centre, so the
+// clump shades like a soft volume instead of a set of flat planes; vertex colour darkens the inside and underside.
+function bessFoliageGeo(cards, seed) {
+  let rnd = bessRng(seed),
+    pos = [],
+    nrm = [],
+    uv = [],
+    col = [],
+    idx = [],
+    n = new K(),
+    a = new K(),
+    b = new K(),
+    ctr = new K(),
+    p = new K(),
+    up = new K(0, 1, 0);
+  for (let i = 0; i < cards; i++) {
+    let r = 0.25 + 0.55 * Math.sqrt(rnd()),
+      th = rnd() * 6.283,
+      ph = Math.acos(2 * rnd() - 1),
+      s = 0.55 + rnd() * 0.3;
+    ctr.set(Math.sin(ph) * Math.cos(th), Math.cos(ph) * 0.85, Math.sin(ph) * Math.sin(th)).multiplyScalar(r);
+    n.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
+    a.crossVectors(n, Math.abs(n.y) > 0.9 ? new K(1, 0, 0) : up).normalize();
+    b.crossVectors(n, a);
+    let base = pos.length / 3;
+    for (let j = 0; j < 4; j++) {
+      let u = j & 1 ? 1 : -1,
+        v = j & 2 ? 1 : -1;
+      p.copy(ctr).addScaledVector(a, u * s).addScaledVector(b, v * s);
+      pos.push(p.x, p.y, p.z);
+      let o = p.clone().normalize();
+      nrm.push(o.x, o.y + 0.15, o.z);
+      uv.push(j & 1 ? 1 : 0, j & 2 ? 1 : 0);
+      let ao = Math.max(0.32, Math.min(1, 0.3 + 0.45 * p.length() + 0.35 * p.y));
+      col.push(ao, ao, ao);
+    }
+    idx.push(base, base + 1, base + 3, base, base + 3, base + 2);
+  }
+  let geo = new pt();
+  geo.setAttribute("position", new et(pos, 3));
+  geo.setAttribute("normal", new et(nrm, 3));
+  geo.setAttribute("uv", new et(uv, 2));
+  geo.setAttribute("color", new et(col, 3));
+  geo.setIndex(idx);
+  // renormalise after the slight upward bias
+  let na = geo.attributes.normal;
+  for (let i = 0; i < na.count; i++) {
+    n.fromBufferAttribute(na, i).normalize();
+    na.setXYZ(i, n.x, n.y, n.z);
+  }
+  geo.computeBoundingSphere();
   return geo;
 }
+var bessWind = { value: 0 };
 function bessTrees(n, root) {
   let rnd = bessRng(90417),
     trees = [],
@@ -7446,7 +7561,8 @@ function bessTrees(n, root) {
       if (z > 32.5 && z < 41 && Math.abs(x) < 520) return;
       // nothing tall on the sun side: the low evening sun must reach the plant
       if (x < -40 && x > -150 && Math.abs(z + 4) < 62) return;
-      trees.push({ x, z, s: s * (0.75 + rnd() * 0.6), hue: rnd(), bare: rnd() < 0.08 });
+      let k = rnd();
+      trees.push({ x, z, s: s * (0.75 + rnd() * 0.6), hue: rnd(), kind: k < 0.06 ? "bare" : k < 0.15 ? "poplar" : "round" });
     },
     lineOf = (x0, z0, x1, z1, step, jitter, s = 1) => {
       let len = Math.hypot(x1 - x0, z1 - z0),
@@ -7486,59 +7602,133 @@ function bessTrees(n, root) {
   wood(0, 500, 480, 60, 130, 1.5);
   let near = trees.filter((t) => Math.hypot(t.x, t.z) < 115),
     far = trees.filter((t) => Math.hypot(t.x, t.z) >= 115),
-    leafMat = new L0({ color: 16777215, roughness: 0.95, metalness: 0, vertexColors: !0 }),
-    barkMat = new L0({ color: 4207135, roughness: 1, metalness: 0 }),
-    canopy = bessCanopyGeo(3),
-    trunkGeo = new io(0.16, 0.3, 1, 6, 1, !0),
+    leafMat = new L0({ color: 16777215, map: bessLeafTexture(512), alphaTest: 0.42, side: ln, roughness: 0.88, metalness: 0, vertexColors: !0 }),
+    barkMat = new L0({ color: 16777215, map: bessBarkTexture(), roughness: 1, metalness: 0 }),
+    clumpNear = bessFoliageGeo(26, 3),
+    clumpFar = bessFoliageGeo(16, 5),
+    // trunk and branches: unit-length tapered cylinders standing on their base
+    trunkGeo = new io(0.55, 1, 1, 8, 1, !0).translate(0, 0.5, 0),
+    branchGeo = new io(0.35, 1, 1, 5, 1, !0).translate(0, 0.5, 0),
     palette = [
-      [0.42, 0.17, 0.04],
-      [0.5, 0.25, 0.05],
-      [0.36, 0.12, 0.04],
-      [0.52, 0.34, 0.07],
-      [0.24, 0.22, 0.07],
-      [0.17, 0.21, 0.08],
-      [0.4, 0.22, 0.09],
+      [0.15, 0.22, 0.06], // oak, still green
+      [0.1, 0.16, 0.05], // dark alder green
+      [0.26, 0.27, 0.08], // olive, turning
+      [0.5, 0.38, 0.07], // lime / birch yellow
+      [0.44, 0.26, 0.06], // ochre
+      [0.38, 0.14, 0.04], // beech rust
+      [0.3, 0.17, 0.07], // dry brown
+      [0.2, 0.25, 0.07], // field-maple green
     ],
     m4 = new Je(),
     q = new St(),
     e = new _0(),
     pos = new K(),
     scl = new K(),
-    c = new Qe(),
-    build = (list, cast, blobs) => {
-      if (!list.length) return;
-      let leaves = new Wo(canopy, leafMat, list.length * blobs),
-        trunks = new Wo(trunkGeo, barkMat, list.length),
-        li = 0;
-      list.forEach((t, ti) => {
-        let h = (5.5 + rnd() * 4.5) * t.s,
-          r = (2.3 + rnd() * 1.4) * t.s;
-        m4.compose(pos.set(t.x, h * 0.3, t.z), q.identity(), scl.set(t.s * 1.3, h * 0.62, t.s * 1.3));
-        trunks.setMatrixAt(ti, m4);
-        let base = palette[Math.floor(t.hue * palette.length)];
-        for (let b = 0; b < blobs; b++) {
-          let a = rnd() * 6.283,
-            off = b === 0 ? 0 : r * 0.55,
-            br = r * (b === 0 ? 1 : 0.62 + rnd() * 0.25) * (t.bare ? 0.6 : 1);
-          e.set(rnd() * 0.5, rnd() * 6.283, rnd() * 0.5);
-          q.setFromEuler(e);
-          m4.compose(pos.set(t.x + Math.cos(a) * off, h * (0.62 + (b === 0 ? 0.08 : rnd() * 0.22)), t.z + Math.sin(a) * off), q, scl.set(br, br * (0.8 + rnd() * 0.3), br));
-          leaves.setMatrixAt(li, m4);
-          let v = 0.8 + rnd() * 0.4;
-          c.setRGB(base[0] * v, base[1] * v, base[2] * v);
-          leaves.setColorAt(li, c);
-          li++;
-        }
-      });
-      leaves.castShadow = trunks.castShadow = cast;
-      leaves.receiveShadow = trunks.receiveShadow = cast;
-      leaves.frustumCulled = trunks.frustumCulled = !1;
-      leaves.instanceMatrix.needsUpdate = !0;
-      leaves.instanceColor && (leaves.instanceColor.needsUpdate = !0);
-      root.add(leaves, trunks);
-    };
-  build(near, !0, 4);
-  build(far, !1, 2);
+    dir = new K(),
+    yAxis = new K(0, 1, 0),
+    c = new Qe();
+  // soft wind sway + leaf flutter; keep the clump-centred normals on both faces of the cards
+  leafMat.onBeforeCompile = (sh) => {
+    sh.uniforms.uBessWind = bessWind;
+    sh.vertexShader = "uniform float uBessWind;\n" + sh.vertexShader.replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vec3 bwP = instanceMatrix[3].xyz;
+      #else
+        vec3 bwP = vec3(0.0);
+      #endif
+      float bwPh = bwP.x * 0.071 + bwP.z * 0.053;
+      float bwS = sin(uBessWind * 1.1 + bwPh) * 0.6 + sin(uBessWind * 2.3 + bwPh * 1.7) * 0.3;
+      transformed.xz += vec2(0.045, 0.025) * bwS * (position.y + 1.0);
+      transformed += normal * sin(uBessWind * 7.0 + dot(position, vec3(9.1, 7.3, 8.7)) + bwPh) * 0.02;`,
+    );
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <normal_fragment_begin>", "#include <normal_fragment_begin>\n  normal = normalize( vNormal );")
+      // a little light scattered through the leaves, so the shaded side of a crown is not black
+      .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * 0.09;");
+  };
+  leafMat.customProgramCacheKey = () => "bess-foliage";
+  let build = (list, cast, clump, detail) => {
+    if (!list.length) return;
+    let clumps = [],
+      trunkM = [],
+      branchM = [],
+      put = (arr, x, y, z, d, len, rad) => {
+        dir.copy(d).normalize();
+        q.setFromUnitVectors(yAxis, dir);
+        m4.compose(pos.set(x, y, z), q, scl.set(rad, len, rad));
+        arr.push(m4.clone());
+      };
+    list.forEach((t) => {
+      let poplar = t.kind === "poplar",
+        bare = t.kind === "bare",
+        h = (poplar ? 13 + rnd() * 6 : 7 + rnd() * 5) * t.s,
+        r = (poplar ? 1.5 + rnd() * 0.6 : 2.6 + rnd() * 1.6) * t.s,
+        ry = poplar ? h * 0.4 : r * (0.85 + rnd() * 0.2),
+        crownY = h - ry,
+        trunkR = (0.17 + rnd() * 0.08) * t.s * (poplar ? 1.15 : 1),
+        lean = new K((rnd() - 0.5) * 0.12, 1, (rnd() - 0.5) * 0.12),
+        trunkLen = poplar ? h * 0.9 : crownY + ry * 0.3,
+        topX = t.x + lean.x * trunkLen,
+        topZ = t.z + lean.z * trunkLen;
+      put(trunkM, t.x, -0.2, t.z, lean, trunkLen + 0.2, trunkR);
+      // main limbs fanning out of the trunk into the crown
+      let limbs = detail ? (bare ? 8 : poplar ? 3 : 5) : bare ? 4 : 0;
+      for (let i = 0; i < limbs; i++) {
+        let a = (i / limbs) * 6.283 + rnd() * 0.8,
+          by = poplar ? crownY - ry * (0.2 + rnd() * 0.6) : (crownY - ry * 0.55) * (0.55 + rnd() * 0.3) + (bare ? 0 : 0.5),
+          out = poplar ? 0.35 : 0.75 + rnd() * 0.5,
+          f = Math.min(1, by / trunkLen);
+        dir.set(Math.cos(a) * out, 1, Math.sin(a) * out);
+        put(branchM, t.x + lean.x * by, by, t.z + lean.z * by, dir, (bare ? r * 1.1 : r * 0.8) * (0.8 + rnd() * 0.4), trunkR * (0.45 + rnd() * 0.15) * (1 - f * 0.4));
+      }
+      // crown: clumps scattered through an ellipsoid, denser on the outside, one cap on top
+      let base = palette[Math.floor(t.hue * palette.length)],
+        count = Math.round((detail ? (poplar ? 18 : 15) : poplar ? 8 : 7) * (bare ? 0.35 : 1)),
+        sx = 0.8 + rnd() * 0.4,
+        sz = 0.8 + rnd() * 0.4;
+      for (let b = 0; b < count; b++) {
+        let th = rnd() * 6.283,
+          rr = b === 0 ? 0 : poplar ? 0.4 * Math.sqrt(rnd()) : 0.3 + 0.7 * Math.sqrt(rnd()),
+          yy = b === 0 ? 0.6 : poplar ? rnd() * 1.9 - 0.95 : (rnd() * 1.9 - 0.95) * Math.sqrt(1 - rr * rr * 0.7),
+          cs = (poplar ? r * 0.95 : r * (detail ? 0.52 : 0.68)) * (0.8 + rnd() * 0.4) * (bare ? 0.55 : 1),
+          cx = topX + Math.cos(th) * rr * r * (poplar ? 0.62 : 0.8) * sx,
+          cz = topZ + Math.sin(th) * rr * r * (poplar ? 0.62 : 0.8) * sz,
+          cy = crownY + yy * ry * 0.62;
+        e.set(rnd() * 6.283, rnd() * 6.283, rnd() * 6.283);
+        q.setFromEuler(e);
+        m4.compose(pos.set(cx, cy, cz), q, scl.set(cs, cs * (0.85 + rnd() * 0.3), cs));
+        // turning trees mix a neighbouring tint into some clumps; clumps up top catch more light
+        let pc = rnd() < 0.25 ? palette[(Math.floor(t.hue * palette.length) + 1) % palette.length] : base,
+          v = (0.85 + rnd() * 0.3) * (0.9 + 0.15 * yy);
+        c.setRGB(pc[0] * v, pc[1] * v, pc[2] * v);
+        clumps.push([m4.clone(), c.clone()]);
+      }
+    });
+    let leaves = new Wo(clump, leafMat, clumps.length),
+      trunks = new Wo(trunkGeo, barkMat, trunkM.length),
+      parts = [leaves, trunks];
+    clumps.forEach(([m, col], i) => {
+      leaves.setMatrixAt(i, m);
+      leaves.setColorAt(i, col);
+    });
+    trunkM.forEach((m, i) => trunks.setMatrixAt(i, m));
+    if (branchM.length) {
+      let branches = new Wo(branchGeo, barkMat, branchM.length);
+      branchM.forEach((m, i) => branches.setMatrixAt(i, m));
+      parts.push(branches);
+    }
+    for (let p of parts) {
+      p.castShadow = p.receiveShadow = cast;
+      p.frustumCulled = !1;
+      p.instanceMatrix.needsUpdate = !0;
+    }
+    leaves.instanceColor && (leaves.instanceColor.needsUpdate = !0);
+    root.add(...parts);
+  };
+  build(near, !0, clumpNear, !0);
+  build(far, !1, clumpFar, !1);
   return trees.length;
 }
 function bessTurbines(n, root) {
@@ -7779,6 +7969,7 @@ function bessBackdrop(n) {
   function update(dt) {
     time += dt;
     uTime.value = time;
+    bessWind.value = time;
     for (let r of rotors) {
       r.rotor.rotation.z -= r.speed * dt;
       r.lamp.visible = (time * 0.5 + r.phase) % 1 < 0.5;
