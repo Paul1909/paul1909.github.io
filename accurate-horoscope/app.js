@@ -13,9 +13,9 @@ const store = {
 
 const $ = id => document.getElementById(id);
 const S = [...document.querySelectorAll('section')];
-const QUESTIONS = ['s-date', 's-sign', 's-time', 's-chart'];
+const QUESTIONS = ['s-date', 's-sign', 's-time', 's-place', 's-chart'];
 const saved = store.get('last', {});
-const st = { dob: saved.dob || '', sign: saved.sign || null, time: saved.time || null };
+const st = { dob: saved.dob || '', sign: saved.sign || null, time: saved.time || null, place: saved.place || null };
 let idx = 0, chartTimer = 0, tense = 1, answers = [], natal = null;
 
 // ---------- helpers ----------
@@ -31,23 +31,23 @@ function rng(str) {        // FNV-1a hash -> mulberry32: same text in, same numb
 }
 const conj = (s, t) => s.replace(/\{([^}]*)\}/g, (_, g) => g.split('|')[t]);
 
-// Where the birth time is read from: the phone's time zone, placed at its main city.
+// Fallback when the birthplace is unknown: the phone's time zone, placed at its main city.
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
 const HOME = (() => {
   const c = CITIES.find(c => c[4] === TZ);
-  if (c) return { name: c[0], lat: c[2], lng: c[3] };
-  return { name: TZ.split('/').pop().replace(/_/g, ' '), lat: 40, lng: -new Date().getTimezoneOffset() / 4 };
+  if (c) return { name: c[0], lat: c[2], lng: c[3], tz: TZ };
+  return { name: TZ.split('/').pop().replace(/_/g, ' '), lat: 40, lng: -new Date().getTimezoneOffset() / 4, tz: TZ };
 })();
 function tzOffsetMin(tz, date) {
   const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
     .formatToParts(date).forEach(x => p[x.type] = +x.value);
   return (Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute) - Math.floor(date.getTime() / 60000) * 60000) / 60000;
 }
-function toUTC(dob, time) {
+function toUTC(dob, time, tz) {
   const [y, m, d] = dob.split('-').map(Number), [h, mi] = time.split(':').map(Number);
   const guess = Date.UTC(y, m - 1, d, h, mi);
-  let off = 0; try { off = tzOffsetMin(TZ, new Date(guess)); off = tzOffsetMin(TZ, new Date(guess - off * 60000)); } catch {}
-  return new Date(guess - off * 60000);
+  let off = 0; try { off = tzOffsetMin(tz, new Date(guess)); off = tzOffsetMin(tz, new Date(guess - off * 60000)); } catch {}
+  return { date: new Date(guess - off * 60000), off };
 }
 
 // ---------- navigation (Android back swipe steps back) ----------
@@ -72,7 +72,7 @@ function enter(id) {
   if (id === 's-reveal') renderReveal();
   if (id === 's-sky') renderSky();
 }
-const save = () => store.set('last', { dob: st.dob, sign: st.sign, time: st.time });
+const save = () => store.set('last', { dob: st.dob, sign: st.sign, time: st.time, place: st.place });
 
 // ---------- questions ----------
 const dateIn = $('in-date');
@@ -96,11 +96,68 @@ timeIn.addEventListener('input', () => { st.time = timeIn.value || null; $('go-t
 $('go-time').disabled = !st.time;
 $('time-unknown').addEventListener('click', () => { st.time = null; timeIn.value = ''; save(); next(); });
 
+// ---------- birthplace: OpenStreetMap search (Photon), time zone looked up from coordinates ----------
+const placeIn = $('in-place'), placeList = $('place-list');
+let searchCtl = null, searchTimer = 0;
+const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function choosePlace(p) {
+  let tz = 'UTC'; try { tz = tzlookup(p.lat, p.lng); } catch {}
+  st.place = { name: p.name, sub: p.sub, lat: p.lat, lng: p.lng, tz }; save();
+  placeIn.value = p.name; placeIn.blur(); showPlaces([p]); $('go-place').disabled = false;
+}
+function showPlaces(list, msg) {
+  placeList.innerHTML = '';
+  list.forEach(p => {
+    const b = el('button', 'chip' + (st.place && st.place.lat === p.lat && st.place.lng === p.lng ? ' on' : ''), p.name);
+    if (p.sub) b.appendChild(el('small', '', p.sub));
+    b.addEventListener('click', () => choosePlace(p));
+    placeList.appendChild(b);
+  });
+  if (msg) placeList.appendChild(el('p', 'small', msg));
+}
+const join = (...a) => a.filter((x, i) => x && a.indexOf(x) === i).join(', ');
+async function photon(q, signal) {
+  const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lang=en&osm_tag=place`, { signal });
+  if (!r.ok) throw r.status;
+  return (await r.json()).features.map(f => { const p = f.properties, [lng, lat] = f.geometry.coordinates;
+    return { name: p.name, sub: join(p.county !== p.name && p.state !== p.county ? p.county : '', p.state !== p.name ? p.state : '', p.country !== p.name ? p.country : ''), lat, lng }; });
+}
+async function nominatim(q, signal) {   // used only on Enter, as Nominatim asks
+  const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=en&q=${encodeURIComponent(q)}`, { signal });
+  if (!r.ok) throw r.status;
+  return (await r.json()).map(x => { const parts = x.display_name.split(', ').filter(t => !/\d/.test(t)), n = parts.length;
+    return { name: x.name || parts[0], sub: join(n > 2 ? parts[n - 2] : '', n > 1 ? parts[n - 1] : ''), lat: +x.lat, lng: +x.lon }; });
+}
+function localPlaces(q) {
+  const f = fold(q);
+  return CITIES.filter(c => fold(c[0]).startsWith(f)).slice(0, 6).map(c => ({ name: c[0], sub: c[1], lat: c[2], lng: c[3] }));
+}
+async function searchPlaces(q, enter) {
+  if (searchCtl) searchCtl.abort();
+  if (q.length < 2) { showPlaces([]); return; }
+  const ctl = searchCtl = new AbortController();
+  let res = null;
+  try { res = await photon(q, ctl.signal); } catch (e) { if (ctl.signal.aborted) return; }
+  if (!res && enter) { try { res = await nominatim(q, ctl.signal); } catch (e) { if (ctl.signal.aborted) return; } }
+  if (ctl !== searchCtl) return;
+  const seen = new Set();
+  res = (res || []).filter(p => { const k = p.name + '|' + p.sub; if (seen.has(k) || !p.name) return false; seen.add(k); return true; }).slice(0, 7);
+  if (res.length) showPlaces(res);
+  else { const loc = localPlaces(q); showPlaces(loc, loc.length ? 'No connection: showing big cities only.' : 'Nothing found. Try another spelling or a nearby town.'); }
+}
+placeIn.addEventListener('input', () => {
+  if (st.place && placeIn.value !== st.place.name) { st.place = null; save(); $('go-place').disabled = true; }
+  clearTimeout(searchTimer); searchTimer = setTimeout(() => searchPlaces(placeIn.value.trim(), false), 350);
+});
+placeIn.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(searchTimer); searchPlaces(placeIn.value.trim(), true); } });
+$('place-skip').addEventListener('click', () => { st.place = null; placeIn.value = ''; save(); showPlaces([]); next(); });
+if (st.place) { placeIn.value = st.place.name; showPlaces([st.place]); $('go-place').disabled = false; }
+
 // ---------- chart ----------
 function computeNatal() {
-  const utc = toUTC(st.dob, st.time || '12:00');
-  const ch = Astro.chart(utc, HOME.lat, HOME.lng);
-  return { utc, sun: Astro.sign(ch.sun), sunLon: ch.sun, moon: Astro.sign(ch.moon), asc: Astro.sign(ch.asc), sunJ2000: ch.sunJ2000 };
+  const loc = st.place || HOME, t = toUTC(st.dob, st.time || '12:00', loc.tz), utc = t.date;
+  const ch = Astro.chart(utc, loc.lat, loc.lng);
+  return { utc, loc, off: t.off, sun: Astro.sign(ch.sun), sunLon: ch.sun, moon: Astro.sign(ch.moon), asc: Astro.sign(ch.asc), sunJ2000: ch.sunJ2000 };
 }
 function runChart() {
   $('chart-wait').hidden = false; $('chart-out').hidden = true; $('go-chart').hidden = true;
@@ -116,8 +173,10 @@ function runChart() {
       notes.push(edge ? `Not ${st.sign}: you were born close to the line between two signs, and the Sun was in ${natal.sun}.` : `Not ${st.sign}: on that date the Sun was in ${natal.sun}.`);
     }
     if (!st.time) notes.push('No birth time, so noon is assumed. Astrologers do the same.');
+    if (!st.place) notes.push(`No birthplace, so your phone's time zone (${HOME.name}) is used.`);
     $('c-note').textContent = notes.join(' ');
-    $('c-src').textContent = `${fmtDate(st.dob, { day: 'numeric', month: 'short', year: 'numeric' })}, ${st.time || '12:00'}, ${HOME.name} time`;
+    const o = natal.off, oh = Math.floor(Math.abs(o) / 60), om = Math.abs(o) % 60;
+    $('c-src').textContent = `${fmtDate(st.dob, { day: 'numeric', month: 'short', year: 'numeric' })}, ${st.time || '12:00'}, ${natal.loc.name} (UTC${o < 0 ? '−' : '+'}${oh}${om ? ':' + pad(om) : ''})`;
   }, 1300);
 }
 
@@ -197,5 +256,5 @@ function renderSky() {
   const end = el('p', 'stamp', "Nothing up there could tell your day apart from anyone else's."); end.style.fontSize = '22px'; end.style.marginTop = '8px';
   out.appendChild(end);
   const map = el('div'); map.style.marginTop = '10px'; out.appendChild(map);
-  SkyMap(map, natal.utc, { name: HOME.name, lat: HOME.lat, lng: HOME.lng, tz: TZ });
+  SkyMap(map, natal.utc, { name: natal.loc.name, lat: natal.loc.lat, lng: natal.loc.lng, tz: natal.loc.tz });
 }

@@ -49,6 +49,10 @@
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .chip { min-height: 46px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 12px; font-size: 15px; }
   .chip.on { border-color: var(--gold); color: var(--gold); }
+  .list { display: flex; flex-direction: column; gap: 6px; min-height: 120px; }
+  .list .chip { text-align: left; padding: 8px 14px; line-height: 1.3; }
+  .list .chip small { display: block; color: var(--mute); font-size: 12px; }
+  input[type=search]::-webkit-search-cancel-button { filter: invert(.6); }
   .rows { display: flex; flex-direction: column; gap: 14px; }
   .row { display: flex; align-items: baseline; gap: 14px; font-size: 24px; }
   .row b { width: 28px; color: var(--gold); font-weight: 400; } .row span { color: var(--mute); font-size: 16px; width: 72px; }
@@ -129,6 +133,19 @@
   </section>
 
 
+  <section id="s-place">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid" style="justify-content:flex-start;padding-top:10vh">
+      <p class="q">Where were you born?</p>
+      <p class="hint">Any town, city or village on Earth.</p>
+      <input id="in-place" type="search" placeholder="Search a place" autocomplete="off" enterkeyhint="search">
+      <div class="list" id="place-list"></div>
+      <button class="ghost" id="place-skip">I don't know</button>
+    </div>
+    <p class="small center" style="margin-bottom:10px">Places from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color:inherit">© OpenStreetMap contributors</a></p>
+    <button class="go" id="go-place" data-next disabled>Next</button>
+  </section>
+
   <section id="s-chart">
     <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
     <div class="mid" id="chart-wait"><div class="spin"></div><p class="tag">Reading the sky…</p></div>
@@ -182,6 +199,7 @@
 <script src="astro.js"></script>
 <script src="data.js"></script>
 <script src="cities.js"></script>
+<script src="tzlookup.js"></script>
 <script src="skydata.js"></script>
 <script src="skymap.js"></script>
 <script src="app.js"></script>

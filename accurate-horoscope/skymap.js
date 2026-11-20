@@ -26,7 +26,7 @@ function SkyMap(host, birthUTC, place) {
   for (let l = 0; l <= 360; l += 4) ecliptic.push(Astro.eclToEq(l, 0, eps));
 
   let showAll = false, picked = null, size = 0, R = 0, cx = 0, cy = 0, pts = [], date = birthUTC;
-  const fmtTime = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const fmtTime = d => { try { return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: place.tz }); } catch { return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); } };
 
   function project(ra, dec, lst) {
     const [alt, az] = Astro.altAz(ra, dec, lst, place.lat);
