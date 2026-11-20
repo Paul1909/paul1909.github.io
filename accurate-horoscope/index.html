@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ACCURATE">
+<title>ACCURATE horoscope</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --bg:#0b0d17; --fg:#ece8df; --mute:#8d8ba3; --line:#262a3d; --gold:#e2b866; --card:#12152a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background:
+      radial-gradient(1px 1px at 12% 18%, #fff8 50%, transparent 51%), radial-gradient(1px 1px at 78% 9%, #fff6 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 64% 32%, #fff5 50%, transparent 51%), radial-gradient(1px 1px at 30% 72%, #fff5 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 64%, #fff7 50%, transparent 51%), radial-gradient(1.5px 1.5px at 45% 88%, #fff4 50%, transparent 51%),
+      radial-gradient(1px 1px at 6% 52%, #fff5 50%, transparent 51%), radial-gradient(1px 1px at 92% 92%, #fff4 50%, transparent 51%),
+      var(--bg);
+    background-attachment: fixed; }
+  main { max-width: 460px; margin: 0 auto; min-height: 100%; padding: 20px 22px 28px; display: flex; flex-direction: column; }
+  section { display: none; flex: 1; flex-direction: column; }
+  section.on { display: flex; animation: in .35s ease; }
+  @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .top { height: 36px; display: flex; align-items: center; justify-content: space-between; }
+  .back { background: none; border: 0; color: var(--mute); font-size: 28px; padding: 0 10px 0 0; line-height: 1; cursor: pointer; }
+  .dots { display: flex; gap: 6px; } .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+  .dots i.on { background: var(--gold); }
+  .mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+  h1 { margin: 0; text-align: center; font-weight: 800; letter-spacing: .28em; font-size: 30px; padding-left: .28em; }
+  h1 em { display: block; font: italic 400 26px Georgia, "Times New Roman", serif; letter-spacing: 0; padding: 0; color: var(--gold); margin-top: 4px; }
+  .tag { text-align: center; color: var(--mute); margin: 0; }
+  .q { font-size: 26px; font-weight: 650; margin: 0; line-height: 1.2; }
+  .hint { color: var(--mute); margin: -8px 0 0; font-size: 15px; }
+  input { width: 100%; font: inherit; font-size: 22px; color: var(--fg); background: transparent; border: 0;
+    border-bottom: 2px solid var(--line); padding: 10px 2px; outline: none; color-scheme: dark; border-radius: 0; }
+  input:focus { border-color: var(--gold); }
+  button { font: inherit; cursor: pointer; user-select: none; }
+  .go { width: 100%; min-height: 54px; border: 0; border-radius: 27px; background: var(--gold); color: #191408; font-size: 18px; font-weight: 700; }
+  .go:disabled { opacity: .3; }
+  .ghost { background: none; border: 0; color: var(--mute); font-size: 16px; min-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .chip { min-height: 46px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 12px; font-size: 15px; }
+  .chip.on { border-color: var(--gold); color: var(--gold); }
+  .list { display: flex; flex-direction: column; gap: 6px; min-height: 160px; }
+  .list .chip { text-align: left; padding: 0 14px; }
+  .list .chip small { color: var(--mute); margin-left: 6px; }
+  .rows { display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; align-items: baseline; gap: 14px; font-size: 24px; }
+  .row b { width: 28px; color: var(--gold); font-weight: 400; } .row span { color: var(--mute); font-size: 16px; width: 72px; }
+  .small { color: var(--mute); font-size: 14px; margin: 0; line-height: 1.45; }
+  .spin { width: 46px; height: 46px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: r 1s linear infinite; margin: 0 auto; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .tabs { display: flex; background: var(--card); border-radius: 22px; padding: 4px; }
+  .tabs button { flex: 1; min-height: 40px; border: 0; border-radius: 18px; background: none; color: var(--mute); font-size: 15px; }
+  .tabs button.on { background: var(--line); color: var(--fg); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .card h2 { margin: 0; font: italic 400 26px Georgia, serif; color: var(--gold); }
+  .card p { margin: 0; line-height: 1.5; }
+  .meta { display: flex; justify-content: space-between; color: var(--mute); font-size: 13px; letter-spacing: .04em; }
+  .meter { display: flex; gap: 14px; flex-wrap: wrap; color: var(--mute); font-size: 13px; }
+  .meter i { font-style: normal; color: var(--gold); letter-spacing: 1px; }
+  .lik { display: flex; flex-direction: column; gap: 8px; }
+  .lik p { margin: 0; font-size: 17px; }
+  .scale { display: flex; justify-content: space-between; }
+  .scale button { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--mute); font-size: 16px; }
+  .scale button.on { background: var(--gold); color: #191408; border-color: var(--gold); font-weight: 700; }
+  .ends { display: flex; justify-content: space-between; color: var(--mute); font-size: 12px; margin-top: -2px; }
+  .big { font-size: 64px; font-weight: 800; text-align: center; margin: 0; color: var(--gold); line-height: 1; }
+  .center { text-align: center; }
+  .stamp { margin: 0; text-align: center; font-size: 34px; font-weight: 800; letter-spacing: .04em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th { text-align: right; color: var(--mute); font-weight: 500; font-size: 11px; letter-spacing: .04em; padding: 0 0 6px 10px; text-transform: uppercase; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+  td { text-align: right; padding: 7px 0 7px 10px; border-top: 1px solid var(--line); white-space: nowrap; }
+  td:last-child, th:last-child { color: var(--gold); padding-left: 8px; }
+  td small { color: var(--mute); }
+  .scroll { gap: 16px; padding-top: 8px; }
+  .fact { margin: 0; line-height: 1.5; }
+  .fact b { color: var(--gold); font-weight: 600; }
+  .sep { height: 1px; background: var(--line); margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <section id="s-start" class="on">
+    <div class="mid">
+      <h1>ACCURATE<em>horoscope</em></h1>
+      <p class="tag">Your sky, calculated.</p>
+    </div>
+    <button class="go" data-next>Begin</button>
+  </section>
+
+  <section id="s-name">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid">
+      <p class="q">What's your first name?</p>
+      <input id="in-name" autocomplete="given-name" maxlength="30" placeholder="Name" enterkeyhint="next">
+    </div>
+    <button class="go" data-next>Next</button>
+  </section>
+
+  <section id="s-date">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid">
+      <p class="q">When were you born?</p>
+      <input id="in-date" type="date" min="1900-01-01">
+    </div>
+    <button class="go" id="go-date" data-next disabled>Next</button>
+  </section>
+
+  <section id="s-sign">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid">
+      <p class="q">Do you know your sign?</p>
+      <div class="grid" id="sign-grid"></div>
+      <button class="ghost" id="sign-unsure">Not sure</button>
+    </div>
+  </section>
+
+  <section id="s-time">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid">
+      <p class="q">What time were you born?</p>
+      <p class="hint">Needed for your Moon and rising sign.</p>
+      <input id="in-time" type="time">
+      <button class="ghost" id="time-unknown">I don't know</button>
+    </div>
+    <button class="go" id="go-time" data-next disabled>Next</button>
+  </section>
+
+  <section id="s-place">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid" style="justify-content:flex-start;padding-top:12vh">
+      <p class="q">Where were you born?</p>
+      <p class="hint">Not listed? Pick the nearest city.</p>
+      <input id="in-place" placeholder="City" autocomplete="off" enterkeyhint="search">
+      <div class="list" id="place-list"></div>
+    </div>
+    <button class="go" id="go-place" data-next disabled>Next</button>
+  </section>
+
+  <section id="s-chart">
+    <div class="top"><button class="back" data-back>‹</button><div class="dots"></div></div>
+    <div class="mid" id="chart-wait"><div class="spin"></div><p class="tag">Reading the sky…</p></div>
+    <div class="mid" id="chart-out" hidden>
+      <p class="q" id="chart-hello"></p>
+      <div class="rows">
+        <div class="row"><b>☉</b><span>Sun</span><div id="c-sun"></div></div>
+        <div class="row"><b>☽</b><span>Moon</span><div id="c-moon"></div></div>
+        <div class="row"><b>↑</b><span>Rising</span><div id="c-asc"></div></div>
+      </div>
+      <p class="small" id="c-note"></p>
+      <p class="small" id="c-src"></p>
+    </div>
+    <button class="go" id="go-chart" data-next hidden>Read my horoscope</button>
+  </section>
+
+  <section id="s-scope">
+    <div class="top"><button class="back" data-back>‹</button></div>
+    <div class="mid" style="justify-content:flex-start;gap:14px">
+      <div class="tabs" id="tabs"><button data-t="0">Yesterday</button><button data-t="1" class="on">Today</button><button data-t="2">Tomorrow</button></div>
+      <div class="card" id="scope-card"></div>
+    </div>
+    <button class="go" data-next>How accurate was it?</button>
+  </section>
+
+  <section id="s-rate">
+    <div class="top"><button class="back" data-back>‹</button></div>
+    <div class="mid" id="rate-list" style="gap:22px"></div>
+    <button class="go" id="go-rate" data-next disabled>Done</button>
+  </section>
+
+  <section id="s-reveal">
+    <div class="top"><button class="back" data-back>‹</button></div>
+    <div class="mid" style="gap:14px">
+      <p class="small center">You rated it</p>
+      <p class="big" id="score"></p>
+      <p class="small center">accurate</p>
+      <div class="sep"></div>
+      <p class="stamp">It was random.</p>
+      <p class="fact center" id="how"></p>
+      <p class="small center" id="forer"></p>
+      <div class="card" id="other-card"></div>
+      <button class="ghost" id="other-btn">Another stranger</button>
+    </div>
+    <button class="go" data-next>Where was everything, really?</button>
+  </section>
+
+  <section id="s-sky">
+    <div class="top"><button class="back" data-back>‹</button></div>
+    <div class="mid scroll" id="sky-out"></div>
+    <button class="go" id="restart" style="margin-top:18px">Start over</button>
+  </section>
+</main>
+<script src="astro.js"></script>
+<script src="data.js"></script>
+<script src="cities.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
