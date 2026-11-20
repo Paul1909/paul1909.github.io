@@ -180,12 +180,21 @@ function runChart() {
   }, 1300);
 }
 
-// ---------- horoscope: one paragraph of advice, 5-6 sentences ----------
-function horoscope(dob, day, t) {
-  const r = rng(`accurate|${dob}|${day}`), pick = a => a[Math.floor(r() * a.length)];
-  const headline = pick(H.headlines), opener = pick(H.openers), story = pick(H.stories), a1 = pick(H.advice);
-  let a2 = pick(H.advice); while (a2 === a1) a2 = pick(H.advice);
-  return { headline, text: [conj(opener, t), conj(story, t), a1, a2, pick(H.closers)].join(' ') };
+// ---------- horoscope: one complete reading per day ----------
+// Each birth date gets its own shuffled order of the readings; the day number walks through it,
+// so the text is identical all day, changes every day, and never repeats two days in a row.
+function shuffled(n, seed) {
+  const r = rng(seed), a = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const DAY_WORD = ['yesterday', 'today', 'tomorrow'];
+function horoscope(dob, day, t, sign) {
+  const [y, m, d] = day.split('-').map(Number), n = Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  const text = H.horoscopes[shuffled(H.horoscopes.length, 'accurate|' + dob)[n % H.horoscopes.length]];
+  const headline = H.headlines[shuffled(H.headlines.length, 'accurate-h|' + dob)[n % H.headlines.length]];
+  const w = DAY_WORD[t];
+  return { headline, text: conj(text.replace(/\{day\}/g, w).replace(/\{Day\}/g, w[0].toUpperCase() + w.slice(1)).replace(/\{sign\}/g, sign), t) };
 }
 const dayOffset = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
 function fillCard(card, h, label, extraTop) {
@@ -198,7 +207,7 @@ function renderScope() {
   if (!natal) natal = computeNatal();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.t === tense));
   const d = dayOffset(tense - 1);
-  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), tense), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
+  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), tense, natal.sun), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
 }
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { tense = +b.dataset.t; renderScope(); }));
 
@@ -225,7 +234,7 @@ function renderRate() {
 function renderReveal() {
   const mean = answers.reduce((a, b) => a + b, 0) / answers.length;
   $('score').textContent = Math.round((mean - 1) / 4 * 100) + '%';
-  $('how').textContent = 'Each sentence was drawn from a shuffled list, using one number made from your birth date and the day\'s date. Your signs were never used.';
+  $('how').textContent = 'Each horoscope was picked from a shuffled list, using one number made from your birth date and the day\'s date. Your sign was only pasted in by name.';
 }
 
 // ---------- the real sky ----------
