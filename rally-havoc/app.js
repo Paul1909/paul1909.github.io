@@ -13,7 +13,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 const settings = { sound: store.get('sound', true), vibe: store.get('vibe', true), color: store.get('color', 0), gfx: store.get('gfx', 'high'),
-  cam: store.get('cam', 'chase'), model: Math.min(4, Math.max(0, store.get('model', 0) | 0)), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), ctrl: store.get('ctrl', 'halves') };
+  cam: store.get('cam', 'chase'), model: Math.min(5, Math.max(0, store.get('model', 0) | 0)), road: Object.assign({ traffic: true, police: true, obstacles: true, peds: true }, store.get('road', {})), ctrl: store.get('ctrl', 'halves') };
 const progress = store.get('progress', { unlocked: 1, best: {} });
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const vibrate = ms => { if (settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
@@ -706,6 +706,21 @@ const CAR_MODELS = [
       for (const sx of [-1, 1]) p.push(withRM(P_('box', 0.05, 0.06, 0.95, sx * 0.62, y, -0.15, 0x222222), TRIM_RM()));
       for (const z of [-0.5, -0.15, 0.2]) p.push(withRM(P_('box', 1.28, 0.04, 0.05, 0, y + 0.02, z, 0x222222), TRIM_RM()));
       return p; } },
+
+  { id: 'volta', name: 'VOLTA E', cls: 'ELECTRIC HYPERCAR', bars: [5, 5, 5, 1], electric: true, st: { spd: 1.1, acc: 1.2, hdl: 1.15, arm: 0.55, mass: 0.95, off: 0.6, electric: true },
+    rim: 0x2a2e33, spokes: 10, hoodAcc: false, pod: { z: 1.8, n: 0 }, roundelZ: -0.1,
+    spec(col, acc) { return { L: 4.5, hw: 0.9, flare: 0.05, n: 4.6, taper: 0.14, E: 0.32, sill: 0.22, noseLift: 0.05, tailLift: 0.08, r: 0.35, w: 0.28, x: 0.81, zs: [1.42, -1.38], sepWheels: true, exhaust: false,
+      paint: col, acc, metal: true, darkSill: true, band: [0.34, 0.4], hoodZ: [0.85, 2.0],
+      top: [[2.25, 0.5], [2.1, 0.62], [1.6, 0.72], [0.85, 0.82], [-1.6, 0.9], [-2.1, 0.92], [-2.25, 0.84]],
+      cab: { z1: 0.9, z0: -2.1, W: 0.74, taper: 0.36, roof: [[0.1, 1.22], [-0.5, 1.26], [-1.3, 1.16], [-1.85, 0.98]], zA: 0.15, zC: -1.3, cW: 0.9, pillars: [-0.6], pillarCol: TRIMC },
+      cabExtra: o => (o.s > 0.6 && Math.abs(o.x) < 0.5 && o.z < 0.15 && o.z > -1.3) ? M_GLASS : null,     // panoramic glass roof
+      seams: [0.8, -0.65], head: { x: 0.38, y: 0.6, w: 0.74, h: 0.05 }, tail: { x: 0.38, y: 0.84, w: 0.74, h: 0.06 }, grille: { y: 0.34, w: 1.3, h: 0.06 },   // full-width light bars, closed grille
+      more(B, b) {
+        const zf = endZ(B, 0, 0.3, true); b.push(withRM(RB(1.7, 0.035, 0.24, 0.015, 0, 0.235, zf - 0.03, TRIMC), TRIM_RM()));   // splitter
+        const zr = endZ(B, 0, 0.3, false); b.push(withRM(RB(1.4, 0.09, 0.2, 0.02, 0, 0.28, zr + 0.07, UNDER), UNDER_RM()));      // diffuser, no exhaust
+        for (const sx of [-1, 1]) { const xh = halfAt(B, 0.35, 0.62); if (xh > 0) b.push(withRM(RB(0.02, 0.05, 0.3, 0.01, sx * (xh + 0.004), 0.62, 0.35, 0xd8dce0), M_CHROME.slice(1))); }   // flush door handles
+      } }; },
+    spoiler(B, C, col, acc) { const y = B.yt(-2.1) + 0.03; return [RB(1.5, 0.035, 0.22, 0.015, 0, y, -2.1, acc, -0.2)]; } },   // ducktail lip
 ];
 const modelIdx = id => Math.max(0, CAR_MODELS.findIndex(m => m.id === id));
 function rallyGeo(mi, col, acc) {
@@ -727,7 +742,7 @@ function rallyGeo(mi, col, acc) {
     for (const sx of [-1, 1]) { const zt = endZ(B, sx * T_.x, T_.y, false); brk.push(RB(T_.w + 0.03, T_.h + 0.02, 0.03, 0.02, sx * T_.x, T_.y, zt - 0.008, 0xffffff)); }
     // light pod on the bonnet (or the roof bar on the truck)
     const pb = [], pl = [], P = M.pod, yp = P.roof ? C.yt(P.z) + 0.14 : B.yt(P.z) + 0.13, sp = P.roof ? 0.36 : 0.4;
-    pb.push(withRM(RB(sp * P.n + 0.1, 0.06, 0.08, 0.02, 0, yp - 0.1, P.z, TRIMC), TRIM_RM()));
+    if (P.n) pb.push(withRM(RB(sp * P.n + 0.1, 0.06, 0.08, 0.02, 0, yp - 0.1, P.z, TRIMC), TRIM_RM()));
     for (let k = 0; k < P.n; k++) { const x = (k - (P.n - 1) / 2) * sp; pb.push(withRM(P_('cyl', 0.13, 0.14, 0.13, x, yp, P.z, TRIMC, HPI), TRIM_RM())); pl.push(P_('cyl', 0.11, 0.04, 0.11, x, yp, P.z + 0.06, 0xfff3c8, HPI)); }
     const yr = S.sill + 0.43; let xr = 0; for (let y = yr - 0.26; y <= yr + 0.26; y += 0.02) xr = Math.max(xr, halfAt(B, M.roundelZ, y));
     return { hi: hi.geo, lo: lo.geo, lights: hi.lights, brake: merge(brk), podBody: merge(pb), podLights: merge(pl), hood, bumper, spoiler,
@@ -1183,6 +1198,11 @@ function audioInit() {
   AU.eG = ctx.createGain(); AU.eG.gain.value = 0;
   AU.eSrc.connect(AU.drive); AU.drive.connect(shaper); shaper.connect(AU.eF); AU.eF.connect(boom); boom.connect(pipe); pipe.connect(hp); hp.connect(AU.eG); AU.eG.connect(AU.master);
   AU.eSrc.start();
+  // electric motor: clean sine whine + triangle overtone + high inverter whine, rising with road speed
+  AU.evG = ctx.createGain(); AU.evG.gain.value = 0; AU.evF = ctx.createBiquadFilter(); AU.evF.type = 'lowpass'; AU.evF.frequency.value = 4000;
+  AU.ev = [['sine', 1, 1], ['triangle', 2.01, 0.35], ['sine', 5.3, 0.12], ['sine', 0.5, 0.4]].map(([type, mul, g]) => {
+    const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = type; gg.gain.value = g; o.connect(gg); gg.connect(AU.evF); o.start(); return { o, mul }; });
+  AU.evF.connect(AU.evG); AU.evG.connect(AU.master);
   const loopNoise = () => { const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true; n.start(); return n; };
   // intake / exhaust roar
   const bpI = ctx.createBiquadFilter(); bpI.type = 'bandpass'; bpI.Q.value = 1.4; AU.iF = bpI;
@@ -1224,20 +1244,23 @@ function audioUpdate(p, drift, off, active) {
   if (!AU.ctx) return;
   const t = AU.ctx.currentTime, rpm = p.rpm, rn = clamp((rpm - 800) / 6800, 0, 1), th = active ? p.throttle : 0;
   const f = rpm / 30;                                   // firing frequency of a 4-cylinder (2 pulses per rev)
+  const ev = !!(p.M && p.M.electric);
+  AU.evG.gain.setTargetAtTime(ev ? (active ? 0.03 + th * 0.025 + rn * 0.03 : 0.012) : 0, t, 0.05);
+  if (ev) { const fe = 110 + p.v * 32; for (const x of AU.ev) x.o.frequency.setTargetAtTime(fe * x.mul, t, 0.03); AU.evF.frequency.setTargetAtTime(1800 + th * 3000, t, 0.05); }
   AU.eSrc.playbackRate.setTargetAtTime(rpm / ENGINE_BASE_RPM, t, 0.012);
   AU.drive.gain.setTargetAtTime(0.7 + th * 1.6 + (p.turbo > 0 ? 0.5 : 0), t, 0.03);                // load: harder, rougher
   AU.eF.frequency.setTargetAtTime(500 + rn * 2400 + th * 1500 + (p.turbo > 0 ? 700 : 0), t, 0.03);  // off throttle = muffled
-  AU.eG.gain.setTargetAtTime(active ? 0.12 - th * 0.03 + rn * 0.045 : 0.07, t, 0.03);
+  AU.eG.gain.setTargetAtTime(ev ? 0 : active ? 0.12 - th * 0.03 + rn * 0.045 : 0.07, t, 0.03);
   // lifting off at high rpm: overrun crackle from the exhaust
-  if (active && th < 0.3 && rpm > 3800 && Math.random() < 0.09) sfxNoise(0.03 + Math.random() * 0.04, 700 + Math.random() * 900, 0.08 + Math.random() * 0.1, 'lowpass');
+  if (!ev && active && th < 0.3 && rpm > 3800 && Math.random() < 0.09) sfxNoise(0.03 + Math.random() * 0.04, 700 + Math.random() * 900, 0.08 + Math.random() * 0.1, 'lowpass');
   AU.iF.frequency.setTargetAtTime(f * 4 + 300, t, 0.03);
-  AU.iG.gain.setTargetAtTime(active ? th * (0.015 + rn * 0.05) : 0, t, 0.04);
+  AU.iG.gain.setTargetAtTime(active && !ev ? th * (0.015 + rn * 0.05) : 0, t, 0.04);
   AU.sG.gain.setTargetAtTime(clamp(drift, 0, 1) * 0.11, t, 0.05);
   AU.rG.gain.setTargetAtTime(off ? clamp(p.v / 30, 0, 1) * 0.35 : 0, t, 0.08);
   AU.tw.frequency.setTargetAtTime(1800 + rn * 2600, t, 0.05);
   AU.sir.frequency.setValueAtTime(Math.floor(t * 1.5) % 2 ? 466 : 622, t);
   AU.sirG.gain.setTargetAtTime(active ? clamp(1 - police.nearest / 170, 0, 1) * 0.045 : 0, t, 0.1);
-  AU.tG.gain.setTargetAtTime(active && (p.turbo > 0 || rn > 0.6) ? (p.turbo > 0 ? 0.022 : 0.006) * th : 0, t, 0.08);
+  AU.tG.gain.setTargetAtTime(active && !ev && (p.turbo > 0 || rn > 0.6) ? (p.turbo > 0 ? 0.022 : 0.006) * th : 0, t, 0.08);
 }
 function sfxNoise(dur, freq, gain, type = 'lowpass', f2) {
   if (!AU.ctx || !settings.sound) return;
@@ -1258,6 +1281,10 @@ const GEAR_TOP = [0, 12, 19, 26, 33, 40, 58];
 function rpmIn(g, v) { return 900 + v / GEAR_TOP[g] * 6500; }
 function updateGearbox(p, dt, inp, air) {
   const live = p.alive && (game.state === 'race' || game.state === 'finished' || game.state === 'countdown');
+  if (p.M && p.M.electric) {   // single-speed electric motor: revs follow road speed, no shifts, no limiter
+    p.gear = 1; p.shiftT = 0; if (!live || game.state === 'countdown') p.throttle = game.state === 'countdown' ? 0.1 : 0;
+    p.rpm = 800 + clamp(p.v / 60, 0, 1.1) * 6800 + (air ? 600 * p.throttle : 0); return;
+  }
   if (!p.gear) { p.gear = 1; p.rpm = 900; p.shiftT = 0; }
   if (p.shiftT > 0) p.shiftT -= dt;
   let target;
@@ -1800,7 +1827,11 @@ function explode(e) {
   SFX.boom(clamp(1.2 - dp / 160, 0.15, 1));
   game.shake = Math.min(2, game.shake + Math.max(0, 1.6 - dp / 40));
   if (dp < 40) vibrate(120);
-  if (e === player) { game.state = 'wrecked'; game.endT = 2.6; msg('WRECKED!', 'hot'); vibrate([150, 60, 250]); }
+  if (e.M && e.M.electric) {   // battery pack goes up: white-blue flash, arcing sparks, a fire that burns longer
+    for (let i = 0; i < 60; i++) emit(FX, _w.x, _w.y, _w.z, R(-12, 12), R(3, 16), R(-12, 12), R(0.3, 0.8), 0.5, 0.15, 14, [0.8, 0.9, 1], [0.2, 0.5, 1], 1, 0.6);
+    e.fire = 14;
+  }
+  if (e === player) { game.state = 'wrecked'; game.endT = 2.6; msg(e.M && e.M.electric ? 'BATTERY FIRE!' : 'WRECKED!', 'hot'); vibrate([150, 60, 250]); }
   else if (game.state === 'race' || game.state === 'finished') {
     const mine = game.t - e.lastByPlayer < 4;
     if (e.kind === 'rival') { if (mine) { msg(e.name.toUpperCase() + ' TAKEN OUT! +1500', 'gold'); game.stats.rivals++; addScore(1500); } }
@@ -1907,7 +1938,7 @@ function zones(e) {
     else if (z.zone === 'oil') {
       if (e === player) { if (player.oil <= 0) { player.spin += (Math.random() < 0.5 ? -1 : 1) * R(1.8, 2.6); msg('OIL!', 'hot'); } player.oil = 1.1; }
       else if (e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
-    } else if (e === player && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2) {   // one pickup per row
+    } else if (e === player && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2 && !(z.zone === 'turbo' && player.M && player.M.electric)) {   // one pickup per row; the electric leaves NOS bottles
       e.rowS = z.s;
       if (z.zone === 'wrench') { player.hp = Math.min(100, player.hp + 30); msg('REPAIR +30%', 'good'); }
       else { player.nos++; msg('NOS +1', 'blue'); }
@@ -2431,7 +2462,7 @@ function vehicleFx(dt) {
   if (p.drift > 0.12 && p.y < 0.1) for (const sd of [-0.8, 0.8]) puff(SMK, p.s + back, p.d + sd, 0.25, 1, COL.tyre0, COL.tyre1, 1.0, 1.1, 0.6, clamp(p.drift * 1.6, 0.2, 0.7), 0.8);
   if (Math.abs(p.d) > RW + 0.2 && p.v > 8 && !trackAt(p.s, tr1).town && p.y < 0.1) puff(SMK, p.s + back, p.d, 0.3, 2, COL.dust0, COL.dust1, 1.4, 1.2, 1, 0.55, 1.2);
   for (const e of ents) { if (e === p) continue; if (!e.dead && e.alive && e.boostT > 0 && Math.abs(e.s - p.s) < 150) nosTrail(e, e.ang, false, step, true); else if (e.trail) e.trail = null; }
-  if (p.turbo > 0 || p.jumpBoost > 0 && p.y < 0.2) nosTrail(p, p.yaw, p.turbo > 0, step, p.turbo > 0); else p.trail = null;
+  if (p.turbo > 0 || p.jumpBoost > 0 && p.y < 0.2 && !(p.M && p.M.electric)) nosTrail(p, p.yaw, p.turbo > 0, step, p.turbo > 0); else p.trail = null;
 }
 
 // NOS: two fat blue contrails from the twin exhausts. Particles are laid along the path travelled
@@ -2515,7 +2546,7 @@ function updateHud(dt, inp) {
   hud.wanted.classList.toggle('hidden', police.heat <= 0 && police.bust <= 0);
   hud.stars.textContent = '★'.repeat(police.heat) + '☆'.repeat(3 - police.heat);
   hud.bustI.style.width = clamp(police.bust / 3.2, 0, 1) * 100 + '%';
-  hud.gear.textContent = player.shiftT > 0 ? 'N' : player.gear || 'N';
+  hud.gear.textContent = player.M && player.M.electric ? 'E' : player.shiftT > 0 ? 'N' : player.gear || 'N';
   hud.spd.textContent = Math.round(player.v * 3.6);
   const hpF = Math.max(0, player.hp) / 100;
   hud.hp.style.width = ((1 - hpF) * 100) + '%';    // DAMAGE fills up as the car gets hurt
@@ -2524,7 +2555,7 @@ function updateHud(dt, inp) {
   const nk = player.nos + (player.turbo > 0 ? 100 : 0) + (lock > 0 ? 1000 * lock : 0);
   if (nk !== hud.lastNos) {
     hud.lastNos = nk; const n = player.nos;
-    hud.nos.innerHTML = n === 0 ? '<span class="none">EMPTY</span>' : n <= 6 ? '<i></i>'.repeat(n) : '<i></i><b>×' + n + '</b>';
+    hud.nos.innerHTML = player.M && player.M.electric ? '<span class="none">ELECTRIC</span>' : n === 0 ? '<span class="none">EMPTY</span>' : n <= 6 ? '<i></i>'.repeat(n) : '<i></i><b>×' + n + '</b>';
     hud.padNc.textContent = lock > 0 ? lock + 'S' : '×' + n; hud.padN.classList.toggle('empty', n === 0 || lock > 0);
     hud.nos.classList.toggle('locked', lock > 0);
   }
@@ -2555,7 +2586,7 @@ function loadStage(idx, forMenu = false) {
     buildDots();
     game.state = 'countdown'; game.count = 3.6; game.lastBeep = 4;
     show('hud'); $('pauseBtn').classList.remove('hidden'); $('camBtn').classList.remove('hidden'); hide('menu'); hide('result'); hide('pause');
-    for (const id of ['padL', 'padR', 'padB', 'padN']) $(id).classList.toggle('hidden', !isTouch); $('keysHint').classList.toggle('hidden', isTouch);
+    for (const id of ['padL', 'padR', 'padB', 'padN']) $(id).classList.toggle('hidden', !isTouch || (id === 'padN' && !!player.M.electric)); $('keysHint').classList.toggle('hidden', isTouch);
     player.gear = 1; player.rpm = 900; player.shiftT = 0; hud.lastNos = -1; game.nosHeld = false;
     try { history.pushState({ rh: 1 }, ''); } catch {}
     requestWake();
@@ -2852,6 +2883,7 @@ function pickupAhead(e, L, want) {
 }
 function useNos() {
   if (game.state !== 'race' || !player.alive || player.turbo > 0) return;
+  if (player.M && player.M.electric) { msg('ELECTRIC - NO NOS', 'hot'); return; }
   if (player.nos <= 0) { msg('NO NOS - GRAB A BOTTLE', 'hot'); return; }
   player.nos--; player.turbo = 3.5; msg('NOS!', 'blue'); SFX.turbo(); vibrate(30);
 }
