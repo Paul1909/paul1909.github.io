@@ -29,7 +29,6 @@ function rng(str) {        // FNV-1a hash -> mulberry32: same text in, same numb
   let a = h >>> 0;
   return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const conj = (s, t) => s.replace(/\{([^}]*)\}/g, (_, g) => g.split('|')[t]);
 
 // Fallback when the birthplace is unknown: the phone's time zone, placed at its main city.
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
@@ -180,34 +179,40 @@ function runChart() {
   }, 1300);
 }
 
-// ---------- horoscope: one complete reading per day ----------
-// Each birth date gets its own shuffled order of the readings; the day number walks through it,
-// so the text is identical all day, changes every day, and never repeats two days in a row.
+// ---------- horoscope: a daily column, written as if published on that date ----------
+// Each building block has its own shuffled order per birth date; the day number walks through it,
+// so the text is identical all day, changes every day, and no block repeats two days in a row.
 function shuffled(n, seed) {
   const r = rng(seed), a = [...Array(n).keys()];
   for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-const DAY_WORD = ['yesterday', 'today', 'tomorrow'];
-function horoscope(dob, day, t, sign) {
+function horoscope(dob, day, sign) {
   const [y, m, d] = day.split('-').map(Number), n = Math.round(Date.UTC(y, m - 1, d) / 86400000);
-  const text = H.horoscopes[shuffled(H.horoscopes.length, 'accurate|' + dob)[n % H.horoscopes.length]];
-  const headline = H.headlines[shuffled(H.headlines.length, 'accurate-h|' + dob)[n % H.headlines.length]];
-  const w = DAY_WORD[t];
-  return { headline, text: conj(text.replace(/\{day\}/g, w).replace(/\{Day\}/g, w[0].toUpperCase() + w.slice(1)).replace(/\{sign\}/g, sign), t) };
+  const pick = key => { const list = H[key]; return list[shuffled(list.length, `accurate|${key}|${dob}`)[n % list.length]]; };
+  const wd = k => new Date(Date.UTC(y, m - 1, d + k)).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+  const mon = k => new Date(Date.UTC(y, m - 1 + k, 1)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+  const T = { sign, SIGN: sign.toUpperCase(), y: wd(-1), t: wd(0), t1: wd(1), t2: wd(2), month0: mon(0), month: mon(1), year0: y, year: y + 1 };
+  const fill = str => str.replace(/\{(\w+)\}/g, (_, k) => k in T ? T[k] : _);
+  const work = pick('work'), mind = pick('mind'), love = pick('love'), single = pick('single'), couple = pick('couple');
+  return {
+    headline: pick('headlines'),
+    main: fill([pick('openers'), pick('pace'), work[0], mind[0], love[0], single[0], couple[0]].join(' ')),
+    closer: fill([work[1], love[1], single[1], couple[1], mind[1]].join(' ')),
+  };
 }
 const dayOffset = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
-function fillCard(card, h, label, extraTop) {
+function fillCard(card, h, label) {
   card.innerHTML = '';
-  if (extraTop) card.appendChild(el('p', 'small', extraTop));
   const meta = el('div', 'meta'); meta.append(el('span', '', label[0]), el('span', '', label[1])); card.appendChild(meta);
-  card.append(el('h2', '', h.headline), el('p', '', h.text));
+  card.append(el('h2', '', h.headline), el('p', '', h.main), el('p', 'look', "Reflections and a closer look at today's astrological landscape"));
+  const p = el('p', ''); p.append(el('b', '', natal.sun.toUpperCase() + ': '), h.closer); card.appendChild(p);
 }
 function renderScope() {
   if (!natal) natal = computeNatal();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.t === tense));
   const d = dayOffset(tense - 1);
-  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), tense, natal.sun), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
+  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), natal.sun), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
 }
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { tense = +b.dataset.t; renderScope(); }));
 
@@ -234,7 +239,7 @@ function renderRate() {
 function renderReveal() {
   const mean = answers.reduce((a, b) => a + b, 0) / answers.length;
   $('score').textContent = Math.round((mean - 1) / 4 * 100) + '%';
-  $('how').textContent = 'Each horoscope was picked from a shuffled list, using one number made from your birth date and the day\'s date. Your sign was only pasted in by name.';
+  $('how').textContent = 'Each horoscope was assembled from shuffled lists, using one number made from your birth date and the day\'s date. Your sign was only pasted in by name.';
 }
 
 // ---------- the real sky ----------
