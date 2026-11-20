@@ -1200,7 +1200,7 @@ function audioInit() {
   AU.eSrc.start();
   // electric motor: clean sine whine + triangle overtone + high inverter whine, rising with road speed
   AU.evG = ctx.createGain(); AU.evG.gain.value = 0; AU.evF = ctx.createBiquadFilter(); AU.evF.type = 'lowpass'; AU.evF.frequency.value = 4000;
-  AU.ev = [['sine', 1, 1], ['triangle', 2.01, 0.35], ['sine', 5.3, 0.12], ['sine', 0.5, 0.4]].map(([type, mul, g]) => {
+  AU.ev = [['sine', 1, 1], ['triangle', 2.0, 0.22], ['sine', 3.02, 0.06], ['sine', 0.5, 0.55]].map(([type, mul, g]) => {
     const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = type; gg.gain.value = g; o.connect(gg); gg.connect(AU.evF); o.start(); return { o, mul }; });
   AU.evF.connect(AU.evG); AU.evG.connect(AU.master);
   const loopNoise = () => { const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true; n.start(); return n; };
@@ -1245,8 +1245,8 @@ function audioUpdate(p, drift, off, active) {
   const t = AU.ctx.currentTime, rpm = p.rpm, rn = clamp((rpm - 800) / 6800, 0, 1), th = active ? p.throttle : 0;
   const f = rpm / 30;                                   // firing frequency of a 4-cylinder (2 pulses per rev)
   const ev = !!(p.M && p.M.electric);
-  AU.evG.gain.setTargetAtTime(ev ? (active ? 0.03 + th * 0.025 + rn * 0.03 : 0.012) : 0, t, 0.05);
-  if (ev) { const fe = 110 + p.v * 32; for (const x of AU.ev) x.o.frequency.setTargetAtTime(fe * x.mul, t, 0.03); AU.evF.frequency.setTargetAtTime(1800 + th * 3000, t, 0.05); }
+  AU.evG.gain.setTargetAtTime(ev ? (active ? 0.045 + th * 0.03 + rn * 0.03 : 0.018) : 0, t, 0.05);
+  if (ev) { const fe = 55 + p.v * 8.5; for (const x of AU.ev) x.o.frequency.setTargetAtTime(fe * x.mul, t, 0.03); AU.evF.frequency.setTargetAtTime(700 + th * 900, t, 0.05); }   // ~55 Hz hum at rest to ~450 Hz whine flat out
   AU.eSrc.playbackRate.setTargetAtTime(rpm / ENGINE_BASE_RPM, t, 0.012);
   AU.drive.gain.setTargetAtTime(0.7 + th * 1.6 + (p.turbo > 0 ? 0.5 : 0), t, 0.03);                // load: harder, rougher
   AU.eF.frequency.setTargetAtTime(500 + rn * 2400 + th * 1500 + (p.turbo > 0 ? 700 : 0), t, 0.03);  // off throttle = muffled
