@@ -79,10 +79,12 @@
   .scroll { gap: 16px; padding-top: 8px; }
   .fact { margin: 0; line-height: 1.5; }
   .fact b { color: var(--gold); font-weight: 600; }
-  figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-  figure img { width: 100%; border-radius: 14px; display: block; background: var(--card); }
-  figcaption { color: var(--mute); font-size: 13px; line-height: 1.4; }
-  figcaption a { color: var(--gold); }
+  .skymap { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .skymap canvas { touch-action: manipulation; }
+  .skyrow { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .skyrow span { color: var(--fg); font-size: 14px; min-width: 88px; font-variant-numeric: tabular-nums; }
+  .skyrow input[type=range] { flex: 1; padding: 0; border: 0; accent-color: var(--gold); }
+  .chip.mini { min-height: 36px; padding: 0 10px; font-size: 13px; }
   .sep { height: 1px; background: var(--line); margin: 4px 0; }
 </style>
 </head>
@@ -167,9 +169,6 @@
       <div class="sep"></div>
       <p class="stamp">It was random.</p>
       <p class="fact center" id="how"></p>
-      <p class="small center" id="forer"></p>
-      <div class="card" id="other-card"></div>
-      <button class="ghost" id="other-btn">Another stranger</button>
     </div>
     <button class="go" data-next>Where was everything, really?</button>
   </section>
@@ -183,6 +182,8 @@
 <script src="astro.js"></script>
 <script src="data.js"></script>
 <script src="cities.js"></script>
+<script src="skydata.js"></script>
+<script src="skymap.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -61,7 +61,8 @@
       - 0.11 * sin(186.5 + 966404.03 * T);
     const par = 0.9508 + 0.0518 * cos(135.0 + 477198.87 * T) + 0.0095 * cos(259.3 - 413335.36 * T)
       + 0.0078 * cos(235.7 + 890534.22 * T) + 0.0028 * cos(269.9 + 954397.74 * T);
-    return { lon: norm(l), km: 6378.14 / sin(par) };
+    const b = 5.13 * sin(93.3 + 483202.02 * T) + 0.28 * sin(228.2 + 960400.89 * T) - 0.28 * sin(318.3 + 6003.15 * T) - 0.17 * sin(217.6 - 407332.21 * T);
+    return { lon: norm(l), lat: b, km: 6378.14 / sin(par) };
   }
   const PREC = 1.396971;  // general precession in longitude, degrees per century
 
@@ -127,6 +128,39 @@
     return { bodies: out, made, sputnik: t >= Date.UTC(1957, 9, 4) };
   }
 
-  root.Astro = { chart, sky, sign, constellation, SIGNS, AU, LY, C, jd, ascendant, cent, helio, moon, halley, norm };
+  // ---- coordinates for the sky map (equinox of date, degrees) ----
+  const obl = T => 23.4392911 - 0.0130042 * T;
+  function eclToEq(l, b, eps) {
+    const ra = Math.atan2(sin(l) * cos(eps) - Math.tan(b * D2R) * sin(eps), cos(l)) / D2R;
+    return [norm(ra), Math.asin(sin(b) * cos(eps) + cos(b) * sin(eps) * sin(l)) / D2R];
+  }
+  function eqToEcl(ra, dec, eps) {
+    const l = Math.atan2(sin(ra) * cos(eps) + Math.tan(dec * D2R) * sin(eps), cos(ra)) / D2R;
+    return [norm(l), Math.asin(sin(dec) * cos(eps) - cos(dec) * sin(eps) * sin(ra)) / D2R];
+  }
+  // J2000 RA/Dec -> RA/Dec of date (precession via ecliptic longitude)
+  function precess(ra, dec, T) { const [l, b] = eqToEcl(ra, dec, 23.4392911); return eclToEq(l + PREC * T, b, obl(T)); }
+  const lat = v => Math.atan2(v[2], Math.hypot(v[0], v[1])) / D2R;
+  function skyBodies(date) {
+    const T = cent(date), eps = obl(T), earth = helio('Earth', T), out = [];
+    const sunV = sub([0, 0, 0], earth);
+    out.push({ name: 'Sun', eq: eclToEq(lon(sunV) + PREC * T, lat(sunV), eps), dist: len(sunV) * AU });
+    const m = moon(T);
+    out.push({ name: 'Moon', eq: eclToEq(m.lon, m.lat, eps), dist: m.km * 1000 });
+    for (const n of ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']) {
+      const g = sub(helio(n, T), earth);
+      out.push({ name: n, eq: eclToEq(lon(g) + PREC * T, lat(g), eps), dist: len(g) * AU });
+    }
+    return out;
+  }
+  const gmst = date => norm(280.46061837 + 360.98564736629 * (jd(date) - 2451545));
+  function altAz(ra, dec, lst, phi) {
+    const H = lst - ra;
+    const alt = Math.asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H)) / D2R;
+    const az = norm(Math.atan2(-sin(H) * cos(dec), cos(phi) * sin(dec) - sin(phi) * cos(dec) * cos(H)) / D2R);
+    return [alt, az];
+  }
+
+  root.Astro = { skyBodies, precess, eclToEq, obl, gmst, altAz, chart, sky, sign, constellation, SIGNS, AU, LY, C, jd, ascendant, cent, helio, moon, halley, norm };
   if (typeof module !== 'undefined') module.exports = root.Astro;
 })(typeof window !== 'undefined' ? window : globalThis);

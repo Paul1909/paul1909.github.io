@@ -121,17 +121,12 @@ function runChart() {
   }, 1300);
 }
 
-// ---------- horoscope: one paragraph, 3-4 sentences ----------
-function horoscope(dob, day, t, signs) {
+// ---------- horoscope: one paragraph of advice, 5-6 sentences ----------
+function horoscope(dob, day, t) {
   const r = rng(`accurate|${dob}|${day}`), pick = a => a[Math.floor(r() * a.length)];
-  const headline = pick(H.headlines), planet = pick(H.planets), aspect = pick(H.aspects);
-  let ti = Math.floor(r() * 3); if (planet === 'The Moon' && ti === 1) ti = 0;   // never "the Moon ... your Moon"
-  const target = [`${signs.sun} Sun`, `${signs.moon} Moon`, `${signs.asc} rising`][ti];
-  const house = pick(H.houses), story = pick(H.stories), advice = pick(H.advice);
-  return {
-    headline,
-    text: `${planet} ${conj('{was|is|will be}', t)} ${aspect} your ${target}, in your ${house} house. ${conj(story, t)} ${advice}`,
-  };
+  const headline = pick(H.headlines), opener = pick(H.openers), story = pick(H.stories), a1 = pick(H.advice);
+  let a2 = pick(H.advice); while (a2 === a1) a2 = pick(H.advice);
+  return { headline, text: [conj(opener, t), conj(story, t), a1, a2, pick(H.closers)].join(' ') };
 }
 const dayOffset = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
 function fillCard(card, h, label, extraTop) {
@@ -144,7 +139,7 @@ function renderScope() {
   if (!natal) natal = computeNatal();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.t === tense));
   const d = dayOffset(tense - 1);
-  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), tense, natal), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
+  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), tense), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
 }
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { tense = +b.dataset.t; renderScope(); }));
 
@@ -168,43 +163,10 @@ function renderRate() {
 }
 
 // ---------- reveal ----------
-function stranger() {
-  const t = Date.UTC(1950, 0, 1) + Math.random() * (Date.UTC(2010, 0, 1) - Date.UTC(1950, 0, 1));
-  const iso = new Date(t).toISOString().slice(0, 10);
-  const c = Astro.chart(new Date(iso + 'T12:00:00Z'), 0, 0);
-  const signs = { sun: Astro.sign(c.sun), moon: Astro.sign(c.moon), asc: Astro.SIGNS[Math.floor(Math.random() * 12)] };
-  fillCard($('other-card'), horoscope(iso, dayKey(dayOffset(0)), 1, signs), [signs.sun.toUpperCase(), 'Today'], `Today, a ${signs.sun} born ${fmtDate(iso)} got:`);
-}
-$('other-btn').addEventListener('click', stranger);
 function renderReveal() {
   const mean = answers.reduce((a, b) => a + b, 0) / answers.length;
   $('score').textContent = Math.round((mean - 1) / 4 * 100) + '%';
-  $('how').textContent = 'Each sentence was drawn from a shuffled list, using one number made from your birth date and the day\'s date. Your signs were only pasted in by name.';
-  $('forer').textContent = `In 1949, psychologist Bertram Forer gave every student the same generic profile. They rated it 4.3 out of 5. You gave yours ${mean.toFixed(1)}.`;
-  stranger();
-}
-
-// ---------- NASA Astronomy Picture of the Day (online, from 16 June 1995) ----------
-const APOD_FIRST = '1995-06-16';
-const apodPage = iso => `https://apod.nasa.gov/apod/ap${iso.slice(2, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}.html`;
-function nasaPicture(iso, box) {
-  if (iso < APOD_FIRST) return;
-  const fig = el('figure'), cap = el('figcaption');
-  const link = text => { const a = el('a', '', text); a.href = apodPage(iso); a.target = '_blank'; a.rel = 'noopener'; return a; };
-  const ctl = new AbortController(); setTimeout(() => ctl.abort(), 10000);
-  fetch(`https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&thumbs=true&date=${iso}`, { signal: ctl.signal })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(d => {
-      const src = d.media_type === 'image' ? d.url : d.thumbnail_url;
-      if (src) { const a = link(''); const img = el('img'); img.src = src; img.alt = d.title || 'NASA picture'; img.loading = 'lazy'; a.appendChild(img); fig.appendChild(a); }
-      cap.append('NASA picture of the day: ', link(d.title || 'open'));
-      if (d.copyright) cap.append(` · © ${d.copyright.trim()}`);
-      fig.appendChild(cap); box.appendChild(fig);
-    })
-    .catch(status => {
-      if (status === 400 || status === 404) return;          // no picture that day
-      cap.append(link("See NASA's picture of the day for your birthday")); fig.appendChild(cap); box.appendChild(fig);
-    });
+  $('how').textContent = 'Each sentence was drawn from a shuffled list, using one number made from your birth date and the day\'s date. Your signs were never used.';
 }
 
 // ---------- the real sky ----------
@@ -218,7 +180,6 @@ function renderSky() {
   out.innerHTML = '';
   const fact = html => { const p = el('p', 'fact'); p.innerHTML = html; out.appendChild(p); };
   out.appendChild(el('p', 'small', 'Your birthday · ' + fmtDate(st.dob)));
-  const pic = el('div'); out.appendChild(pic); nasaPicture(st.dob, pic);
 
   const real = Astro.constellation(natal.sunJ2000), drift = Math.round(23.86 + 0.01397 * (year - 2000));
   if (real === (IAU[natal.sun] || natal.sun)) fact(`The Sun stood in front of <b>${real}</b>, but only by luck: Earth's axis has wobbled ~${drift}° since horoscope dates were fixed, 2,000 years ago.`);
@@ -235,4 +196,6 @@ function renderSky() {
   else if (sky.made.some(m => m.name === 'ISS' || m.name === 'Hubble')) out.appendChild(el('p', 'small', 'ISS and Hubble shown at their height above the ground.'));
   const end = el('p', 'stamp', "Nothing up there could tell your day apart from anyone else's."); end.style.fontSize = '22px'; end.style.marginTop = '8px';
   out.appendChild(end);
+  const map = el('div'); map.style.marginTop = '10px'; out.appendChild(map);
+  SkyMap(map, natal.utc, { name: HOME.name, lat: HOME.lat, lng: HOME.lng, tz: TZ });
 }
