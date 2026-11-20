@@ -194,19 +194,29 @@ function horoscope(dob, day, sign) {
   const mon = k => new Date(Date.UTC(y, m - 1 + k, 1)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
   const T = { sign, SIGN: sign.toUpperCase(), y: wd(-1), t: wd(0), t1: wd(1), t2: wd(2), month0: mon(0), month: mon(1), year0: y, year: y + 1 };
   const fill = str => str.replace(/\{(\w+)\}/g, (_, k) => k in T ? T[k] : _);
-  const work = pick('work'), mind = pick('mind'), love = pick('love'), single = pick('single'), couple = pick('couple');
+  const [pace, work, mind, love, love2, single, couple, friends, well, reflect] =
+    ['pace', 'work', 'mind', 'love', 'love2', 'single', 'couple', 'friends', 'well', 'reflect'].map(pick);
   return {
     headline: pick('headlines'),
-    main: fill([pick('openers'), pick('pace'), work[0], mind[0], love[0], single[0], couple[0]].join(' ')),
-    closer: fill([work[1], love[1], single[1], couple[1], mind[1]].join(' ')),
+    main: [
+      [pick('openers'), pace[0], work[0], mind[0]],
+      [love[0], love2[0], single[0], couple[0]],
+      [friends[0], well[0], reflect[0]],
+    ].map(p => fill(p.join(' '))),
+    closer: [[work[1], pace[1]], [love[1], love2[1], single[1], couple[1]], [friends[1], well[1], mind[1]]].map(p => fill(p.join(' '))),
+    reflect: fill(reflect[1]),
   };
 }
 const dayOffset = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
 function fillCard(card, h, label) {
   card.innerHTML = '';
   const meta = el('div', 'meta'); meta.append(el('span', '', label[0]), el('span', '', label[1])); card.appendChild(meta);
-  card.append(el('h2', '', h.headline), el('p', '', h.main), el('p', 'look', "Reflections and a closer look at today's astrological landscape"));
-  const p = el('p', ''); p.append(el('b', '', natal.sun.toUpperCase() + ': '), h.closer); card.appendChild(p);
+  card.appendChild(el('h2', '', h.headline));
+  h.main.forEach(t => card.appendChild(el('p', '', t)));
+  card.appendChild(el('p', 'look', "Reflections and a closer look at today's astrological landscape"));
+  h.closer.forEach((t, i) => { const p = el('p', ''); if (!i) p.appendChild(el('b', '', natal.sun.toUpperCase() + ': ')); p.append(t); card.appendChild(p); });
+  card.appendChild(el('p', 'look', 'Something to reflect on'));
+  card.appendChild(el('p', 'muse', h.reflect));
 }
 function renderScope() {
   if (!natal) natal = computeNatal();
