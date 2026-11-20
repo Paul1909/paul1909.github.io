@@ -1,6 +1,8 @@
+// No offline mode: remove this app's old service worker and cache, if a phone still has them.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => { if (r.scope.includes('/accurate-horoscope/')) r.unregister(); })).catch(() => {});
 }
+if (window.caches) caches.keys().then(ks => ks.forEach(k => { if (k.startsWith('accurate-horoscope-')) caches.delete(k); })).catch(() => {});
 
 // All apps in the arcade share one localStorage, so every key gets this app's prefix.
 const APP = 'accurate-horoscope';
@@ -11,12 +13,12 @@ const store = {
 
 const $ = id => document.getElementById(id);
 const S = [...document.querySelectorAll('section')];
-const QUESTIONS = ['s-name', 's-date', 's-sign', 's-time', 's-place', 's-chart'];
-const st = Object.assign({ name: '', dob: '', sign: null, time: null, city: null }, store.get('last', {}));
+const QUESTIONS = ['s-date', 's-sign', 's-time', 's-chart'];
+const saved = store.get('last', {});
+const st = { dob: saved.dob || '', sign: saved.sign || null, time: saved.time || null };
 let idx = 0, chartTimer = 0, tense = 1, answers = [], natal = null;
 
 // ---------- helpers ----------
-const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const pad = n => String(n).padStart(2, '0');
 const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fmtDate = (iso, o = { day: 'numeric', month: 'long', year: 'numeric' }) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', Object.assign({ timeZone: 'UTC' }, o));
@@ -29,17 +31,23 @@ function rng(str) {        // FNV-1a hash -> mulberry32: same text in, same numb
 }
 const conj = (s, t) => s.replace(/\{([^}]*)\}/g, (_, g) => g.split('|')[t]);
 
-// Local birth time in a city -> UTC instant (uses the browser's time-zone history).
+// Where the birth time is read from: the phone's time zone, placed at its main city.
+const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
+const HOME = (() => {
+  const c = CITIES.find(c => c[4] === TZ);
+  if (c) return { name: c[0], lat: c[2], lng: c[3] };
+  return { name: TZ.split('/').pop().replace(/_/g, ' '), lat: 40, lng: -new Date().getTimezoneOffset() / 4 };
+})();
 function tzOffsetMin(tz, date) {
   const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
     .formatToParts(date).forEach(x => p[x.type] = +x.value);
   return (Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute) - Math.floor(date.getTime() / 60000) * 60000) / 60000;
 }
-function toUTC(dob, time, tz) {
+function toUTC(dob, time) {
   const [y, m, d] = dob.split('-').map(Number), [h, mi] = time.split(':').map(Number);
   const guess = Date.UTC(y, m - 1, d, h, mi);
-  let off = 0; try { off = tzOffsetMin(tz, new Date(guess)); off = tzOffsetMin(tz, new Date(guess - off * 60000)); } catch {}
-  return { date: new Date(guess - off * 60000), off };
+  let off = 0; try { off = tzOffsetMin(TZ, new Date(guess)); off = tzOffsetMin(TZ, new Date(guess - off * 60000)); } catch {}
+  return new Date(guess - off * 60000);
 }
 
 // ---------- navigation (Android back swipe steps back) ----------
@@ -64,18 +72,13 @@ function enter(id) {
   if (id === 's-reveal') renderReveal();
   if (id === 's-sky') renderSky();
 }
-const save = () => store.set('last', { name: st.name, dob: st.dob, sign: st.sign, time: st.time, city: st.city });
+const save = () => store.set('last', { dob: st.dob, sign: st.sign, time: st.time });
 
 // ---------- questions ----------
-const nameIn = $('in-name');
-nameIn.value = st.name;
-nameIn.addEventListener('input', () => { st.name = nameIn.value.trim(); save(); });
-nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') { nameIn.blur(); next(); } });
-
 const dateIn = $('in-date');
 dateIn.max = dayKey(new Date());
 const dateOk = () => /^\d{4}-\d\d-\d\d$/.test(dateIn.value) && dateIn.value >= '1900-01-01' && dateIn.value <= dateIn.max;
-dateIn.value = st.dob || '';
+dateIn.value = st.dob;
 dateIn.addEventListener('input', () => { $('go-date').disabled = !dateOk(); if (dateOk()) { st.dob = dateIn.value; save(); } });
 $('go-date').disabled = !dateOk();
 
@@ -93,39 +96,18 @@ timeIn.addEventListener('input', () => { st.time = timeIn.value || null; $('go-t
 $('go-time').disabled = !st.time;
 $('time-unknown').addEventListener('click', () => { st.time = null; timeIn.value = ''; save(); next(); });
 
-const placeIn = $('in-place'), list = $('place-list');
-function renderPlaces() {
-  const q = fold(placeIn.value.trim()); list.innerHTML = '';
-  let hits = [];
-  if (q) {
-    const scored = CITIES.map((c, i) => { const n = fold(c[0]), k = fold(c[1]);
-      return [n.startsWith(q) ? 0 : n.includes(q) ? 1 : k.startsWith(q) ? 2 : 9, i]; }).filter(x => x[0] < 9);
-    scored.sort((a, b) => a[0] - b[0] || CITIES[a[1]][0].localeCompare(CITIES[b[1]][0]));
-    hits = scored.slice(0, 6).map(x => x[1]);
-  } else if (st.city != null) hits = [st.city];
-  hits.forEach(i => {
-    const b = el('button', 'chip' + (i === st.city ? ' on' : ''), CITIES[i][0]); b.appendChild(el('small', '', CITIES[i][1]));
-    b.addEventListener('click', () => { st.city = i; save(); placeIn.value = CITIES[i][0]; placeIn.blur(); renderPlaces(); $('go-place').disabled = false; });
-    list.appendChild(b);
-  });
-  if (q && !hits.length) list.appendChild(el('p', 'small', 'No match. Try a bigger city nearby.'));
-}
-placeIn.addEventListener('input', () => { if (st.city != null && placeIn.value !== CITIES[st.city][0]) { st.city = null; $('go-place').disabled = true; } renderPlaces(); });
-if (st.city != null && CITIES[st.city]) { placeIn.value = CITIES[st.city][0]; $('go-place').disabled = false; } else st.city = null;
-renderPlaces();
-
 // ---------- chart ----------
 function computeNatal() {
-  const c = CITIES[st.city], t = toUTC(st.dob, st.time || '12:00', c[4]);
-  const ch = Astro.chart(t.date, c[2], c[3]);
-  return { utc: t.date, off: t.off, city: c, sun: Astro.sign(ch.sun), sunLon: ch.sun, moon: Astro.sign(ch.moon), asc: Astro.sign(ch.asc), sunJ2000: ch.sunJ2000 };
+  const utc = toUTC(st.dob, st.time || '12:00');
+  const ch = Astro.chart(utc, HOME.lat, HOME.lng);
+  return { utc, sun: Astro.sign(ch.sun), sunLon: ch.sun, moon: Astro.sign(ch.moon), asc: Astro.sign(ch.asc), sunJ2000: ch.sunJ2000 };
 }
 function runChart() {
   $('chart-wait').hidden = false; $('chart-out').hidden = true; $('go-chart').hidden = true;
   natal = computeNatal();
   chartTimer = setTimeout(() => {
     $('chart-wait').hidden = true; $('chart-out').hidden = false; $('go-chart').hidden = false;
-    $('chart-hello').textContent = st.name ? `${st.name}, here's your sky.` : "Here's your sky.";
+    $('chart-hello').textContent = "Here's your sky.";
     $('c-sun').textContent = natal.sun; $('c-moon').textContent = natal.moon; $('c-asc').textContent = natal.asc;
     const notes = [];
     if (st.sign && st.sign !== natal.sun) {
@@ -135,49 +117,39 @@ function runChart() {
     }
     if (!st.time) notes.push('No birth time, so noon is assumed. Astrologers do the same.');
     $('c-note').textContent = notes.join(' ');
-    const o = natal.off, sign = o < 0 ? '−' : '+', oh = Math.floor(Math.abs(o) / 60), om = Math.abs(o) % 60;
-    $('c-src').textContent = `${fmtDate(st.dob, { day: 'numeric', month: 'short', year: 'numeric' })}, ${st.time || '12:00'}, ${natal.city[0]} (UTC${sign}${oh}${om ? ':' + pad(om) : ''})`;
+    $('c-src').textContent = `${fmtDate(st.dob, { day: 'numeric', month: 'short', year: 'numeric' })}, ${st.time || '12:00'}, ${HOME.name} time`;
   }, 1300);
 }
 
-// ---------- horoscope ----------
+// ---------- horoscope: one paragraph, 3-4 sentences ----------
 function horoscope(dob, day, t, signs) {
   const r = rng(`accurate|${dob}|${day}`), pick = a => a[Math.floor(r() * a.length)];
   const headline = pick(H.headlines), planet = pick(H.planets), aspect = pick(H.aspects);
-  const target = [`${signs.sun} Sun`, `${signs.moon} Moon`, `${signs.asc} rising`][Math.floor(r() * 3)];
-  const house = pick(H.houses), story = pick(H.stories), advice = pick(H.advice), colour = pick(H.colours);
-  const number = 1 + Math.floor(r() * 99), love = 1 + Math.floor(r() * 5), work = 1 + Math.floor(r() * 5), energy = 1 + Math.floor(r() * 5);
+  let ti = Math.floor(r() * 3); if (planet === 'The Moon' && ti === 1) ti = 0;   // never "the Moon ... your Moon"
+  const target = [`${signs.sun} Sun`, `${signs.moon} Moon`, `${signs.asc} rising`][ti];
+  const house = pick(H.houses), story = pick(H.stories), advice = pick(H.advice);
   return {
-    headline, advice, colour, number, love, work, energy,
-    sky: `${planet} ${conj('{was|is|will be}', t)} ${aspect} your ${target}, in your ${house} house.`,
-    story: conj(story, t),
+    headline,
+    text: `${planet} ${conj('{was|is|will be}', t)} ${aspect} your ${target}, in your ${house} house. ${conj(story, t)} ${advice}`,
   };
 }
 const dayOffset = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
-const bar = n => '●'.repeat(n) + '○'.repeat(5 - n);
-function fillCard(card, h, label, t, extraTop) {
+function fillCard(card, h, label, extraTop) {
   card.innerHTML = '';
   if (extraTop) card.appendChild(el('p', 'small', extraTop));
   const meta = el('div', 'meta'); meta.append(el('span', '', label[0]), el('span', '', label[1])); card.appendChild(meta);
-  card.append(el('h2', '', h.headline), el('p', 'small', h.sky), el('p', '', h.story));
-  const tip = el('p', ''); tip.append(el('b', '', (t === 0 ? 'Lesson' : 'Tip') + '  ')); tip.querySelector('b').style.color = 'var(--gold)';
-  tip.append(h.advice); card.appendChild(tip);
-  const m = el('div', 'meter');
-  [['Love', h.love], ['Work', h.work], ['Energy', h.energy]].forEach(([k, v]) => { const s = el('span', '', k + ' '); s.appendChild(el('i', '', bar(v))); m.appendChild(s); });
-  card.appendChild(m);
-  card.appendChild(el('p', 'small', `Lucky number ${h.number} · Lucky colour ${h.colour}`));
+  card.append(el('h2', '', h.headline), el('p', '', h.text));
 }
 function renderScope() {
   if (!natal) natal = computeNatal();
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.t === tense));
   const d = dayOffset(tense - 1);
-  const h = horoscope(st.dob, dayKey(d), tense, natal);
-  fillCard($('scope-card'), h, [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })], tense);
+  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), tense, natal), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
 }
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { tense = +b.dataset.t; renderScope(); }));
 
 // ---------- rating ----------
-const STATEMENTS = ['It matched my day.', 'It felt written for me.', 'The tip was useful.', "I'd read it again tomorrow."];
+const STATEMENTS = ['It matched my day.', 'It felt written for me.', 'The advice was useful.', "I'd read it again tomorrow."];
 function renderRate() {
   const box = $('rate-list'); box.innerHTML = '';
   answers = answers.length ? answers : STATEMENTS.map(() => 0);
@@ -198,32 +170,47 @@ function renderRate() {
 // ---------- reveal ----------
 function stranger() {
   const t = Date.UTC(1950, 0, 1) + Math.random() * (Date.UTC(2010, 0, 1) - Date.UTC(1950, 0, 1));
-  const d = new Date(t), iso = d.toISOString().slice(0, 10);
+  const iso = new Date(t).toISOString().slice(0, 10);
   const c = Astro.chart(new Date(iso + 'T12:00:00Z'), 0, 0);
   const signs = { sun: Astro.sign(c.sun), moon: Astro.sign(c.moon), asc: Astro.SIGNS[Math.floor(Math.random() * 12)] };
-  const h = horoscope(iso, dayKey(dayOffset(0)), 1, signs);
-  fillCard($('other-card'), h, [signs.sun.toUpperCase(), 'Today'], 1, `Today, a ${signs.sun} born ${fmtDate(iso)} got:`);
+  fillCard($('other-card'), horoscope(iso, dayKey(dayOffset(0)), 1, signs), [signs.sun.toUpperCase(), 'Today'], `Today, a ${signs.sun} born ${fmtDate(iso)} got:`);
 }
 $('other-btn').addEventListener('click', stranger);
 function renderReveal() {
   const mean = answers.reduce((a, b) => a + b, 0) / answers.length;
   $('score').textContent = Math.round((mean - 1) / 4 * 100) + '%';
-  $('how').textContent = 'Each line was drawn from a shuffled list, using one number made from your birth date and the day\'s date. Your signs were only pasted in by name.';
+  $('how').textContent = 'Each sentence was drawn from a shuffled list, using one number made from your birth date and the day\'s date. Your signs were only pasted in by name.';
   $('forer').textContent = `In 1949, psychologist Bertram Forer gave every student the same generic profile. They rated it 4.3 out of 5. You gave yours ${mean.toFixed(1)}.`;
   stranger();
 }
 
+// ---------- NASA Astronomy Picture of the Day (online, from 16 June 1995) ----------
+const APOD_FIRST = '1995-06-16';
+const apodPage = iso => `https://apod.nasa.gov/apod/ap${iso.slice(2, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}.html`;
+function nasaPicture(iso, box) {
+  if (iso < APOD_FIRST) return;
+  const fig = el('figure'), cap = el('figcaption');
+  const link = text => { const a = el('a', '', text); a.href = apodPage(iso); a.target = '_blank'; a.rel = 'noopener'; return a; };
+  const ctl = new AbortController(); setTimeout(() => ctl.abort(), 10000);
+  fetch(`https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&thumbs=true&date=${iso}`, { signal: ctl.signal })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(d => {
+      const src = d.media_type === 'image' ? d.url : d.thumbnail_url;
+      if (src) { const a = link(''); const img = el('img'); img.src = src; img.alt = d.title || 'NASA picture'; img.loading = 'lazy'; a.appendChild(img); fig.appendChild(a); }
+      cap.append('NASA picture of the day: ', link(d.title || 'open'));
+      if (d.copyright) cap.append(` · © ${d.copyright.trim()}`);
+      fig.appendChild(cap); box.appendChild(fig);
+    })
+    .catch(status => {
+      if (status === 400 || status === 404) return;          // no picture that day
+      cap.append(link("See NASA's picture of the day for your birthday")); fig.appendChild(cap); box.appendChild(fig);
+    });
+}
+
 // ---------- the real sky ----------
-const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
 const sig = (x, n = 3) => Number(x.toPrecision(n)).toLocaleString('en-US');
 function fmtDist(m) { const km = m / 1000; return km < 1e6 ? sig(km, 4) + ' km' : km < 1e9 ? sig(km / 1e6) + ' M km' : sig(km / 1e9) + ' bn km'; }
 function fmtLight(m) { const s = m / Astro.C; return s < 1 ? Math.max(1, Math.round(s * 1000)) + ' ms' : s < 90 ? s.toFixed(1) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h'; }
-function fmtWin(x) {
-  if (x < 1e6) return sig(x, 2) + '×';
-  const e = Math.floor(Math.log10(x)), mnt = Math.round(x / 10 ** e);
-  const sup = n => [...String(n)].map(c => SUP[c]).join('');
-  return mnt === 10 ? '10' + sup(e + 1) : `${mnt} × 10${sup(e)}`;
-}
 const IAU = { Scorpio: 'Scorpius', Capricorn: 'Capricornus' };
 function renderSky() {
   if (!natal) natal = computeNatal();
@@ -231,6 +218,7 @@ function renderSky() {
   out.innerHTML = '';
   const fact = html => { const p = el('p', 'fact'); p.innerHTML = html; out.appendChild(p); };
   out.appendChild(el('p', 'small', 'Your birthday · ' + fmtDate(st.dob)));
+  const pic = el('div'); out.appendChild(pic); nasaPicture(st.dob, pic);
 
   const real = Astro.constellation(natal.sunJ2000), drift = Math.round(23.86 + 0.01397 * (year - 2000));
   if (real === (IAU[natal.sun] || natal.sun)) fact(`The Sun stood in front of <b>${real}</b>, but only by luck: Earth's axis has wobbled ~${drift}° since horoscope dates were fixed, 2,000 years ago.`);
@@ -238,19 +226,13 @@ function renderSky() {
   const [star, ly] = SIGN_STARS[natal.sun];
   fact(`<b>${star}</b>, ${natal.sun}'s brightest star, is ~${ly} light-years away. Its light reaching Earth that day left it around ${year - ly}.`);
 
-  const t = el('table'); t.innerHTML = '<tr><th></th><th>Distance</th><th>Light</th><th>Doctor wins by</th></tr>';
-  const row = (name, b, note) => {
-    const tr = el('tr'), td = el('td', '', name); if (note) { td.append(' '); td.appendChild(el('small', '', note)); }
-    tr.append(td, el('td', '', (b.approx ? '~' : '') + fmtDist(b.dist)), el('td', '', fmtLight(b.dist)), el('td', '', fmtWin(Astro.doctorWins(b.mass, b.dist))));
-    t.appendChild(tr);
-  };
-  sky.bodies.forEach(b => row(b.name, b));
-  const made = sky.made.slice();
-  if (sky.sputnik && !made.some(m => m.name === 'ISS' || m.name === 'Hubble')) made.unshift({ name: 'A satellite', dist: 4e5, mass: 1000, note: '1 t' });
-  made.forEach(b => row(b.name, b, b.note === '1 t' ? '1 t' : ''));
+  const t = el('table'); t.innerHTML = '<tr><th></th><th>Distance</th><th>Light takes</th></tr>';
+  const row = b => { const tr = el('tr'); tr.append(el('td', '', b.name), el('td', '', (b.approx ? '~' : '') + fmtDist(b.dist)), el('td', '', fmtLight(b.dist))); t.appendChild(tr); };
+  sky.bodies.forEach(row);
+  sky.made.forEach(row);
   out.appendChild(t);
   if (!sky.sputnik) out.appendChild(el('p', 'small', 'No artificial satellites yet: Sputnik 1 launched on 4 October 1957.'));
-  out.appendChild(el('p', 'small', 'Doctor: 70 kg, 1 m from you. Compared by tidal pull, the only part of gravity that can push or stretch a body; the rest moves you and Earth together. Satellites assumed directly overhead.'));
+  else if (sky.made.some(m => m.name === 'ISS' || m.name === 'Hubble')) out.appendChild(el('p', 'small', 'ISS and Hubble shown at their height above the ground.'));
   const end = el('p', 'stamp', "Nothing up there could tell your day apart from anyone else's."); end.style.fontSize = '22px'; end.style.marginTop = '8px';
   out.appendChild(end);
 }

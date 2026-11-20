@@ -127,10 +127,6 @@
     return { bodies: out, made, sputnik: t >= Date.UTC(1957, 9, 4) };
   }
 
-  // How many times stronger the tidal pull (the part of gravity that can push or stretch you)
-  // of a 70 kg doctor 1 m away was, compared to a body of `mass` kg at `dist` metres.
-  const doctorWins = (mass, dist) => 70 * dist ** 3 / mass;
-
-  root.Astro = { chart, sky, sign, constellation, SIGNS, doctorWins, AU, LY, C, jd, ascendant, cent, helio, moon, halley, norm };
+  root.Astro = { chart, sky, sign, constellation, SIGNS, AU, LY, C, jd, ascendant, cent, helio, moon, halley, norm };
   if (typeof module !== 'undefined') module.exports = root.Astro;
 })(typeof window !== 'undefined' ? window : globalThis);
