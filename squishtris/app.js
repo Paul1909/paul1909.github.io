@@ -170,7 +170,7 @@ function shapeMatch(b, alpha) {
   cx /= n; cy /= n;
   b.cx = cx; b.cy = cy;
   let gx0 = cx, gy0 = cy, ang;
-  if (b.controlled) ang = T.a;     // the player sets the falling piece's angle; it moves freely
+  if (b.controlled && !b.landed) ang = T.a;     // the player sets the falling piece's angle until it lands
   else {
     let A = 0, B = 0;
     for (const p of ps) { const dx = p.x - cx, dy = p.y - cy; A += p.qx * dx + p.qy * dy; B += p.qx * dy - p.qy * dx; }
@@ -389,19 +389,22 @@ function physStep() {
       adx = (vx - mvx) * 0.35; ady = (vy - mvy) * 0.35;
       const amax = (settings.mat === 'glass' ? 50 : 250) * STEP * STEP, al = Math.hypot(adx, ady);
       if (al > amax) { adx *= amax / al; ady *= amax / al; }
-    } else {
+    } else if (!active.landed) {
       ady = gravityActive() * ((softBtn || softDrag) ? 4 : 1) * STEP * STEP;
       if (hard && active.since > 30) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
-      if (Math.abs(T.tx - cx) > 0.8) T.tx = cx + Math.sign(T.tx - cx) * 0.8;
-      const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
-      adx = (vx - mvx) * 0.25;
+      if (!active.landed) {
+        if (Math.abs(T.tx - cx) > 0.8) T.tx = cx + Math.sign(T.tx - cx) * 0.8;
+        const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
+        adx = (vx - mvx) * 0.25;
+      }
     }
   }
   const held = grabs.size ? new Set([...grabs.values()].map(g => g.body)) : null;
   for (const b of bodies) { b.squeezed = b.pressed || (held && held.has(b)); b.touch = 0; b.pressed = false; }
   const g = G * STEP * STEP;
   for (const p of parts) {
-    const isA = p.b === active;
+    // A landed piece behaves like the rest of the stack (normal gravity), so it doesn't moon-bounce.
+    const isA = p.b === active && (carry || !active.landed);
     let vx = (p.x - p.px) * (isA ? 0.998 : DAMP), vy = (p.y - p.py) * (isA ? 0.998 : DAMP);
     if (isA) { vx += adx; vy += ady; } else vy += g;
     const m = isA ? aMax : 0.2, v2 = vx * vx + vy * vy;
@@ -416,7 +419,11 @@ function physStep() {
     applyGrabs();
     collide();
   }
-  if (active) { if (active.touch) active.contact++; active.since = active.touch ? 0 : active.since + 1; }
+  if (active) {
+    // On touching something the drop ends and the piece is left to physics, so it settles naturally.
+    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; T.a = T.ta = active.ang; } }
+    active.since = active.touch ? 0 : active.since + 1;
+  }
   if (settings.mat === 'glass') checkGlass();
 }
 
@@ -498,14 +505,17 @@ function lockActive() {
   spawnDelay = 0.1;
 }
 
+function takeControl() { if (active.landed) { active.landed = false; T.a = T.ta = active.ang; T.tx = active.cx; } }
 function moveBy(dx) {
   if (!active || state !== 'play' || carry) return;
+  takeControl();
   const before = T.tx; T.tx += dx; clampTX();
   if (T.tx !== before) { sfx.move(); bumpLock(); }
 }
 function rotate() {
   if (!active || state !== 'play') return;
-  T.ta += Math.PI / 2; clampTX(); sfx.rotate(); bumpLock();
+  takeControl();
+  T.ta += Math.PI / 2; clampTX(); sfx.rotate(); bumpLock(); active.restT = 0;
 }
 function hardDrop() { if (!active || state !== 'play' || hard || carry || active.since < 30 || lockTimer > 0) return; hard = true; sfx.drop(); }
 function bumpLock() { if (lockTimer > 0 && lockResets < MAX_RESETS) { lockResets++; lockTimer = Math.min(lockTimer, LOCK_DELAY * 0.4); } }
@@ -651,8 +661,8 @@ function update(dt) {
       const speed = Math.hypot(vx, vy) / active.parts.length / STEP;
       if (carry) lockTimer = 0;
       else if (active.contact > 0) {
-        lockTimer += dt;
-        if ((lockTimer >= 0.25 && speed < 2.5) || lockTimer >= 0.9) lockActive();
+        lockTimer += dt; active.restT = (active.restT || 0) + dt;
+        if ((lockTimer >= 0.25 && speed < 2.5) || lockTimer >= 0.9 || active.restT >= 1.6) lockActive();
       } else lockTimer = Math.max(0, lockTimer - dt * 0.3);
       if (active) active.contact = 0;
     } else if (press.phase === 'idle') {
@@ -1099,6 +1109,7 @@ cv.addEventListener('pointerdown', e => {
     const w = worldPos(e);
     if (active.parts.some(p => (p.x - w.x) ** 2 + (p.y - w.y) ** 2 < 0.9 * 0.9)) {
       try { cv.setPointerCapture(e.pointerId); } catch {}
+      takeControl();
       carry = { id: e.pointerId, x: w.x, y: w.y, ox: active.cx - w.x, oy: active.cy - w.y, cx0: e.clientX, cy0: e.clientY, t0: performance.now(), moved: false };
       sfx.squish(); buzz(8);
       return;
