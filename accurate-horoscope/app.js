@@ -194,16 +194,17 @@ function horoscope(dob, day, sign) {
   const mon = k => new Date(Date.UTC(y, m - 1 + k, 1)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
   const T = { sign, SIGN: sign.toUpperCase(), y: wd(-1), t: wd(0), t1: wd(1), t2: wd(2), month0: mon(0), month: mon(1), year0: y, year: y + 1 };
   const fill = str => str.replace(/\{(\w+)\}/g, (_, k) => k in T ? T[k] : _);
-  const [pace, work, mind, love, love2, single, couple, friends, well, reflect] =
-    ['pace', 'work', 'mind', 'love', 'love2', 'single', 'couple', 'friends', 'well', 'reflect'].map(pick);
+  const [pace, traits, work, mind, love, love2, single, couple, friends, well, reflect] =
+    ['pace', 'traits', 'work', 'mind', 'love', 'love2', 'single', 'couple', 'friends', 'well', 'reflect'].map(pick);
   return {
     headline: pick('headlines'),
     main: [
-      [pick('openers'), pace[0], work[0], mind[0]],
+      [pick('openers'), pace[0]],
+      [traits[0], work[0]],
       [love[0], love2[0], single[0], couple[0]],
-      [friends[0], well[0], reflect[0]],
+      [mind[0], reflect[0]],
     ].map(p => fill(p.join(' '))),
-    closer: [[work[1], pace[1]], [love[1], love2[1], single[1], couple[1]], [friends[1], well[1], mind[1]]].map(p => fill(p.join(' '))),
+    closer: [[work[1], pace[1]], [traits[1], love[1], single[1], couple[1]], [friends[1], well[1], mind[1]]].map(p => fill(p.join(' '))),
     reflect: fill(reflect[1]),
   };
 }
