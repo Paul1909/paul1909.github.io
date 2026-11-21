@@ -61,7 +61,7 @@ let pid = 0;
 let bodies = [], parts = [], active = null, sparks = [], flashes = [];
 const T = { x: 0, y: 0, tx: 0, a: 0, ta: 0 };   // target pose of the falling piece
 let state = 'menu', score = 0, lines = 0, level = 1, bag = [], nextType = null;
-let lockTimer = 0, lockResets = 0, hard = false, softBtn = false, softDrag = false;
+let lockTimer = 0, lockResets = 0, hard = false, hardHeld = false, softBtn = false, softDrag = false;
 let overTimer = 0, covTimer = 0, acc = 0, spawnDelay = 0, shake = 0;
 const fill = new Float32Array(H), hold = new Float32Array(H);
 const press = { phase: 'idle', y: PRESS_TOP, target: 0, t: 0, touch: 0, contact: false };
@@ -312,7 +312,7 @@ function physStep() {
   if (active) {
     const da = T.ta - T.a; T.a += Math.sign(da) * Math.min(Math.abs(da), 14 * STEP);
     const dx = T.tx - T.x; T.x += Math.sign(dx) * Math.min(Math.abs(dx), 20 * STEP);
-    const sp = hard ? 18 : (softBtn || softDrag) ? Math.max(10, fallSpeed()) : fallSpeed();
+    const sp = hard ? (hardHeld ? 45 : 24) : (softBtn || softDrag) ? Math.max(10, fallSpeed()) : fallSpeed();
     T.y += sp * STEP;
   }
   stepPress();
@@ -395,7 +395,7 @@ function rotate() {
   if (!active || state !== 'play') return;
   T.ta += Math.PI / 2; clampTX(); sfx.rotate(); bumpLock();
 }
-function hardDrop() { if (!active || state !== 'play') return; hard = true; sfx.drop(); }
+function hardDrop() { if (!active || state !== 'play' || hard) return; hard = true; sfx.drop(); }
 function bumpLock() { if (lockTimer > 0 && lockResets < MAX_RESETS) { lockResets++; lockTimer = Math.min(lockTimer, LOCK_DELAY * 0.4); } }
 
 // Coverage: rasterize the settled jelly at 8 px per cell and count pixels per row.
@@ -460,7 +460,7 @@ function burst(x, y, color, n) {
 function resetWorld() {
   bodies = []; parts = []; active = null; sparks = []; flashes = [];
   score = 0; lines = 0; level = 1; bag = []; nextType = null;
-  lockTimer = 0; overTimer = 0; covTimer = 0; acc = 0; spawnDelay = 0; hard = false; softBtn = softDrag = false;
+  lockTimer = 0; overTimer = 0; covTimer = 0; acc = 0; spawnDelay = 0; hard = hardHeld = false; softBtn = softDrag = false;
   fill.fill(0); hold.fill(0);
   press.phase = 'idle'; press.y = PRESS_TOP; heldType = null; grabs.clear();
   if (typeof syncPress === 'function') syncPress();
@@ -487,7 +487,7 @@ function gameOver() {
 
 function pause() {
   if (state !== 'play') return;
-  state = 'pause'; show('pause'); wake(false);
+  state = 'pause'; show('pause'); wake(false); hardHeld = softBtn = false;
 }
 function resume() {
   if (state !== 'pause') return;
@@ -762,7 +762,8 @@ function holdButton(id, onDown, onUp, repeat) {
 holdButton('bLeft', () => moveBy(-0.5), null, true);
 holdButton('bRight', () => moveBy(0.5), null, true);
 holdButton('bRot', rotate);
-holdButton('bHard', hardDrop);
+// Tap: quick drop. Hold: the piece plummets.
+holdButton('bHard', () => { hardHeld = true; hardDrop(); }, () => { hardHeld = false; });
 holdButton('bSoft', () => { softBtn = true; }, () => { softBtn = false; });
 
 let drag = null;
@@ -828,14 +829,14 @@ window.addEventListener('keydown', e => {
     else if (e.key === 'ArrowRight') moveBy(0.5);
     else if (e.key === 'ArrowUp' || e.key === 'x' || e.key === 'X') rotate();
     else if (e.key === 'ArrowDown') softBtn = true;
-    else if (e.key === ' ') hardDrop();
+    else if (e.key === ' ') { hardHeld = true; hardDrop(); }
     else if (e.key === 'p' || e.key === 'Escape') pause();
     else if (e.key === 'h' || e.key === 'H') startPress();
     else return;
     e.preventDefault(); audio();
   } else if (state === 'pause' && (e.key === 'p' || e.key === 'Escape')) resume();
 });
-window.addEventListener('keyup', e => { if (e.key === 'ArrowDown') softBtn = false; });
+window.addEventListener('keyup', e => { if (e.key === 'ArrowDown') softBtn = false; if (e.key === ' ') hardHeld = false; });
 
 // ---------- sound & vibration ----------
 let ac = null;
