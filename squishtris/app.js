@@ -35,7 +35,8 @@ const MAT = {
 };
 const mat = () => MAT[settings.mat] || MAT.wood;
 const YIELD = 0.07, CREEP = 0.35;
-const BREAK_DV = 5.5, CRUSH = 0.14;
+// The falling piece breaks if it lands fast; pieces already in the tower are tougher.
+const BREAK_DV = 9, CRUSH = 0.25, IMPACT = 5.5, IMPACT_SETTLED = 9;
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
 const PRESS_TOP = -2.7, PLATE = 0.8;               // parked plate bottom (off screen), plate thickness
@@ -300,7 +301,7 @@ function applyGrabs() {
   for (const g of grabs.values()) {
     for (const h of g.ps) {
       const p = h.p;
-      const sq = settings.mat === 'glass' ? 1 : 0.8, k = settings.mat === 'glass' ? 0.15 : 0.3;
+      const sq = 1, k = settings.mat === 'jelly' ? 0.2 : 0.25;
       p.x += (g.sx + h.ox * sq - p.x) * k;
       p.y += (g.sy + h.oy * sq - p.y) * k;
     }
@@ -308,7 +309,7 @@ function applyGrabs() {
 }
 function moveGrabs() {
   // The squeeze point follows the finger at a limited speed so jelly can't be yanked through other jelly.
-  const m = (settings.mat === 'glass' ? 2.5 : 10) * STEP;
+  const m = (settings.mat === 'glass' ? 4 : 14) * STEP;
   for (const g of grabs.values()) {
     const dx = g.x - g.sx, dy = g.y - g.sy, d = Math.hypot(dx, dy);
     if (d > m) { g.sx += dx / d * m; g.sy += dy / d * m; } else { g.sx = g.x; g.sy = g.y; }
@@ -473,7 +474,13 @@ function checkGlass() {
     const h = b.vh || (b.vh = []);
     h.push(vx, vy); if (h.length > 8) h.splice(0, 2);
     b.tc = b.touch ? 6 : (b.tc || 0) - 1;
-    if (b.tc > 0 && ((h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV) || (b.strain > CRUSH && !held.has(b)))) (broke || (broke = [])).push(b);
+    // Landing: how fast it was going the step before it touched down.
+    const impact = b.touch && (b.free || 0) >= 3 && h.length >= 4 && Math.hypot(h[h.length - 4], h[h.length - 3]) > (b.controlled ? IMPACT : IMPACT_SETTLED);
+    b.free = b.touch ? 0 : (b.free || 0) + 1;
+    // Knock: a sudden jolt while touching something (not while you're holding it).
+    const knock = !held.has(b) && b.tc > 0 && h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV;
+    const crushed = !held.has(b) && b.tc > 0 && b.strain > CRUSH;
+    if (impact || knock || crushed) (broke || (broke = [])).push(b);
   }
   if (broke) for (const b of broke) shatter(b);
 }
@@ -929,13 +936,6 @@ function draw() {
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-  const rings = [...grabs.values()].map(g => ({ x: g.sx, y: g.sy }));
-  if (carry) rings.push(carry);
-  for (const g of rings) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 0.06;
-    ctx.beginPath(); ctx.arc(g.x, g.y, 0.42, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
-  }
   if (press.y > VY0 - 0.1) drawPress(ctx);
   for (const s of sparks) {
     ctx.globalAlpha = Math.max(0, 1 - s.t / s.life);
@@ -1114,7 +1114,6 @@ holdButton('bRight', () => moveBy(0.5), null, true);
 holdButton('bRot', rotate);
 // Tap: quick drop. Hold: the piece plummets.
 holdButton('bHard', () => { hardHeld = true; hardDrop(); }, () => { hardHeld = false; });
-holdButton('bSoft', () => { softBtn = true; }, () => { softBtn = false; });
 
 let drag = null;
 function worldPos(e) {
@@ -1131,7 +1130,7 @@ function tryGrab(e) {
   }
   if (!best) return null;
   const ps = [];
-  const whole = settings.mat === 'glass';
+  const whole = true;
   for (const p of best.b.parts) { const dx = p.x - w.x, dy = p.y - w.y; if (whole || dx * dx + dy * dy < 1.1) ps.push({ p, ox: dx, oy: dy }); }
   const y = Math.max(0.4, w.y);
   return { body: best.b, ps, x: w.x, y, sx: w.x, sy: y };
@@ -1188,7 +1187,12 @@ function dropCarry(e, tapOk) {
 }
 const endDrag = e => {
   if (carry && e.pointerId === carry.id) { dropCarry(e, true); return; }
-  if (grabs.delete(e.pointerId)) return;
+  const g = grabs.get(e.pointerId);
+  if (g) {                          // set it down gently: no fling when you let go
+    grabs.delete(e.pointerId);
+    for (const p of g.body.parts) { p.px = p.x; p.py = p.y; }
+    return;
+  }
   if (!drag || e.pointerId !== drag.id) return;
   const dx = (e.clientX - drag.x0) / scale, dy = (e.clientY - drag.y0) / scale, t = performance.now() - drag.t0;
   if (!drag.moved && t < 350) rotate();

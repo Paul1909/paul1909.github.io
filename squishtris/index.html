@@ -41,7 +41,7 @@
   #stage { flex: 1; position: relative; min-height: 0; }
   #field { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 
-  #controls { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1.25fr; gap: 8px; padding: 6px 12px 10px; }
+  #controls { display: grid; grid-template-columns: 1fr 1fr 1fr 1.25fr; gap: 8px; padding: 6px 12px 10px; }
   .ctl { height: 58px; border: 0; border-radius: 18px; background: #2c2450; box-shadow: 0 4px 0 #120d24; display: grid; place-items: center; touch-action: none; }
   .ctl svg { width: 26px; height: 26px; }
   .ctl.on, .ctl:active { transform: translateY(3px); box-shadow: 0 1px 0 #120d24; background: #3a3068; }
@@ -95,7 +95,6 @@
   <nav id="controls">
     <button class="ctl" id="bLeft" aria-label="Move left"><svg viewBox="0 0 24 24"><path d="M16 4 6 12l10 8z" fill="#f1ecff" stroke="#f1ecff" stroke-width="2" stroke-linejoin="round"/></svg></button>
     <button class="ctl" id="bRight" aria-label="Move right"><svg viewBox="0 0 24 24"><path d="m8 4 10 8-10 8z" fill="#f1ecff" stroke="#f1ecff" stroke-width="2" stroke-linejoin="round"/></svg></button>
-    <button class="ctl" id="bSoft" aria-label="Soft drop"><svg viewBox="0 0 24 24"><path d="m5 9 7 7 7-7" fill="none" stroke="#f1ecff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <button class="ctl" id="bHard" aria-label="Hard drop"><svg viewBox="0 0 24 24"><path d="m5 5 7 7 7-7M5 11l7 7 7-7" fill="none" stroke="#f1ecff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21.5h14" stroke="#f1ecff" stroke-width="3" stroke-linecap="round"/></svg></button>
     <button class="ctl rot" id="bRot" aria-label="Rotate"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </nav>
@@ -115,7 +114,7 @@
       <button id="soundBtn">Sound</button><button id="vibeBtn">Vibration</button>
     </div>
     <div class="best" id="bestMenu"></div>
-    <div class="help">Reach the gold line and keep the tower there for 2 seconds. You only get a few pieces per level.<br>Pick up the falling piece with your finger and set it down wherever you like, or drag empty space to steer · tap to rotate · flick down to drop.<br>Grab a landed piece to nudge or squish it. The hydraulic press crushes everything and restarts the level.<br>The bars on the right warn you when a row is close to vanishing.</div>
+    <div class="help">Reach the gold line and keep the tower there for 2 seconds. You only get a few pieces per level.<br>Pick up the falling piece with your finger and set it down wherever you like, or drag empty space to steer · tap to rotate · flick down to drop.<br>Landed pieces can be picked up and moved too. The hydraulic press crushes everything and restarts the level.<br>The bars on the right warn you when a row is close to vanishing.</div>
   </div>
 </div>
 
