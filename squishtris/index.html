@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#17122b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Squishtris">
+<title>Squishtris</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  /* System fonts only: a Google Fonts link would fail offline. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: #17122b; color: #f1ecff; overflow: hidden;
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+    overscroll-behavior: none;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #app { display: flex; flex-direction: column; height: 100%; max-width: 560px; margin: 0 auto; }
+
+  #hud { display: flex; align-items: center; gap: 6px; padding: 8px 12px 4px; }
+  .stat { flex: 1; min-width: 0; background: #241d42; border-radius: 12px; padding: 5px 4px; text-align: center; }
+  .stat span, .next span { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #a89cd6; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .next { background: #241d42; border-radius: 12px; padding: 4px 6px 2px; text-align: center; }
+  #next { display: block; width: 60px; height: 40px; }
+  .icon { width: 44px; height: 44px; border: 0; border-radius: 12px; background: #241d42; display: grid; place-items: center; }
+  .icon svg { width: 20px; height: 20px; }
+  .icon.press { background: linear-gradient(90deg, #6b727d, #e9ecf0 30%, #a7adb6 55%, #dfe3e8 80%, #5b616b); box-shadow: 0 3px 0 #2e323a; }
+  .icon.press svg { width: 26px; height: 26px; }
+  .icon.press:active { transform: translateY(2px); box-shadow: 0 1px 0 #2e323a; }
+  .icon.press.busy { opacity: .45; }
+
+  #stage { flex: 1; position: relative; min-height: 0; }
+  #field { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+
+  #controls { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1.25fr; gap: 8px; padding: 6px 12px 10px; }
+  .ctl { height: 58px; border: 0; border-radius: 18px; background: #2c2450; box-shadow: 0 4px 0 #120d24; display: grid; place-items: center; touch-action: none; }
+  .ctl svg { width: 26px; height: 26px; }
+  .ctl.on, .ctl:active { transform: translateY(3px); box-shadow: 0 1px 0 #120d24; background: #3a3068; }
+  .ctl.rot { background: #6b46d8; box-shadow: 0 4px 0 #3b2483; }
+  .ctl.rot.on, .ctl.rot:active { background: #7d5ae8; box-shadow: 0 1px 0 #3b2483; }
+
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px);
+    background: rgba(15, 10, 30, .86); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .overlay.hidden { display: none; }
+  .card { width: 100%; max-width: 360px; text-align: center; }
+  h1 { margin: 0 0 6px; font-size: 46px; font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
+  h1 i { font-style: normal; display: inline-block; animation: wob 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+  @keyframes wob { 0%,100% { transform: scale(1,1); } 30% { transform: scale(1.18,.82); } 55% { transform: scale(.9,1.1); } 75% { transform: scale(1.04,.96); } }
+  h2 { margin: 0 0 8px; font-size: 32px; font-weight: 900; }
+  .tag { margin: 0 0 18px; color: #c4b9ee; font-size: 15px; }
+  .big { display: block; width: 100%; padding: 15px; margin: 10px 0; border: 0; border-radius: 18px; font-size: 20px; font-weight: 800;
+    background: #ff5aa5; color: #fff; box-shadow: 0 5px 0 #a8286a; }
+  .big:active { transform: translateY(4px); box-shadow: 0 1px 0 #a8286a; }
+  .big.alt { background: #2c2450; box-shadow: 0 5px 0 #120d24; }
+  .seg { display: flex; background: #241d42; border-radius: 14px; padding: 4px; margin: 14px 0 6px; }
+  .seg button { flex: 1; border: 0; background: none; padding: 10px 4px; border-radius: 10px; font-weight: 700; color: #a89cd6; min-height: 44px; }
+  .seg button.sel { background: #6b46d8; color: #fff; }
+  .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #a89cd6; margin-top: 12px; }
+  .toggles { display: flex; gap: 8px; margin-top: 10px; }
+  .toggles button { flex: 1; border: 0; border-radius: 12px; padding: 10px; min-height: 44px; background: #241d42; color: #a89cd6; font-weight: 700; }
+  .toggles button.sel { color: #fff; background: #3a3068; }
+  .help { margin-top: 16px; font-size: 13px; line-height: 1.5; color: #a89cd6; }
+  .best { margin-top: 10px; font-size: 14px; color: #ffd23f; font-weight: 700; }
+  .final { font-size: 52px; font-weight: 900; margin: 4px 0; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="stat"><span>Score</span><b id="score">0</b></div>
+    <div class="stat"><span>Lines</span><b id="lines">0</b></div>
+    <div class="stat"><span>Level</span><b id="level">1</b></div>
+    <div class="next"><span>Next</span><canvas id="next" width="120" height="80"></canvas></div>
+    <button id="pressBtn" class="icon press" aria-label="Hydraulic press">
+      <svg viewBox="0 0 24 24"><rect x="9" y="1" width="6" height="7" fill="#3b4049"/><rect x="3" y="8" width="18" height="4" rx="1" fill="#3b4049"/><rect x="5" y="12.5" width="14" height="1.6" fill="#ffcc00"/><path d="M3 21c1-3 3-4.5 5-4.5s2.5 1.5 4 1.5 2.5-1.5 4.5-1.5S20 18 21 21z" fill="#ff5577"/><rect x="2" y="21" width="20" height="2" rx="1" fill="#3b4049"/></svg>
+    </button>
+    <button id="pauseBtn" class="icon" aria-label="Pause">
+      <svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1.5" fill="#f1ecff"/><rect x="12" y="3" width="4" height="14" rx="1.5" fill="#f1ecff"/></svg>
+    </button>
+  </header>
+  <main id="stage"><canvas id="field"></canvas></main>
+  <nav id="controls">
+    <button class="ctl" id="bLeft" aria-label="Move left"><svg viewBox="0 0 24 24"><path d="M16 4 6 12l10 8z" fill="#f1ecff" stroke="#f1ecff" stroke-width="2" stroke-linejoin="round"/></svg></button>
+    <button class="ctl" id="bRight" aria-label="Move right"><svg viewBox="0 0 24 24"><path d="m8 4 10 8-10 8z" fill="#f1ecff" stroke="#f1ecff" stroke-width="2" stroke-linejoin="round"/></svg></button>
+    <button class="ctl" id="bSoft" aria-label="Soft drop"><svg viewBox="0 0 24 24"><path d="m5 9 7 7 7-7" fill="none" stroke="#f1ecff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="ctl" id="bHard" aria-label="Hard drop"><svg viewBox="0 0 24 24"><path d="m5 5 7 7 7-7M5 11l7 7 7-7" fill="none" stroke="#f1ecff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21.5h14" stroke="#f1ecff" stroke-width="3" stroke-linecap="round"/></svg></button>
+    <button class="ctl rot" id="bRot" aria-label="Rotate"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </nav>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="card">
+    <h1><i style="color:#45d4ff">S</i><i style="color:#ffd23f;animation-delay:.1s">q</i><i style="color:#b77cff;animation-delay:.2s">u</i><i style="color:#55e07a;animation-delay:.3s">i</i><i style="color:#ff5577;animation-delay:.4s">s</i><i style="color:#4f86ff;animation-delay:.5s">h</i><i style="color:#ff9b3d;animation-delay:.6s">t</i><i style="color:#45d4ff;animation-delay:.7s">r</i><i style="color:#ffd23f;animation-delay:.8s">i</i><i style="color:#ff5aa5;animation-delay:.9s">s</i></h1>
+    <p class="tag">Falling blocks made of jelly. A row clears when it's 90&nbsp;% full.</p>
+    <button class="big" id="playBtn">Play</button>
+    <div class="label">Squishiness</div>
+    <div class="seg" id="squishSeg">
+      <button data-v="firm">Firm</button><button data-v="squishy">Squishy</button><button data-v="jelly">Jelly</button>
+    </div>
+    <div class="toggles">
+      <button id="soundBtn">Sound</button><button id="vibeBtn">Vibration</button>
+    </div>
+    <div class="best" id="bestMenu"></div>
+    <div class="help">Drag empty space to move · tap to rotate · flick down to drop.<br>Grab a landed piece with your finger to squish it into a gap (two fingers to squeeze two together).<br>Hit the press button any time to compact the whole stack.<br>The bars on the right show how full each row is.</div>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="card">
+    <h2>Paused</h2>
+    <button class="big" id="resumeBtn">Resume</button>
+    <button class="big alt" id="restartBtn">Restart</button>
+    <button class="big alt" id="quitBtn">Menu</button>
+    <div class="toggles">
+      <button id="soundBtn2">Sound</button><button id="vibeBtn2">Vibration</button>
+    </div>
+  </div>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="card">
+    <h2>Overflow!</h2>
+    <div class="label">Score</div>
+    <div class="final" id="finalScore">0</div>
+    <div class="best" id="bestOver"></div>
+    <button class="big" id="againBtn">Play again</button>
+    <button class="big alt" id="menuBtn">Menu</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
