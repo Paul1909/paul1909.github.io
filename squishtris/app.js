@@ -34,7 +34,7 @@ const MAT = {
   jelly: { alpha: 0.09, mu: 0.18, pack: 0.88, name: 'Jelly', info: 'Squishy! It spreads into every gap, so rows fill up (and vanish) easily.' },
 };
 const mat = () => MAT[settings.mat] || MAT.wood;
-const BREAK_DV = 4.5, CRUSH = 0.14;
+const BREAK_DV = 5.5, CRUSH = 0.14;
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
 const PRESS_TOP = -2.7, PLATE = 0.8;               // parked plate bottom (off screen), plate thickness
@@ -186,6 +186,7 @@ function shapeMatch(b, alpha) {
   b.strain = strain / n;
 }
 
+const TOUCH2 = (D + 0.06) * (D + 0.06);
 function collide() {
   const n = parts.length, D2 = D * D, MU = mat().mu;
   for (let i = 0; i < n; i++) {
@@ -202,12 +203,13 @@ function collide() {
           const q = parts[j];
           if (q.b === p.b) continue;
           const dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy;
-          if (d2 >= D2 || d2 < 1e-10) continue;
+          if (d2 >= TOUCH2 || d2 < 1e-10) continue;
+          p.b.touch++; q.b.touch++;               // resting contact counts too, not just overlap
+          if (d2 >= D2) continue;
           const wb = q.b.controlled ? CTRL_INVMASS : 1, sa = wa / (wa + wb), sb = 1 - sa;
           // A particle that slipped inside the other body's mesh gets pushed back out through the skin.
           if (insideQuads(p, q.qs)) { pushOut(p, q.b, sa, sb); continue; }
           if (insideQuads(q, p.qs)) { pushOut(q, p.b, sb, sa); continue; }
-          p.b.touch++; q.b.touch++;
           const d = Math.sqrt(d2), corr = (D - d) / d;
           p.x -= dx * corr * sa; p.y -= dy * corr * sa;
           q.x += dx * corr * sb; q.y += dy * corr * sb;
@@ -226,7 +228,8 @@ function collide() {
   for (const p of parts) {
     if (p.x < R) { p.x = R; p.py += (p.y - p.py) * 0.1; }
     else if (p.x > W - R) { p.x = W - R; p.py += (p.y - p.py) * 0.1; }
-    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; p.b.touch++; }
+    if (p.y > H - R - 0.06) p.b.touch++;
+    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; }
     if (press.phase !== 'idle' && p.y < press.y + R) { p.y = press.y + R; p.px += (p.x - p.px) * 0.4; press.touch++; }
   }
 }
@@ -279,14 +282,15 @@ function applyGrabs() {
   for (const g of grabs.values()) {
     for (const h of g.ps) {
       const p = h.p;
-      p.x += (g.sx + h.ox * 0.8 - p.x) * 0.3;
-      p.y += (g.sy + h.oy * 0.8 - p.y) * 0.3;
+      const sq = settings.mat === 'jelly' ? 0.8 : 1, k = settings.mat === 'jelly' ? 0.3 : 0.15;
+      p.x += (g.sx + h.ox * sq - p.x) * k;
+      p.y += (g.sy + h.oy * sq - p.y) * k;
     }
   }
 }
 function moveGrabs() {
   // The squeeze point follows the finger at a limited speed so jelly can't be yanked through other jelly.
-  const m = 10 * STEP;
+  const m = (settings.mat === 'glass' ? 2.5 : 10) * STEP;
   for (const g of grabs.values()) {
     const dx = g.x - g.sx, dy = g.y - g.sy, d = Math.hypot(dx, dy);
     if (d > m) { g.sx += dx / d * m; g.sy += dy / d * m; } else { g.sx = g.x; g.sy = g.y; }
@@ -345,12 +349,14 @@ function physStep() {
     if (carry) {
       // Follow the finger; slow and gentle once it touches other jelly, so it can be set down softly.
       let vx = (carry.x + carry.ox - cx) * 14 * STEP, vy = (carry.y + carry.oy - cy) * 14 * STEP;
-      const vm = (touching ? 3 : 25) * STEP, l = Math.hypot(vx, vy);
+      const vm = (touching ? (settings.mat === 'glass' ? 1.5 : 3) : 25) * STEP, l = Math.hypot(vx, vy);
       if (l > vm) { vx *= vm / l; vy *= vm / l; }
       adx = (vx - mvx) * 0.35; ady = (vy - mvy) * 0.35;
+      const amax = (settings.mat === 'glass' ? 50 : 250) * STEP * STEP, al = Math.hypot(adx, ady);
+      if (al > amax) { adx *= amax / al; ady *= amax / al; }
     } else {
       ady = gravityActive() * ((softBtn || softDrag) ? 4 : 1) * STEP * STEP;
-      if (hard && !touching) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
+      if (hard && active.since > 30) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
       if (Math.abs(T.tx - cx) > 0.8) T.tx = cx + Math.sign(T.tx - cx) * 0.8;
       const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
       adx = (vx - mvx) * 0.25;
@@ -374,13 +380,14 @@ function physStep() {
     applyGrabs();
     collide();
   }
-  if (active && active.touch) active.contact++;
+  if (active) { if (active.touch) active.contact++; active.since = active.touch ? 0 : active.since + 1; }
   if (settings.mat === 'glass') checkGlass();
 }
 
 // Glass breaks on a hard knock (sudden change of speed while touching something) or when crushed.
 function checkGlass() {
   let broke = null;
+  const held = new Set([...grabs.values()].map(g => g.body));
   for (const b of bodies) {
     let vx = 0, vy = 0;
     for (const p of b.parts) { vx += p.x - p.px; vy += p.y - p.py; }
@@ -388,7 +395,7 @@ function checkGlass() {
     const h = b.vh || (b.vh = []);
     h.push(vx, vy); if (h.length > 8) h.splice(0, 2);
     b.tc = b.touch ? 6 : (b.tc || 0) - 1;
-    if (b.tc > 0 && ((h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV) || b.strain > CRUSH)) (broke || (broke = [])).push(b);
+    if (b.tc > 0 && ((h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV) || (b.strain > CRUSH && !held.has(b)))) (broke || (broke = [])).push(b);
   }
   if (broke) for (const b of broke) shatter(b);
 }
@@ -434,7 +441,7 @@ function spawn() {
   updateHud();
   drawNext();
   const b = makePiece(type);
-  b.controlled = true; b.touch = 0; b.contact = 0;
+  b.controlled = true; b.touch = 0; b.contact = 0; b.since = 999;
   let mn = 1e9, mx = -1e9, my = -1e9;
   for (const p of b.parts) { mn = Math.min(mn, p.qx); mx = Math.max(mx, p.qx); my = Math.max(my, p.qy); }
   const w = mx - mn + D, left = Math.round((W - w) / 2);
@@ -464,7 +471,7 @@ function rotate() {
   if (!active || state !== 'play') return;
   T.ta += Math.PI / 2; clampTX(); sfx.rotate(); bumpLock();
 }
-function hardDrop() { if (!active || state !== 'play' || hard || carry) return; hard = true; sfx.drop(); }
+function hardDrop() { if (!active || state !== 'play' || hard || carry || active.since < 30 || lockTimer > 0) return; hard = true; sfx.drop(); }
 function bumpLock() { if (lockTimer > 0 && lockResets < MAX_RESETS) { lockResets++; lockTimer = Math.min(lockTimer, LOCK_DELAY * 0.4); } }
 
 // Coverage: rasterize the settled jelly at 8 px per cell and count pixels per row.
@@ -604,7 +611,7 @@ function update(dt) {
       else if (active.contact > 0) {
         lockTimer += dt;
         if ((lockTimer >= 0.25 && speed < 2.5) || lockTimer >= 0.9) lockActive();
-      } else lockTimer = Math.max(0, lockTimer - dt);
+      } else lockTimer = Math.max(0, lockTimer - dt * 0.3);
       if (active) active.contact = 0;
     } else if (press.phase === 'idle') {
       spawnDelay -= dt;
@@ -1032,7 +1039,8 @@ function tryGrab(e) {
   }
   if (!best) return null;
   const ps = [];
-  for (const p of best.b.parts) { const dx = p.x - w.x, dy = p.y - w.y; if (dx * dx + dy * dy < 1.1) ps.push({ p, ox: dx, oy: dy }); }
+  const whole = settings.mat !== 'jelly';
+  for (const p of best.b.parts) { const dx = p.x - w.x, dy = p.y - w.y; if (whole || dx * dx + dy * dy < 1.1) ps.push({ p, ox: dx, oy: dy }); }
   const y = Math.max(0.4, w.y);
   return { body: best.b, ps, x: w.x, y, sx: w.x, sy: y };
 }
