@@ -1940,7 +1940,7 @@ function zones(e) {
       else if (e.kind === 'rival' && !e.oiled) { e.oiled = true; e.spin += R(-2, 2); e.knock = 0.8; }
     } else if (e === player && game.state === 'race' && Math.abs((e.rowS ?? -99) - z.s) > 2 && !(z.zone === 'turbo' && player.M && player.M.electric)) {   // one pickup per row; the electric leaves NOS bottles
       e.rowS = z.s;
-      if (z.zone === 'wrench') { player.hp = Math.min(100, player.hp + 30); msg('REPAIR +30%', 'good'); }
+      if (z.zone === 'wrench') { const fix = player.M && player.M.electric ? 50 : 30; player.hp = Math.min(100, player.hp + fix); msg('REPAIR +' + fix + '%', 'good'); }   // the fragile electric gets a bigger fix
       else { player.nos++; msg('NOS +1', 'blue'); }
       SFX.pickup(); vibrate(20); addScore(100); removeEnt(z);
     }
