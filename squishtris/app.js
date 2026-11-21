@@ -34,7 +34,8 @@ const MAT = {
   jelly: { alpha: 0.09, mu: 0.18, pack: 0.88, name: 'Jelly', info: 'Squishy! It spreads into every gap, so rows fill up (and vanish) easily.' },
 };
 const mat = () => MAT[settings.mat] || MAT.wood;
-const YIELD = 0.07, CREEP = 0.35;
+const YIELD = 0.18, CREEP = 0.2;            // wood only dents under a really hard squeeze
+const FIRM = () => settings.mat !== 'jelly';   // wood and glass lock into the grid and stay put
 // The falling piece breaks if it lands fast; pieces already in the tower are tougher.
 const BREAK_DV = 9, CRUSH = 0.25, IMPACT = 5.5, IMPACT_SETTLED = 9;
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
@@ -171,7 +172,7 @@ function shapeMatch(b, alpha) {
   cx /= n; cy /= n;
   b.cx = cx; b.cy = cy;
   let gx0 = cx, gy0 = cy, ang;
-  if (b.controlled && !b.landed) ang = T.a;     // the player sets the falling piece's angle until it lands
+  if (b.controlled && (!b.landed || FIRM())) ang = T.a;     // the player sets the angle (until it lands, for jelly)
   else {
     let A = 0, B = 0;
     for (const p of ps) { const dx = p.x - cx, dy = p.y - cy; A += p.qx * dx + p.qy * dy; B += p.qx * dy - p.qy * dx; }
@@ -206,7 +207,7 @@ function collide() {
   const n = parts.length, D2 = D * D, MU = mat().mu;
   for (let i = 0; i < n; i++) {
     const p = parts[i], c = pcell[i], gx = c % GC, gy = (c / GC) | 0;
-    const wa = p.b.controlled ? CTRL_INVMASS : 1;
+    const wa = p.b.asleep ? 0 : p.b.controlled ? CTRL_INVMASS : 1;
     for (let oy = -1; oy <= 1; oy++) {
       const yy = gy + oy; if (yy < 0 || yy >= GR) continue;
       for (let ox = -1; ox <= 1; ox++) {
@@ -216,12 +217,12 @@ function collide() {
           const j = cellItems[k];
           if (j <= i) continue;
           const q = parts[j];
-          if (q.b === p.b) continue;
+          if (q.b === p.b || (wa === 0 && q.b.asleep)) continue;
           const dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy;
           if (d2 >= TOUCH2 || d2 < 1e-10) continue;
           p.b.touch++; q.b.touch++;               // resting contact counts too, not just overlap
           if (d2 >= D2) continue;
-          const wb = q.b.controlled ? CTRL_INVMASS : 1, sa = wa / (wa + wb), sb = 1 - sa;
+          const wb = q.b.asleep ? 0 : q.b.controlled ? CTRL_INVMASS : 1, sa = wa / (wa + wb), sb = 1 - sa;
           // A particle that slipped inside the other body's mesh gets pushed back out through the skin.
           if (insideQuads(p, q.qs)) { pushOut(p, q.b, sa, sb); continue; }
           if (insideQuads(q, p.qs)) { pushOut(q, p.b, sb, sa); continue; }
@@ -324,7 +325,7 @@ function startPress() {
     const b = active; active = null; b.controlled = false;
     if (settings.mat === 'glass') shatter(b); else crushBody(b);
   }
-  carry = null; grabs.clear(); hard = false; softBtn = softDrag = false;
+  carry = null; grabs.clear(); hard = false; softBtn = softDrag = false; wakeAll();
   press.target = H - 0.12; press.phase = 'down'; press.t = 0; press.contact = false; press.y = PRESS_TOP;
   sfx.hydraulic(1.6); syncPress();
 }
@@ -429,7 +430,6 @@ function physStep() {
       ady = gravityActive() * ((softBtn || softDrag) ? 4 : 1) * STEP * STEP;
       if (hard && active.since > 30) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
       if (!active.landed) {
-        if (Math.abs(T.tx - cx) > 0.8) T.tx = cx + Math.sign(T.tx - cx) * 0.8;
         const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
         adx = (vx - mvx) * 0.25;
       }
@@ -439,6 +439,7 @@ function physStep() {
   for (const b of bodies) { b.squeezed = b.pressed || (held && held.has(b)); b.touch = 0; b.pressed = false; }
   const g = G * STEP * STEP;
   for (const p of parts) {
+    if (p.b.asleep) { p.px = p.x; p.py = p.y; continue; }
     // A landed piece behaves like the rest of the stack (normal gravity), so it doesn't moon-bounce.
     const isA = p.b === active && (carry || !active.landed);
     let vx = (p.x - p.px) * (isA ? 0.998 : DAMP), vy = (p.y - p.py) * (isA ? 0.998 : DAMP);
@@ -451,23 +452,54 @@ function physStep() {
   buildHash();
   const alpha = mat().alpha, ctrlAlpha = Math.max(CTRL_ALPHA, alpha);
   for (let it = 0; it < ITERS; it++) {
-    for (const b of bodies) shapeMatch(b, b.controlled ? ctrlAlpha : alpha);
+    for (const b of bodies) if (!b.asleep) shapeMatch(b, b.controlled ? ctrlAlpha : alpha);
     applyGrabs();
     collide();
   }
   if (active) {
     // On touching something the drop ends and the piece is left to physics, so it settles naturally.
-    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; T.a = T.ta = active.ang; } }
+    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; if (!FIRM()) T.a = T.ta = active.ang; } }
     active.since = active.touch ? 0 : active.since + 1;
   }
   if (settings.mat === 'glass') checkGlass();
+  // Wood and glass that have come to rest are put to sleep (snapped to the grid if nearly aligned),
+  // so they stand perfectly still and hold firm, like regular Tetris blocks.
+  if (FIRM() && press.phase === 'idle') for (const b of bodies) {
+    if (b.asleep || b.controlled) continue;
+    if (held && held.has(b)) { b.restT = 0; continue; }
+    let mv = 0;
+    for (const p of b.parts) { const v = (p.x - p.px) ** 2 + (p.y - p.py) ** 2; if (v > mv) mv = v; }
+    if (mv < (0.6 * STEP) ** 2) { b.restT = (b.restT || 0) + STEP; if (b.restT > 0.35) settle(b); }
+    else b.restT = 0;
+  }
 }
+
+function snapBody(b) {
+  const a = Math.round(b.ang / (Math.PI / 2)) * (Math.PI / 2);
+  if (Math.abs(b.ang - a) > 0.25) return;
+  const c = Math.cos(a), s = Math.sin(a), n = b.parts.length;
+  let cx = 0, cy = 0;
+  for (const p of b.parts) { cx += p.x; cy += p.y; }
+  cx /= n; cy /= n;
+  let mn = 1e9, my = -1e9;
+  for (const p of b.parts) { mn = Math.min(mn, cx + c * p.qx - s * p.qy); my = Math.max(my, cy + s * p.qx + c * p.qy); }
+  const dx = Math.round(mn - R) - (mn - R), dy = Math.round(my + R) - (my + R);
+  if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) return;
+  for (const p of b.parts) {
+    p.x = p.px = cx + dx + c * p.qx - s * p.qy;
+    p.y = p.py = cy + dy + s * p.qx + c * p.qy;
+  }
+  b.cx = cx + dx; b.cy = cy + dy; b.ang = a;
+}
+function settle(b) { snapBody(b); b.asleep = true; b.restT = 0; for (const p of b.parts) { p.px = p.x; p.py = p.y; } }
+function wakeAll() { for (const b of bodies) { b.asleep = false; b.restT = 0; b.vh = null; b.free = 0; b.tc = 0; } }
 
 // Glass breaks on a hard knock (sudden change of speed while touching something) or when crushed.
 function checkGlass() {
   let broke = null;
   const held = new Set([...grabs.values()].map(g => g.body));
   for (const b of bodies) {
+    if (b.asleep) continue;
     let vx = 0, vy = 0;
     for (const p of b.parts) { vx += p.x - p.px; vy += p.y - p.py; }
     const n = b.parts.length * STEP; vx /= n; vy /= n;
@@ -499,7 +531,7 @@ function shatter(b) {
       s: 0.12 + Math.random() * 0.2, t: 0, life: 0.9 + Math.random() * 0.7, color: b.glass,
     });
   }
-  rebuildParts();
+  rebuildParts(); wakeAll();
   sfx.glass(); buzz([15, 20, 35]); shake = 0.15;
 }
 
@@ -513,6 +545,7 @@ function extents(a) {
   for (const p of active.parts) { const x = c * p.qx - s * p.qy; if (x < mn) mn = x; if (x > mx) mx = x; }
   return [mn - R, mx + R];
 }
+function snapX(x) { if (!active) return x; const [mn] = extents(T.ta); return Math.round(x + mn) - mn; }
 function clampTX() { if (!active) return; const [mn, mx] = extents(T.ta); T.tx = Math.max(-mn, Math.min(W - mx, T.tx)); }
 
 function spawn() {
@@ -542,22 +575,28 @@ function spawn() {
 function lockActive() {
   const b = active;
   b.controlled = false; b.squint = 0.45;
+  if (FIRM()) { b.ang = T.a; settle(b); }
   active = null; hard = false; carry = null;
   sfx.lock(); buzz(14);
   spawnDelay = 0.1;
 }
 
-function takeControl() { if (active.landed) { active.landed = false; T.a = T.ta = active.ang; T.tx = active.cx; } }
+function takeControl() {
+  if (!active.landed) return;
+  active.landed = false;
+  if (FIRM()) T.a = active.ang; else T.a = T.ta = active.ang;
+  T.tx = snapX(active.cx); clampTX();
+}
 function moveBy(dx) {
   if (!active || state !== 'play' || carry) return;
   takeControl();
-  const before = T.tx; T.tx += dx; clampTX();
+  const before = T.tx; T.tx = snapX(T.tx + Math.sign(dx)); clampTX();
   if (T.tx !== before) { sfx.move(); bumpLock(); }
 }
 function rotate() {
   if (!active || state !== 'play') return;
   takeControl();
-  T.ta += Math.PI / 2; clampTX(); sfx.rotate(); bumpLock(); active.restT = 0;
+  T.ta += Math.PI / 2; T.tx = snapX(T.tx); clampTX(); sfx.rotate(); bumpLock(); active.restT = 0;
 }
 function hardDrop() { if (!active || state !== 'play' || hard || carry || active.since < 30 || lockTimer > 0) return; hard = true; sfx.drop(); }
 function bumpLock() { if (lockTimer > 0 && lockResets < MAX_RESETS) { lockResets++; lockTimer = Math.min(lockTimer, LOCK_DELAY * 0.4); } }
@@ -603,7 +642,7 @@ function clearRows(rows) {
     }
     for (const g of groups.values()) out.push(buildBody([...g.ps], g.quads, b.type));
   }
-  bodies = out; rebuildParts(); grabs.clear();
+  bodies = out; rebuildParts(); grabs.clear(); wakeAll();
   for (const k of rows) { flashes.push({ k, t: 0 }); hold[k] = 0; }
   const n = rows.length;
   lines += n;
@@ -1103,14 +1142,14 @@ function holdButton(id, onDown, onUp, repeat) {
     e.preventDefault(); audio(); el.classList.add('on');
     try { el.setPointerCapture(e.pointerId); } catch {}
     onDown();
-    if (repeat) { const rep = () => { onDown(); timer = setTimeout(rep, 70); }; timer = setTimeout(rep, 190); }
+    if (repeat) { const rep = () => { onDown(); timer = setTimeout(rep, 95); }; timer = setTimeout(rep, 200); }
   });
   el.addEventListener('pointerup', stop);
   el.addEventListener('pointercancel', stop);
   el.addEventListener('contextmenu', e => e.preventDefault());
 }
-holdButton('bLeft', () => moveBy(-0.5), null, true);
-holdButton('bRight', () => moveBy(0.5), null, true);
+holdButton('bLeft', () => moveBy(-1), null, true);
+holdButton('bRight', () => moveBy(1), null, true);
 holdButton('bRot', rotate);
 // Tap: quick drop. Hold: the piece plummets.
 holdButton('bHard', () => { hardHeld = true; hardDrop(); }, () => { hardHeld = false; });
@@ -1152,6 +1191,7 @@ cv.addEventListener('pointerdown', e => {
   const g = tryGrab(e);
   if (g) {
     try { cv.setPointerCapture(e.pointerId); } catch {}
+    g.body.asleep = false; g.body.vh = null;
     grabs.set(e.pointerId, g); sfx.squish(); buzz(8);
     return;
   }
@@ -1172,8 +1212,8 @@ cv.addEventListener('pointermove', e => {
   const dx = (e.clientX - drag.x0) / scale, dy = (e.clientY - drag.y0) / scale;
   if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) drag.moved = true;
   if (drag.moved && Math.abs(dx) > Math.abs(dy) * 0.5) {
-    T.tx = drag.tx0 + dx; clampTX();
-    if (Math.abs(T.tx - drag.last) >= 0.5) { drag.last = T.tx; sfx.move(); bumpLock(); }
+    T.tx = snapX(drag.tx0 + dx); clampTX();
+    if (T.tx !== drag.last) { drag.last = T.tx; sfx.move(); bumpLock(); }
   }
   softDrag = dy > 1.2 && dy > Math.abs(dx);
   const now = performance.now();
@@ -1191,6 +1231,7 @@ const endDrag = e => {
   if (g) {                          // set it down gently: no fling when you let go
     grabs.delete(e.pointerId);
     for (const p of g.body.parts) { p.px = p.x; p.py = p.y; }
+    wakeAll();                      // whatever it was holding up can now fall
     return;
   }
   if (!drag || e.pointerId !== drag.id) return;
@@ -1204,8 +1245,8 @@ cv.addEventListener('pointercancel', e => { if (carry && e.pointerId === carry.i
 
 window.addEventListener('keydown', e => {
   if (state === 'play') {
-    if (e.key === 'ArrowLeft') moveBy(-0.5);
-    else if (e.key === 'ArrowRight') moveBy(0.5);
+    if (e.key === 'ArrowLeft') moveBy(-1);
+    else if (e.key === 'ArrowRight') moveBy(1);
     else if (e.key === 'ArrowUp' || e.key === 'x' || e.key === 'X') rotate();
     else if (e.key === 'ArrowDown') softBtn = true;
     else if (e.key === ' ') { hardHeld = true; hardDrop(); }
