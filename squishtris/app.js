@@ -30,10 +30,11 @@ const CTRL_ALPHA = 0.5, CTRL_INVMASS = 1;
 // Materials: alpha = shape stiffness, mu = friction, pack = how hard the press squeezes.
 const MAT = {
   glass: { alpha: 0.85, mu: 0.1, pack: 0.97, name: 'Glass', info: 'Fragile! Let it fall or bang it and it shatters. Carry it down gently.' },
-  wood: { alpha: 0.85, mu: 0.35, pack: 0.97, name: 'Wood', info: 'Solid blocks. Stack them like a real tower.' },
+  wood: { alpha: 0.85, mu: 0.35, pack: 0.97, name: 'Wood', info: 'Solid blocks that don\'t bounce. Squeeze one and it stays crushed.' },
   jelly: { alpha: 0.09, mu: 0.18, pack: 0.88, name: 'Jelly', info: 'Squishy! It spreads into every gap, so rows fill up (and vanish) easily.' },
 };
 const mat = () => MAT[settings.mat] || MAT.wood;
+const YIELD = 0.07, CREEP = 0.35;
 const BREAK_DV = 5.5, CRUSH = 0.14;
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
@@ -74,6 +75,7 @@ let pid = 0;
 let bodies = [], parts = [], active = null, sparks = [], flashes = [];
 const T = { x: 0, y: 0, tx: 0, a: 0, ta: 0 };   // target pose of the falling piece
 let state = 'menu', score = 0, lines = 0, level = 1, bag = [], nextType = null;
+let levelTime = 0;
 let goal = 6, piecesLeft = 0, winHold = 0, outTimer = 0, curHeight = 0, levelStartScore = 0, shards = [];
 const levelGoal = l => Math.min(4 + 2 * l, 17);     // rows to build up to
 const levelPieces = l => levelGoal(l) + 4;          // pieces you get for it
@@ -176,18 +178,30 @@ function shapeMatch(b, alpha) {
   }
   b.ang = ang;
   const c = Math.cos(ang), s = Math.sin(ang);
-  let strain = 0;
+  const plastic = settings.mat === 'wood' && b.squeezed;   // only a finger or the press crushes wood
+  let strain = 0, mx = 0, my = 0;
   for (const p of ps) {
     const gx = gx0 + c * p.qx - s * p.qy, gy = gy0 + s * p.qx + c * p.qy;
     const ex = gx - p.x, ey = gy - p.y;
     strain += Math.abs(ex) + Math.abs(ey);
+    if (plastic) {
+      // Wood yields: a dent beyond a small limit becomes its new shape, so it stays crushed.
+      const lx = -(c * ex + s * ey), ly = -(-s * ex + c * ey), e = Math.hypot(lx, ly);
+      if (e > YIELD) { const k = (e - YIELD) / e * CREEP; p.qx += lx * k; p.qy += ly * k; }
+      mx += p.qx; my += p.qy;
+    }
     p.x += ex * alpha; p.y += ey * alpha;
+  }
+  if (plastic && (mx || my)) {
+    mx /= n; my /= n;
+    for (const p of ps) { p.qx -= mx; p.qy -= my; p.rx = p.qx; p.ry = p.qy; }
   }
   b.strain = strain / n;
 }
 
 const TOUCH2 = (D + 0.06) * (D + 0.06);
 function collide() {
+  const DEAD = settings.mat === 'wood';
   const n = parts.length, D2 = D * D, MU = mat().mu;
   for (let i = 0; i < n; i++) {
     const p = parts[i], c = pcell[i], gx = c % GC, gy = (c / GC) | 0;
@@ -221,6 +235,10 @@ function collide() {
           const rvx = (q.x - q.px) - (p.x - p.px), rvy = (q.y - q.py) - (p.y - p.py);
           const vn = rvx * nx + rvy * ny, tx = (rvx - vn * nx) * MU, ty = (rvy - vn * ny) * MU;
           p.x += tx * sa; p.y += ty * sa; q.x -= tx * sb; q.y -= ty * sb;
+          if (DEAD && vn > 0) {             // wood: no rebound
+            const k = vn * 0.8;
+            p.x += nx * k * sa; p.y += ny * k * sa; q.x -= nx * k * sb; q.y -= ny * k * sb;
+          }
         }
       }
     }
@@ -229,8 +247,8 @@ function collide() {
     if (p.x < R) { p.x = R; p.py += (p.y - p.py) * 0.1; }
     else if (p.x > W - R) { p.x = W - R; p.py += (p.y - p.py) * 0.1; }
     if (p.y > H - R - 0.06) p.b.touch++;
-    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; }
-    if (press.phase !== 'idle' && p.y < press.y + R) { p.y = press.y + R; p.px += (p.x - p.px) * 0.4; press.touch++; }
+    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; if (DEAD && p.py > p.y) p.py = p.y; }
+    if (press.phase !== 'idle' && p.y < press.y + R) { p.y = press.y + R; p.px += (p.x - p.px) * 0.4; press.touch++; p.b.pressed = true; }
   }
 }
 
@@ -282,7 +300,7 @@ function applyGrabs() {
   for (const g of grabs.values()) {
     for (const h of g.ps) {
       const p = h.p;
-      const sq = settings.mat === 'jelly' ? 0.8 : 1, k = settings.mat === 'jelly' ? 0.3 : 0.15;
+      const sq = settings.mat === 'glass' ? 1 : 0.8, k = settings.mat === 'glass' ? 0.15 : 0.3;
       p.x += (g.sx + h.ox * sq - p.x) * k;
       p.y += (g.sy + h.oy * sq - p.y) * k;
     }
@@ -298,32 +316,49 @@ function moveGrabs() {
 }
 
 // ---------- hydraulic press ----------
+// The hydraulic press restarts the level: it comes down, crushes every piece, then the level starts over.
 function startPress() {
   if (state !== 'play' || press.phase !== 'idle') return;
-  if (active) {                    // the falling piece steps aside and comes back after
-    heldType = active.type;
-    bodies = bodies.filter(b => b !== active); active = null; rebuildParts();
-    hard = false; softBtn = softDrag = false; carry = null;
+  if (active) { active.controlled = false; active = null; }   // the falling piece gets crushed too
+  carry = null; grabs.clear(); hard = false; softBtn = softDrag = false;
+  press.target = H - 0.12; press.phase = 'down'; press.t = 0; press.contact = false; press.y = PRESS_TOP;
+  sfx.hydraulic(2.4); syncPress();
+}
+function bodyArea(b) {
+  let a = 0;
+  for (const q of b.quads) a += ((q[0].x - q[2].x) * (q[1].y - q[3].y) - (q[1].x - q[3].x) * (q[0].y - q[2].y)) / 2;
+  return Math.abs(a);
+}
+function crushBody(b) {
+  if (!bodies.includes(b)) return;
+  bodies = bodies.filter(x => x !== b);
+  for (const p of b.parts) {
+    if (settings.mat === 'jelly') burst(p.x, p.y, b.color, 1);
+    else if (Math.random() < 0.7) shards.push({
+      x: p.x, y: p.y, vx: (Math.random() - 0.5) * 9, vy: -Math.random() * 6, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
+      s: 0.1 + Math.random() * 0.16, t: 0, life: 0.7 + Math.random() * 0.6, color: settings.mat === 'wood' ? b.wood : b.glass,
+    });
   }
-  computeCoverage();
-  let area = 0; for (let k = 0; k < H; k++) area += fill[k];
-  press.target = Math.max(1, Math.min(H - 0.35, H - area * mat().pack));
-  press.phase = 'down'; press.t = 0; press.contact = false; press.y = PRESS_TOP;
-  overTimer = 0;
-  sfx.hydraulic(1.6); syncPress();
+  rebuildParts();
+  if (settings.mat === 'glass') sfx.glass(); else sfx.splat();
+  buzz(12); shake = Math.max(shake, 0.12);
 }
 function stepPress() {
   if (press.phase === 'idle') return;
   press.t += STEP;
   if (press.phase === 'down') {
     if (press.touch > 0 && !press.contact) { press.contact = true; sfx.clunk(); buzz([30, 30, 60]); shake = 0.2; }
-    press.y = Math.min(press.target, press.y + (press.contact ? 2 : 15) * STEP);
-    if (press.y >= press.target || press.t > 4) { press.phase = 'hold'; press.t = 0; shake = 0.3; sfx.clunk(); buzz(40); }
+    press.y = Math.min(press.target, press.y + (press.contact ? 3 : 15) * STEP);
+    // Pieces squashed far enough pop; whatever is left goes when the plate nears the floor.
+    const limit = settings.mat === 'jelly' ? 0.5 : 0.65;
+    for (const b of bodies.slice()) if (b.pressed && bodyArea(b) < b.quads.length * D * D * limit) crushBody(b);
+    if (press.y >= H - 0.75 || press.t > 6) for (const b of bodies.slice()) crushBody(b);
+    if (press.y >= press.target) { press.phase = 'hold'; press.t = 0; shake = 0.3; sfx.clunk(); buzz(40); }
   } else if (press.phase === 'hold') {
-    if (press.t > 0.8) { press.phase = 'up'; press.t = 0; sfx.hydraulic(0.7); }
+    if (press.t > 0.35) { press.phase = 'up'; press.t = 0; sfx.hydraulic(0.7); }
   } else if (press.phase === 'up') {
-    press.y -= 8 * STEP;
-    if (press.y <= PRESS_TOP) { press.y = PRESS_TOP; press.phase = 'idle'; spawnDelay = 0.2; syncPress(); }
+    press.y -= 10 * STEP;
+    if (press.y <= PRESS_TOP) { press.y = PRESS_TOP; press.phase = 'idle'; syncPress(); restartLevel(); }
   }
   press.touch = 0;
 }
@@ -362,7 +397,8 @@ function physStep() {
       adx = (vx - mvx) * 0.25;
     }
   }
-  for (const b of bodies) b.touch = 0;
+  const held = grabs.size ? new Set([...grabs.values()].map(g => g.body)) : null;
+  for (const b of bodies) { b.squeezed = b.pressed || (held && held.has(b)); b.touch = 0; b.pressed = false; }
   const g = G * STEP * STEP;
   for (const p of parts) {
     const isA = p.b === active;
@@ -542,12 +578,17 @@ function resetWorld() {
 
 function startGame() { audio(); score = 0; startLevel(1); }
 
-function startLevel(l) {
+function initLevel(l) {
   resetWorld();
-  level = l; goal = levelGoal(l); piecesLeft = levelPieces(l); levelStartScore = score;
+  level = l; goal = levelGoal(l); piecesLeft = levelPieces(l); levelTime = 0;
   state = 'play';
-  show(null);
   spawn(); updateHud();
+}
+function restartLevel() { score = levelStartScore; initLevel(level); }
+function startLevel(l) {
+  levelStartScore = score;
+  initLevel(l);
+  show(null);
   try { history.pushState({ squish: 1 }, ''); } catch {}
   wake(true);
 }
@@ -564,7 +605,7 @@ function levelComplete() {
   score += bonus;
   saveBest();
   $('wonTitle').textContent = 'Level ' + level + ' done!';
-  $('wonInfo').textContent = '+' + bonus + ' points' + (piecesLeft ? ' (' + piecesLeft + ' pieces to spare)' : '');
+  $('wonInfo').textContent = 'Time ' + clock(levelTime) + ' · +' + bonus + ' points' + (piecesLeft ? ' (' + piecesLeft + ' pieces to spare)' : '');
   $('wonScore').textContent = score;
   $('nextBtn').textContent = 'Level ' + (level + 1) + ': build to ' + levelGoal(level + 1) + ' rows';
   sfx.win(); buzz([30, 40, 30, 40, 90]);
@@ -597,6 +638,7 @@ function toMenu() { state = 'menu'; score = 0; level = 1; resetWorld(); updateHu
 
 function update(dt) {
   if (state === 'play') {
+    levelTime += dt;
     acc += dt;
     let n = 0;
     while (acc >= STEP && n < 6) { physStep(); acc -= STEP; n++; }
@@ -825,6 +867,9 @@ function draw() {
   ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); ctx.setLineDash([]);
   if (state !== 'menu') {
     ctx.font = '800 0.42px system-ui, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = ok ? '#7dffb3' : '#ffd23f';
+    ctx.textAlign = 'right'; ctx.fillStyle = '#c4b9ee'; ctx.font = '700 0.5px system-ui, sans-serif';
+    ctx.fillText('⏱ ' + clock(levelTime), W - 0.1, -1.55);
+    ctx.textAlign = 'left'; ctx.font = '800 0.42px system-ui, sans-serif'; ctx.fillStyle = ok ? '#7dffb3' : '#ffd23f';
     ctx.fillText(state === 'won' ? 'GOAL REACHED ✓' : ok ? 'HOLD IT… ' + Math.max(0, 2 - winHold).toFixed(1) : 'GOAL', 0.15, gy - 0.08);
   }
   for (const s of shards) {
@@ -895,6 +940,8 @@ function drawNext() {
   drawBody(nctx, b, null);
 }
 
+function clock(t) { const m = Math.floor(t / 60), s2 = Math.floor(t % 60); return m + ':' + String(s2).padStart(2, '0'); }
+
 function updateHud() {
   $('level').textContent = level;
   $('height').textContent = curHeight.toFixed(1) + '/' + goal;
@@ -944,7 +991,7 @@ function shareCard() {
   [...title].forEach((ch, i) => { g.fillStyle = cols[i]; g.fillText(ch, x, 140); x += g.measureText(ch).width; });
   const won = state === 'won';
   g.textAlign = 'center'; g.fillStyle = '#f1ecff'; g.font = '800 52px system-ui, -apple-system, sans-serif';
-  g.fillText(MAT_EMOJI[settings.mat] + ' ' + mat().name + ' · ' + (won ? 'Level ' + level + ' done!' : $('overTitle').textContent + ' on level ' + level), W2 / 2, 230);
+  g.fillText(MAT_EMOJI[settings.mat] + ' ' + mat().name + ' · ' + (won ? 'Level ' + level + ' done in ' + clock(levelTime) + '!' : $('overTitle').textContent + ' on level ' + level), W2 / 2, 230);
   // the tower, as it stands on screen
   const top = 270, bottom = H2 - 250, avail = bottom - top;
   // crop to the tower and the goal line, with some sky above
@@ -974,7 +1021,7 @@ async function shareResult() {
   audio();
   const won = state === 'won';
   const url = new URL('./', location.href).href;
-  const text = (won ? 'I built a ' + mat().name.toLowerCase() + ' tower up to level ' + level + ' in Squishtris'
+  const text = (won ? 'I built a ' + mat().name.toLowerCase() + ' tower up to level ' + level + ' in ' + clock(levelTime) + ' in Squishtris'
                     : 'I reached level ' + level + ' with ' + mat().name.toLowerCase() + ' blocks in Squishtris') +
                ' and scored ' + score + '! ' + MAT_EMOJI[settings.mat] + ' Can you beat it?';
   // Build the picture synchronously so the share still counts as part of the tap.
@@ -1039,7 +1086,7 @@ function tryGrab(e) {
   }
   if (!best) return null;
   const ps = [];
-  const whole = settings.mat !== 'jelly';
+  const whole = settings.mat === 'glass';
   for (const p of best.b.parts) { const dx = p.x - w.x, dy = p.y - w.y; if (whole || dx * dx + dy * dy < 1.1) ps.push({ p, ox: dx, oy: dy }); }
   const y = Math.max(0.4, w.y);
   return { body: best.b, ps, x: w.x, y, sx: w.x, sy: y };
@@ -1154,6 +1201,7 @@ const sfx = {
   },
   lost() { [523, 415, 330].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, f * 0.9, i * 0.08)); },
   win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, null, i * 0.09)); },
+  splat() { tone(160, 0.12, 'sine', 0.14, 70); noise(0.08, 500, 0.06); },
   over() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.05, f * 0.97, i * 0.16)); },
 };
 function noise(dur, freq, vol) {
