@@ -16,7 +16,7 @@ const S = [...document.querySelectorAll('section')];
 const QUESTIONS = ['s-date', 's-sign', 's-time', 's-place', 's-chart'];
 const saved = store.get('last', {});
 const st = { dob: saved.dob || '', sign: saved.sign || null, time: saved.time || null, place: saved.place || null };
-let idx = 0, chartTimer = 0, tense = 1, answers = [], natal = null;
+let idx = 0, chartTimer = 0, answers = [], natal = null;
 
 // ---------- helpers ----------
 const pad = n => String(n).padStart(2, '0');
@@ -220,11 +220,9 @@ function fillCard(card, h, label) {
 }
 function renderScope() {
   if (!natal) natal = computeNatal();
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.t === tense));
-  const d = dayOffset(tense - 1);
+  const d = dayOffset(0);
   fillCard($('scope-card'), horoscope(st.dob, dayKey(d), natal.sun), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
 }
-document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { tense = +b.dataset.t; renderScope(); }));
 
 // ---------- rating ----------
 const STATEMENTS = ['It matched my day.', 'It felt written for me.', 'The advice was useful.', "I'd read it again tomorrow."];
