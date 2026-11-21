@@ -805,7 +805,7 @@ function draw() {
   ctx.save();
   roundRect(ctx, -0.08, VY0, W + 0.16, H - VY0 + 0.08, 0.35); ctx.clip();
   for (const b of bodies) if (!b.controlled) drawBody(ctx, b, look);
-  if (active) drawBody(ctx, active, null);
+  if (active && state !== 'won') drawBody(ctx, active, null);
   // flashes
   for (const f of flashes) {
     ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - f.t / 0.4)})`;
@@ -818,7 +818,7 @@ function draw() {
   ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); ctx.setLineDash([]);
   if (state !== 'menu') {
     ctx.font = '800 0.42px system-ui, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = ok ? '#7dffb3' : '#ffd23f';
-    ctx.fillText(ok ? 'HOLD IT… ' + Math.max(0, 2 - winHold).toFixed(1) : 'GOAL', 0.15, gy - 0.08);
+    ctx.fillText(state === 'won' ? 'GOAL REACHED ✓' : ok ? 'HOLD IT… ' + Math.max(0, 2 - winHold).toFixed(1) : 'GOAL', 0.15, gy - 0.08);
   }
   for (const s of shards) {
     ctx.globalAlpha = Math.max(0, 1 - s.t / s.life);
@@ -919,6 +919,71 @@ $('restartBtn').addEventListener('click', retryLevel);
 $('retryBtn').addEventListener('click', retryLevel);
 $('nextBtn').addEventListener('click', () => { audio(); startLevel(level + 1); });
 $('wonMenuBtn').addEventListener('click', toMenu);
+$('shareWon').addEventListener('click', shareResult);
+$('shareOver').addEventListener('click', shareResult);
+
+// ---------- share: a picture of the tower with the score ----------
+const MAT_EMOJI = { glass: '🔷', wood: '🪵', jelly: '🍬' };
+function shareCard() {
+  const W2 = 1080, H2 = 1600, c = document.createElement('canvas');
+  c.width = W2; c.height = H2;
+  const g = c.getContext('2d');
+  g.fillStyle = '#17122b'; g.fillRect(0, 0, W2, H2);
+  // title in the game's candy colours
+  const title = 'Squishtris', cols = ['#45d4ff', '#ffd23f', '#b77cff', '#55e07a', '#ff5577', '#4f86ff', '#ff9b3d', '#45d4ff', '#ffd23f', '#ff5aa5'];
+  g.font = '900 104px system-ui, -apple-system, sans-serif'; g.textBaseline = 'alphabetic';
+  let tw = 0; for (const ch of title) tw += g.measureText(ch).width;
+  let x = (W2 - tw) / 2;
+  [...title].forEach((ch, i) => { g.fillStyle = cols[i]; g.fillText(ch, x, 140); x += g.measureText(ch).width; });
+  const won = state === 'won';
+  g.textAlign = 'center'; g.fillStyle = '#f1ecff'; g.font = '800 52px system-ui, -apple-system, sans-serif';
+  g.fillText(MAT_EMOJI[settings.mat] + ' ' + mat().name + ' · ' + (won ? 'Level ' + level + ' done!' : $('overTitle').textContent + ' on level ' + level), W2 / 2, 230);
+  // the tower, as it stands on screen
+  const top = 270, bottom = H2 - 250, avail = bottom - top;
+  // crop to the tower and the goal line, with some sky above
+  let ty = H - goal;
+  for (const p of parts) if (!p.b.controlled && p.y < ty) ty = p.y;
+  const y0 = Math.max(VY0, Math.min(ty - 2.5, H - 9));
+  const fx = dpr * (offX + VX0 * scale), fy = dpr * (offY + y0 * scale), fw = dpr * (VX1 - VX0) * scale, fh = dpr * (VY1 - y0) * scale;
+  const k = Math.min((W2 - 120) / fw, avail / fh), dw = fw * k, dh = fh * k, dy = top + (avail - dh) / 2;
+  g.save(); roundRect(g, (W2 - dw) / 2, dy, dw, dh, 28); g.clip();
+  g.drawImage(cv, fx, fy, fw, fh, (W2 - dw) / 2, dy, dw, dh);
+  g.restore();
+  // score
+  g.fillStyle = '#a89cd6'; g.font = '700 38px system-ui, -apple-system, sans-serif';
+  g.fillText('SCORE', W2 / 2, H2 - 175);
+  g.fillStyle = '#ffd23f'; g.font = '900 96px system-ui, -apple-system, sans-serif';
+  g.fillText(String(score), W2 / 2, H2 - 90);
+  g.fillStyle = '#7f72b8'; g.font = '600 30px system-ui, -apple-system, sans-serif';
+  g.fillText(new URL('./', location.href).href.replace(/^https?:\/\//, ''), W2 / 2, H2 - 35);
+  return c;
+}
+function dataUrlToBlob(u) {
+  const [head, b64] = u.split(','), bin = atob(b64), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: head.slice(5, head.indexOf(';')) });
+}
+async function shareResult() {
+  audio();
+  const won = state === 'won';
+  const url = new URL('./', location.href).href;
+  const text = (won ? 'I built a ' + mat().name.toLowerCase() + ' tower up to level ' + level + ' in Squishtris'
+                    : 'I reached level ' + level + ' with ' + mat().name.toLowerCase() + ' blocks in Squishtris') +
+               ' and scored ' + score + '! ' + MAT_EMOJI[settings.mat] + ' Can you beat it?';
+  // Build the picture synchronously so the share still counts as part of the tap.
+  const blob = dataUrlToBlob(shareCard().toDataURL('image/png'));
+  const file = new File([blob], 'squishtris-level-' + level + '.png', { type: 'image/png' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: text + ' ' + url }); return; }
+    if (navigator.share) { await navigator.share({ title: 'Squishtris', text, url }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // No share sheet (e.g. desktop): save the picture and copy the message.
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  try { await navigator.clipboard.writeText(text + ' ' + url); } catch {}
+}
 $('resumeBtn').addEventListener('click', resume);
 $('quitBtn').addEventListener('click', toMenu);
 $('menuBtn').addEventListener('click', toMenu);
@@ -1116,7 +1181,7 @@ syncSettings(); updateHud(); show('menu');
 requestAnimationFrame(frame);
 
 // Debug hook for automated tests.
-window.__sq = { get state() { return state; }, get bodies() { return bodies.length; }, get parts() { return parts.length; }, get fill() { return Array.from(fill); }, get lines() { return lines; }, get score() { return score; }, get height() { return curHeight; }, get goal() { return goal; }, get left() { return piecesLeft; }, startLevel, shatterCount: () => shards.length, hardDrop, moveBy, rotate, gameOver, startPress, get press() { return press.phase; }, get carrying() { return !!carry; },
+window.__sq = { get state() { return state; }, get bodies() { return bodies.length; }, get parts() { return parts.length; }, get fill() { return Array.from(fill); }, get lines() { return lines; }, get score() { return score; }, get height() { return curHeight; }, get goal() { return goal; }, get left() { return piecesLeft; }, startLevel, shatterCount: () => shards.length, hardDrop, moveBy, rotate, gameOver, shareCard, levelComplete, startPress, get press() { return press.phase; }, get carrying() { return !!carry; },
   dbg() {
     let minD = 9;
     for (const p of parts) for (const q of parts) if (p.b !== q.b) minD = Math.min(minD, Math.hypot(p.x - q.x, p.y - q.y));

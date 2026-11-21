@@ -62,6 +62,8 @@
     background: #ff5aa5; color: #fff; box-shadow: 0 5px 0 #a8286a; }
   .big:active { transform: translateY(4px); box-shadow: 0 1px 0 #a8286a; }
   .big.alt { background: #2c2450; box-shadow: 0 5px 0 #120d24; }
+  .big.share { background: #6b46d8; box-shadow: 0 5px 0 #3b2483; }
+  .big.share:active { box-shadow: 0 1px 0 #3b2483; }
   .seg { display: flex; background: #241d42; border-radius: 14px; padding: 4px; margin: 14px 0 6px; }
   .seg button { flex: 1; border: 0; background: none; padding: 10px 4px; border-radius: 10px; font-weight: 700; color: #a89cd6; min-height: 44px; }
   .seg button.sel { background: #6b46d8; color: #fff; }
@@ -137,6 +139,7 @@
     <div class="best" id="bestOver"></div>
     <button class="big" id="retryBtn">Retry level</button>
     <button class="big alt" id="againBtn">Start over</button>
+    <button class="big share" id="shareOver">Share with friends</button>
     <button class="big alt" id="menuBtn">Menu</button>
   </div>
 </div>
@@ -148,6 +151,7 @@
     <div class="label">Score</div>
     <div class="final" id="wonScore">0</div>
     <button class="big" id="nextBtn">Next level</button>
+    <button class="big share" id="shareWon">Share with friends</button>
     <button class="big alt" id="wonMenuBtn">Menu</button>
   </div>
 </div>
