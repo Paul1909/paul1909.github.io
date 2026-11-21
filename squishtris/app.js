@@ -172,7 +172,7 @@ function shapeMatch(b, alpha) {
   cx /= n; cy /= n;
   b.cx = cx; b.cy = cy;
   let gx0 = cx, gy0 = cy, ang;
-  if (b.controlled && (!b.landed || FIRM())) ang = T.a;     // the player sets the angle (until it lands, for jelly)
+  if (b.controlled && !b.landed) ang = T.a;     // the player sets the angle until it lands; then it can tip
   else {
     let A = 0, B = 0;
     for (const p of ps) { const dx = p.x - cx, dy = p.y - cy; A += p.qx * dx + p.qy * dy; B += p.qx * dy - p.qy * dx; }
@@ -218,6 +218,10 @@ function collide() {
           if (j <= i) continue;
           const q = parts[j];
           if (q.b === p.b || (wa === 0 && q.b.asleep)) continue;
+          if (p.b.asleep !== q.b.asleep) {     // something moving touches a resting piece: wake it so it carries the load
+            const dx0 = q.x - p.x, dy0 = q.y - p.y;
+            if (dx0 * dx0 + dy0 * dy0 < D * D) wake(p.b.asleep ? p.b : q.b);
+          }
           const dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy;
           if (d2 >= TOUCH2 || d2 < 1e-10) continue;
           p.b.touch++; q.b.touch++;               // resting contact counts too, not just overlap
@@ -458,7 +462,7 @@ function physStep() {
   }
   if (active) {
     // On touching something the drop ends and the piece is left to physics, so it settles naturally.
-    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; if (!FIRM()) T.a = T.ta = active.ang; } }
+    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; T.a = T.ta = active.ang; if (FIRM()) for (const p of active.parts) { p.px = p.x; p.py = p.y; } } }   // wood and glass land with a thud, no rebound
     active.since = active.touch ? 0 : active.since + 1;
   }
   if (settings.mat === 'glass') checkGlass();
@@ -476,7 +480,7 @@ function physStep() {
 
 function snapBody(b) {
   const a = Math.round(b.ang / (Math.PI / 2)) * (Math.PI / 2);
-  if (Math.abs(b.ang - a) > 0.25) return;
+  if (Math.abs(b.ang - a) > 0.12) return;
   const c = Math.cos(a), s = Math.sin(a), n = b.parts.length;
   let cx = 0, cy = 0;
   for (const p of b.parts) { cx += p.x; cy += p.y; }
@@ -492,6 +496,7 @@ function snapBody(b) {
   b.cx = cx + dx; b.cy = cy + dy; b.ang = a;
 }
 function settle(b) { snapBody(b); b.asleep = true; b.restT = 0; for (const p of b.parts) { p.px = p.x; p.py = p.y; } }
+function wake(b) { b.asleep = false; b.restT = 0; b.vh = null; b.free = 0; b.tc = 0; }
 function wakeAll() { for (const b of bodies) { b.asleep = false; b.restT = 0; b.vh = null; b.free = 0; b.tc = 0; } }
 
 // Glass breaks on a hard knock (sudden change of speed while touching something) or when crushed.
@@ -507,10 +512,10 @@ function checkGlass() {
     h.push(vx, vy); if (h.length > 8) h.splice(0, 2);
     b.tc = b.touch ? 6 : (b.tc || 0) - 1;
     // Landing: how fast it was going the step before it touched down.
-    const impact = b.touch && (b.free || 0) >= 3 && h.length >= 4 && Math.hypot(h[h.length - 4], h[h.length - 3]) > (b.controlled ? IMPACT : IMPACT_SETTLED);
+    const impact = b.touch && (b.free || 0) >= 3 && h.length >= 4 && h[h.length - 3] > (b.controlled ? IMPACT : IMPACT_SETTLED);   // falling speed just before touching down
     b.free = b.touch ? 0 : (b.free || 0) + 1;
     // Knock: a sudden jolt while touching something (not while you're holding it).
-    const knock = !held.has(b) && b.tc > 0 && h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV;
+    const knock = !held.has(b) && !b.controlled && b.tc > 0 && h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV;
     const crushed = !held.has(b) && b.tc > 0 && b.strain > CRUSH;
     if (impact || knock || crushed) (broke || (broke = [])).push(b);
   }
@@ -575,7 +580,6 @@ function spawn() {
 function lockActive() {
   const b = active;
   b.controlled = false; b.squint = 0.45;
-  if (FIRM()) { b.ang = T.a; settle(b); }
   active = null; hard = false; carry = null;
   sfx.lock(); buzz(14);
   spawnDelay = 0.1;
@@ -584,7 +588,7 @@ function lockActive() {
 function takeControl() {
   if (!active.landed) return;
   active.landed = false;
-  if (FIRM()) T.a = active.ang; else T.a = T.ta = active.ang;
+  T.a = active.ang; T.ta = FIRM() ? Math.round(active.ang / (Math.PI / 2)) * (Math.PI / 2) : active.ang;
   T.tx = snapX(active.cx); clampTX();
 }
 function moveBy(dx) {
