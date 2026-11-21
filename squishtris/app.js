@@ -24,7 +24,7 @@ const W = 10, H = 20;
 const R = 0.25, D = R * 2;               // particle radius / spacing
 const STEP = 1 / 120, ITERS = 4;
 const G = 26, DAMP = 0.992, MU = 0.18;
-const CTRL_ALPHA = 0.5, CTRL_INVMASS = 0.7;
+const CTRL_ALPHA = 0.5, CTRL_INVMASS = 1;
 const SQUISH = { firm: 0.45, squishy: 0.22, jelly: 0.09 };
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
@@ -65,7 +65,8 @@ let lockTimer = 0, lockResets = 0, hard = false, hardHeld = false, softBtn = fal
 let overTimer = 0, covTimer = 0, acc = 0, spawnDelay = 0, shake = 0;
 const fill = new Float32Array(H), hold = new Float32Array(H);
 const press = { phase: 'idle', y: PRESS_TOP, target: 0, t: 0, touch: 0, contact: false };
-let heldType = null;            // the falling piece waits here while the press works
+let heldType = null;
+let carry = null;               // finger carrying the falling piece            // the falling piece waits here while the press works
 const grabs = new Map();        // pointerId -> finger squeezing a settled piece
 
 // ---------- bodies ----------
@@ -149,7 +150,7 @@ function shapeMatch(b, alpha) {
   cx /= n; cy /= n;
   b.cx = cx; b.cy = cy;
   let gx0 = cx, gy0 = cy, ang;
-  if (b.controlled) { gx0 = T.x; gy0 = T.y; ang = T.a; }
+  if (b.controlled) ang = T.a;     // the player sets the falling piece's angle; it moves freely
   else {
     let A = 0, B = 0;
     for (const p of ps) { const dx = p.x - cx, dy = p.y - cy; A += p.qx * dx + p.qy * dy; B += p.qx * dy - p.qy * dx; }
@@ -188,6 +189,7 @@ function collide() {
           // A particle that slipped inside the other body's mesh gets pushed back out through the skin.
           if (insideQuads(p, q.qs)) { pushOut(p, q.b, sa, sb); continue; }
           if (insideQuads(q, p.qs)) { pushOut(q, p.b, sb, sa); continue; }
+          if (active && (p.b === active || q.b === active)) active.touch++;
           const d = Math.sqrt(d2), corr = (D - d) / d;
           p.x -= dx * corr * sa; p.y -= dy * corr * sa;
           q.x += dx * corr * sb; q.y += dy * corr * sb;
@@ -206,7 +208,7 @@ function collide() {
   for (const p of parts) {
     if (p.x < R) { p.x = R; p.py += (p.y - p.py) * 0.1; }
     else if (p.x > W - R) { p.x = W - R; p.py += (p.y - p.py) * 0.1; }
-    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; }
+    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; if (p.b === active) active.touch++; }
     if (press.phase !== 'idle' && p.y < press.y + R) { p.y = press.y + R; p.px += (p.x - p.px) * 0.4; press.touch++; }
   }
 }
@@ -279,7 +281,7 @@ function startPress() {
   if (active) {                    // the falling piece steps aside and comes back after
     heldType = active.type;
     bodies = bodies.filter(b => b !== active); active = null; rebuildParts();
-    hard = false; softBtn = softDrag = false;
+    hard = false; softBtn = softDrag = false; carry = null;
   }
   computeCoverage();
   let area = 0; for (let k = 0; k < H; k++) area += fill[k];
@@ -307,24 +309,45 @@ function syncPress() { $('pressBtn').classList.toggle('busy', press.phase !== 'i
 
 function fallSpeed() { return Math.min(0.9 + 0.22 * (level - 1), 6); }
 
+function gravityActive() { return Math.min(3 + 0.9 * (level - 1), 20); }
+
 function physStep() {
-  // Move the falling piece's target pose.
-  if (active) {
-    const da = T.ta - T.a; T.a += Math.sign(da) * Math.min(Math.abs(da), 14 * STEP);
-    const dx = T.tx - T.x; T.x += Math.sign(dx) * Math.min(Math.abs(dx), 20 * STEP);
-    const sp = hard ? (hardHeld ? 45 : 24) : (softBtn || softDrag) ? Math.max(10, fallSpeed()) : fallSpeed();
-    T.y += sp * STEP;
-  }
   stepPress();
   moveGrabs();
+  // The falling piece is a free body under gravity. We only nudge its velocity:
+  // steering towards T.tx, a finger carrying it, or a drop.
+  let adx = 0, ady = 0, aMax = 0.2;
+  if (active) {
+    const da = T.ta - T.a; T.a += Math.sign(da) * Math.min(Math.abs(da), 14 * STEP);
+    const n = active.parts.length;
+    let cx = 0, cy = 0, mvx = 0, mvy = 0;
+    for (const p of active.parts) { cx += p.x; cy += p.y; mvx += p.x - p.px; mvy += p.y - p.py; }
+    cx /= n; cy /= n; mvx /= n; mvy /= n;            // velocities are per step
+    const touching = active.touch > 0;
+    if (carry) {
+      // Follow the finger; slow and gentle once it touches other jelly, so it can be set down softly.
+      let vx = (carry.x + carry.ox - cx) * 14 * STEP, vy = (carry.y + carry.oy - cy) * 14 * STEP;
+      const vm = (touching ? 3 : 25) * STEP, l = Math.hypot(vx, vy);
+      if (l > vm) { vx *= vm / l; vy *= vm / l; }
+      adx = (vx - mvx) * 0.35; ady = (vy - mvy) * 0.35;
+    } else {
+      ady = gravityActive() * ((softBtn || softDrag) ? 4 : 1) * STEP * STEP;
+      if (hard && !touching) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
+      if (Math.abs(T.tx - cx) > 0.8) T.tx = cx + Math.sign(T.tx - cx) * 0.8;
+      const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
+      adx = (vx - mvx) * 0.25;
+    }
+    active.touch = 0;
+  }
   const g = G * STEP * STEP;
   for (const p of parts) {
-    const c = p.b.controlled, d = c ? 0.85 : DAMP;
-    let vx = (p.x - p.px) * d, vy = (p.y - p.py) * d;
-    const v2 = vx * vx + vy * vy;
-    if (v2 > 0.04) { const k = 0.2 / Math.sqrt(v2); vx *= k; vy *= k; }
+    const isA = p.b === active;
+    let vx = (p.x - p.px) * (isA ? 0.998 : DAMP), vy = (p.y - p.py) * (isA ? 0.998 : DAMP);
+    if (isA) { vx += adx; vy += ady; } else vy += g;
+    const m = isA ? aMax : 0.2, v2 = vx * vx + vy * vy;
+    if (v2 > m * m) { const k = m / Math.sqrt(v2); vx *= k; vy *= k; }
     p.px = p.x; p.py = p.y;
-    p.x += vx; p.y += vy + (c ? 0 : g);
+    p.x += vx; p.y += vy;
   }
   buildHash();
   const alpha = SQUISH[settings.squish] || SQUISH.squishy;
@@ -333,16 +356,7 @@ function physStep() {
     applyGrabs();
     collide();
   }
-  if (active) {
-    // Keep the target from running away into whatever blocks the piece.
-    let cx = 0, cy = 0;
-    for (const p of active.parts) { cx += p.x; cy += p.y; }
-    cx /= active.parts.length; cy /= active.parts.length;
-    active.lag = T.y - cy;
-    if (active.lag > 0.3) T.y = cy + 0.3;
-    const lx = T.x - cx;
-    if (Math.abs(lx) > 0.4) { T.x = cx + Math.sign(lx) * 0.4; T.tx = T.x; }
-  }
+  if (active && active.touch) active.contact++;
 }
 
 // ---------- game flow ----------
@@ -363,31 +377,30 @@ function spawn() {
   else { type = nextType || nextFromBag(); nextType = nextFromBag(); }
   drawNext();
   const b = makePiece(type);
-  b.controlled = true; b.lag = 0;
+  b.controlled = true; b.touch = 0; b.contact = 0;
   let mn = 1e9, mx = -1e9, my = -1e9;
   for (const p of b.parts) { mn = Math.min(mn, p.qx); mx = Math.max(mx, p.qx); my = Math.max(my, p.qy); }
   const w = mx - mn + D, left = Math.round((W - w) / 2);
   T.a = T.ta = 0;
   T.x = T.tx = left - (mn - R);
   T.y = -(my + R) - 0.02;
-  const v = fallSpeed() * STEP;
-  for (const p of b.parts) { p.x = p.px = T.x + p.qx; p.y = T.y + p.qy; p.py = p.y - v; }
+  for (const p of b.parts) { p.x = p.px = T.x + p.qx; p.y = p.py = T.y + p.qy; }
   b.cx = T.x; b.cy = T.y;
   bodies.push(b); active = b; rebuildParts();
-  lockTimer = 0; lockResets = 0; hard = false;
+  lockTimer = 0; lockResets = 0; hard = false; carry = null;
 }
 
 function lockActive() {
   const b = active;
   b.controlled = false; b.squint = 0.45;
-  active = null; hard = false;
+  active = null; hard = false; carry = null;
   score += 5; updateHud();
   sfx.lock(); buzz(14);
   spawnDelay = 0.1;
 }
 
 function moveBy(dx) {
-  if (!active || state !== 'play') return;
+  if (!active || state !== 'play' || carry) return;
   const before = T.tx; T.tx += dx; clampTX();
   if (T.tx !== before) { sfx.move(); bumpLock(); }
 }
@@ -395,7 +408,7 @@ function rotate() {
   if (!active || state !== 'play') return;
   T.ta += Math.PI / 2; clampTX(); sfx.rotate(); bumpLock();
 }
-function hardDrop() { if (!active || state !== 'play' || hard) return; hard = true; sfx.drop(); }
+function hardDrop() { if (!active || state !== 'play' || hard || carry) return; hard = true; sfx.drop(); }
 function bumpLock() { if (lockTimer > 0 && lockResets < MAX_RESETS) { lockResets++; lockTimer = Math.min(lockTimer, LOCK_DELAY * 0.4); } }
 
 // Coverage: rasterize the settled jelly at 8 px per cell and count pixels per row.
@@ -462,7 +475,7 @@ function resetWorld() {
   score = 0; lines = 0; level = 1; bag = []; nextType = null;
   lockTimer = 0; overTimer = 0; covTimer = 0; acc = 0; spawnDelay = 0; hard = hardHeld = false; softBtn = softDrag = false;
   fill.fill(0); hold.fill(0);
-  press.phase = 'idle'; press.y = PRESS_TOP; heldType = null; grabs.clear();
+  press.phase = 'idle'; press.y = PRESS_TOP; heldType = null; grabs.clear(); carry = null;
   if (typeof syncPress === 'function') syncPress();
 }
 
@@ -487,7 +500,7 @@ function gameOver() {
 
 function pause() {
   if (state !== 'play') return;
-  state = 'pause'; show('pause'); wake(false); hardHeld = softBtn = false;
+  state = 'pause'; show('pause'); wake(false); hardHeld = softBtn = false; carry = null;
 }
 function resume() {
   if (state !== 'pause') return;
@@ -504,10 +517,16 @@ function update(dt) {
     if (n === 6) acc = 0;
 
     if (active) {
-      if (active.lag > 0.12) {
+      // Lock once it rests on the stack (it may bounce first). Never while a finger holds it.
+      let vx = 0, vy = 0;
+      for (const p of active.parts) { vx += p.x - p.px; vy += p.y - p.py; }
+      const speed = Math.hypot(vx, vy) / active.parts.length / STEP;
+      if (carry) lockTimer = 0;
+      else if (active.contact > 0) {
         lockTimer += dt;
-        if (lockTimer >= (hard ? 0.04 : LOCK_DELAY)) lockActive();
+        if ((lockTimer >= 0.25 && speed < 2.5) || lockTimer >= 0.9) lockActive();
       } else lockTimer = Math.max(0, lockTimer - dt);
+      if (active) active.contact = 0;
     } else if (press.phase === 'idle') {
       spawnDelay -= dt;
       if (spawnDelay <= 0) spawn();
@@ -654,9 +673,11 @@ function draw() {
     ctx.fillRect(0, f.k - grow, W, 1 + grow * 2);
   }
   ctx.restore();
-  for (const g of grabs.values()) {
+  const rings = [...grabs.values()].map(g => ({ x: g.sx, y: g.sy }));
+  if (carry) rings.push(carry);
+  for (const g of rings) {
     ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 0.06;
-    ctx.beginPath(); ctx.arc(g.sx, g.sy, 0.42, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(g.x, g.y, 0.42, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
   }
   if (press.y > VY0 - 0.1) drawPress(ctx);
@@ -788,6 +809,16 @@ function tryGrab(e) {
 cv.addEventListener('pointerdown', e => {
   audio();
   if (state !== 'play') return;
+  if (active && !carry) {
+    // Touching the falling piece picks it up.
+    const w = worldPos(e);
+    if (active.parts.some(p => (p.x - w.x) ** 2 + (p.y - w.y) ** 2 < 0.9 * 0.9)) {
+      try { cv.setPointerCapture(e.pointerId); } catch {}
+      carry = { id: e.pointerId, x: w.x, y: w.y, ox: active.cx - w.x, oy: active.cy - w.y, cx0: e.clientX, cy0: e.clientY, t0: performance.now(), moved: false };
+      sfx.squish(); buzz(8);
+      return;
+    }
+  }
   const g = tryGrab(e);
   if (g) {
     try { cv.setPointerCapture(e.pointerId); } catch {}
@@ -799,6 +830,12 @@ cv.addEventListener('pointerdown', e => {
   drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), tx0: T.tx, moved: false, ly: e.clientY, lt: performance.now(), vy: 0, last: T.tx };
 });
 cv.addEventListener('pointermove', e => {
+  if (carry && e.pointerId === carry.id) {
+    const w = worldPos(e);
+    carry.x = Math.max(0, Math.min(W, w.x)); carry.y = Math.max(-2, Math.min(H, w.y));
+    if (Math.hypot(e.clientX - carry.cx0, e.clientY - carry.cy0) > 8) carry.moved = true;
+    return;
+  }
   const g = grabs.get(e.pointerId);
   if (g) { const w = worldPos(e); g.x = Math.max(0, Math.min(W, w.x)); g.y = Math.max(0.4, Math.min(H, w.y)); return; }
   if (!drag || e.pointerId !== drag.id || !active) return;
@@ -812,7 +849,14 @@ cv.addEventListener('pointermove', e => {
   const now = performance.now();
   if (now > drag.lt) { drag.vy = drag.vy * 0.5 + 0.5 * (e.clientY - drag.ly) / (now - drag.lt); drag.ly = e.clientY; drag.lt = now; }
 });
+function dropCarry(e, tapOk) {
+  const c = carry; carry = null;
+  if (!active) return;
+  T.tx = active.cx; lockTimer = 0;
+  if (tapOk && !c.moved && performance.now() - c.t0 < 300) rotate();
+}
 const endDrag = e => {
+  if (carry && e.pointerId === carry.id) { dropCarry(e, true); return; }
   if (grabs.delete(e.pointerId)) return;
   if (!drag || e.pointerId !== drag.id) return;
   const dx = (e.clientX - drag.x0) / scale, dy = (e.clientY - drag.y0) / scale, t = performance.now() - drag.t0;
@@ -821,7 +865,7 @@ const endDrag = e => {
   softDrag = false; drag = null;
 };
 cv.addEventListener('pointerup', endDrag);
-cv.addEventListener('pointercancel', e => { grabs.delete(e.pointerId); softDrag = false; if (drag && e.pointerId === drag.id) drag = null; });
+cv.addEventListener('pointercancel', e => { if (carry && e.pointerId === carry.id) dropCarry(e, false); grabs.delete(e.pointerId); softDrag = false; if (drag && e.pointerId === drag.id) drag = null; });
 
 window.addEventListener('keydown', e => {
   if (state === 'play') {
@@ -901,7 +945,7 @@ syncSettings(); updateHud(); show('menu');
 requestAnimationFrame(frame);
 
 // Debug hook for automated tests.
-window.__sq = { get state() { return state; }, get bodies() { return bodies.length; }, get parts() { return parts.length; }, get fill() { return Array.from(fill); }, get lines() { return lines; }, get score() { return score; }, hardDrop, moveBy, rotate, gameOver, startPress, get press() { return press.phase; },
+window.__sq = { get state() { return state; }, get bodies() { return bodies.length; }, get parts() { return parts.length; }, get fill() { return Array.from(fill); }, get lines() { return lines; }, get score() { return score; }, hardDrop, moveBy, rotate, gameOver, startPress, get press() { return press.phase; }, get carrying() { return !!carry; },
   dbg() {
     let minD = 9;
     for (const p of parts) for (const q of parts) if (p.b !== q.b) minD = Math.min(minD, Math.hypot(p.x - q.x, p.y - q.y));
