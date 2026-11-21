@@ -15,21 +15,29 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 
-const settings = Object.assign({ squish: 'squishy', sound: true, vibe: true }, store.get('settings', {}));
+const settings = Object.assign({ mat: 'wood', sound: true, vibe: true }, store.get('settings', {}));
+if (!['glass', 'wood', 'jelly'].includes(settings.mat)) settings.mat = settings.squish === 'jelly' ? 'jelly' : 'wood';
+delete settings.squish;
 const saveSettings = () => store.set('settings', settings);
-let best = store.get('best', 0);
+const bestOf = m => store.get('best-' + m, { score: 0, level: 0 });
 
 // ---------- constants (world units: 1 = one cell) ----------
 const W = 10, H = 20;
 const R = 0.25, D = R * 2;               // particle radius / spacing
 const STEP = 1 / 120, ITERS = 4;
-const G = 26, DAMP = 0.992, MU = 0.18;
+const G = 26, DAMP = 0.992;
 const CTRL_ALPHA = 0.5, CTRL_INVMASS = 1;
-const SQUISH = { firm: 0.45, squishy: 0.22, jelly: 0.09 };
+// Materials: alpha = shape stiffness, mu = friction, pack = how hard the press squeezes.
+const MAT = {
+  glass: { alpha: 0.85, mu: 0.1, pack: 0.97, name: 'Glass', info: 'Fragile! Let it fall or bang it and it shatters. Carry it down gently.' },
+  wood: { alpha: 0.85, mu: 0.35, pack: 0.97, name: 'Wood', info: 'Solid blocks. Stack them like a real tower.' },
+  jelly: { alpha: 0.09, mu: 0.18, pack: 0.88, name: 'Jelly', info: 'Squishy! It spreads into every gap, so rows fill up (and vanish) easily.' },
+};
+const mat = () => MAT[settings.mat] || MAT.wood;
+const BREAK_DV = 4.5, CRUSH = 0.14;
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
 const PRESS_TOP = -2.7, PLATE = 0.8;               // parked plate bottom (off screen), plate thickness
-const PACK = { firm: 0.97, squishy: 0.93, jelly: 0.88 }; // how hard the press squeezes
 
 const SHAPES = {
   I: [[0, 0], [1, 0], [2, 0], [3, 0]],
@@ -42,6 +50,11 @@ const SHAPES = {
 };
 const COLORS = { I: '#45d4ff', O: '#ffd23f', T: '#b77cff', S: '#55e07a', Z: '#ff5577', J: '#4f86ff', L: '#ff9b3d' };
 
+function mix2(a, b, t) {
+  const n = parseInt(a.slice(1), 16), m = parseInt(b.slice(1), 16);
+  const c = [16, 8, 0].map(s => Math.round(((n >> s) & 255) * (1 - t) + ((m >> s) & 255) * t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 function mix(hex, t, toWhite) {
   const n = parseInt(hex.slice(1), 16), v = toWhite ? 255 : 0;
   const c = [n >> 16, (n >> 8) & 255, n & 255].map(x => Math.round(x + (v - x) * t));
@@ -61,6 +74,9 @@ let pid = 0;
 let bodies = [], parts = [], active = null, sparks = [], flashes = [];
 const T = { x: 0, y: 0, tx: 0, a: 0, ta: 0 };   // target pose of the falling piece
 let state = 'menu', score = 0, lines = 0, level = 1, bag = [], nextType = null;
+let goal = 6, piecesLeft = 0, winHold = 0, outTimer = 0, curHeight = 0, levelStartScore = 0, shards = [];
+const levelGoal = l => Math.min(4 + 2 * l, 17);     // rows to build up to
+const levelPieces = l => levelGoal(l) + 4;          // pieces you get for it
 let lockTimer = 0, lockResets = 0, hard = false, hardHeld = false, softBtn = false, softDrag = false;
 let overTimer = 0, covTimer = 0, acc = 0, spawnDelay = 0, shake = 0;
 const fill = new Float32Array(H), hold = new Float32Array(H);
@@ -93,6 +109,8 @@ function buildBody(ps, quads, type) {
   const body = {
     parts: ps, quads, type, edges: [], controlled: false,
     color: COLORS[type], dark: mix(COLORS[type], 0.55, false), light: mix(COLORS[type], 0.55, true),
+    wood: mix2(COLORS[type], '#a06a38', 0.5), woodDark: mix2(COLORS[type], '#3a220e', 0.7),
+    glass: mix2(COLORS[type], '#2b3d63', 0.42), touch: 0,
     cx: 0, cy: 0, ang: 0, strain: 0, eyes: false, blink: 1 + Math.random() * 4, squint: 0,
   };
   let sx = 0, sy = 0;
@@ -169,7 +187,7 @@ function shapeMatch(b, alpha) {
 }
 
 function collide() {
-  const n = parts.length, D2 = D * D;
+  const n = parts.length, D2 = D * D, MU = mat().mu;
   for (let i = 0; i < n; i++) {
     const p = parts[i], c = pcell[i], gx = c % GC, gy = (c / GC) | 0;
     const wa = p.b.controlled ? CTRL_INVMASS : 1;
@@ -189,7 +207,7 @@ function collide() {
           // A particle that slipped inside the other body's mesh gets pushed back out through the skin.
           if (insideQuads(p, q.qs)) { pushOut(p, q.b, sa, sb); continue; }
           if (insideQuads(q, p.qs)) { pushOut(q, p.b, sb, sa); continue; }
-          if (active && (p.b === active || q.b === active)) active.touch++;
+          p.b.touch++; q.b.touch++;
           const d = Math.sqrt(d2), corr = (D - d) / d;
           p.x -= dx * corr * sa; p.y -= dy * corr * sa;
           q.x += dx * corr * sb; q.y += dy * corr * sb;
@@ -208,7 +226,7 @@ function collide() {
   for (const p of parts) {
     if (p.x < R) { p.x = R; p.py += (p.y - p.py) * 0.1; }
     else if (p.x > W - R) { p.x = W - R; p.py += (p.y - p.py) * 0.1; }
-    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; if (p.b === active) active.touch++; }
+    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; p.b.touch++; }
     if (press.phase !== 'idle' && p.y < press.y + R) { p.y = press.y + R; p.px += (p.x - p.px) * 0.4; press.touch++; }
   }
 }
@@ -285,7 +303,7 @@ function startPress() {
   }
   computeCoverage();
   let area = 0; for (let k = 0; k < H; k++) area += fill[k];
-  press.target = Math.max(1, Math.min(H - 0.35, H - area * (PACK[settings.squish] || PACK.squishy)));
+  press.target = Math.max(1, Math.min(H - 0.35, H - area * mat().pack));
   press.phase = 'down'; press.t = 0; press.contact = false; press.y = PRESS_TOP;
   overTimer = 0;
   sfx.hydraulic(1.6); syncPress();
@@ -337,8 +355,8 @@ function physStep() {
       const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
       adx = (vx - mvx) * 0.25;
     }
-    active.touch = 0;
   }
+  for (const b of bodies) b.touch = 0;
   const g = G * STEP * STEP;
   for (const p of parts) {
     const isA = p.b === active;
@@ -350,13 +368,47 @@ function physStep() {
     p.x += vx; p.y += vy;
   }
   buildHash();
-  const alpha = SQUISH[settings.squish] || SQUISH.squishy;
+  const alpha = mat().alpha, ctrlAlpha = Math.max(CTRL_ALPHA, alpha);
   for (let it = 0; it < ITERS; it++) {
-    for (const b of bodies) shapeMatch(b, b.controlled ? CTRL_ALPHA : alpha);
+    for (const b of bodies) shapeMatch(b, b.controlled ? ctrlAlpha : alpha);
     applyGrabs();
     collide();
   }
   if (active && active.touch) active.contact++;
+  if (settings.mat === 'glass') checkGlass();
+}
+
+// Glass breaks on a hard knock (sudden change of speed while touching something) or when crushed.
+function checkGlass() {
+  let broke = null;
+  for (const b of bodies) {
+    let vx = 0, vy = 0;
+    for (const p of b.parts) { vx += p.x - p.px; vy += p.y - p.py; }
+    const n = b.parts.length * STEP; vx /= n; vy /= n;
+    const h = b.vh || (b.vh = []);
+    h.push(vx, vy); if (h.length > 8) h.splice(0, 2);
+    b.tc = b.touch ? 6 : (b.tc || 0) - 1;
+    if (b.tc > 0 && ((h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV) || b.strain > CRUSH)) (broke || (broke = [])).push(b);
+  }
+  if (broke) for (const b of broke) shatter(b);
+}
+
+function shatter(b) {
+  if (!bodies.includes(b)) return;
+  bodies = bodies.filter(x => x !== b);
+  if (b === active) { active = null; carry = null; hard = false; spawnDelay = 0.4; }
+  for (const [k, g] of grabs) if (g.body === b) grabs.delete(k);
+  for (const q of b.quads) {
+    const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+    const vx = (q[0].x - q[0].px) / STEP * 0.4, vy = (q[0].y - q[0].py) / STEP * 0.4;
+    for (let i = 0; i < 3; i++) shards.push({
+      x: cx + (Math.random() - 0.5) * 0.4, y: cy + (Math.random() - 0.5) * 0.4,
+      vx: vx + (Math.random() - 0.5) * 7, vy: vy - Math.random() * 5, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
+      s: 0.12 + Math.random() * 0.2, t: 0, life: 0.9 + Math.random() * 0.7, color: b.glass,
+    });
+  }
+  rebuildParts();
+  sfx.glass(); buzz([15, 20, 35]); shake = 0.15;
 }
 
 // ---------- game flow ----------
@@ -374,7 +426,12 @@ function clampTX() { if (!active) return; const [mn, mx] = extents(T.ta); T.tx =
 function spawn() {
   let type;
   if (heldType) { type = heldType; heldType = null; }
-  else { type = nextType || nextFromBag(); nextType = nextFromBag(); }
+  else {
+    if (piecesLeft <= 0) return;
+    piecesLeft--;
+    type = nextType || nextFromBag(); nextType = nextFromBag();
+  }
+  updateHud();
   drawNext();
   const b = makePiece(type);
   b.controlled = true; b.touch = 0; b.contact = 0;
@@ -394,7 +451,6 @@ function lockActive() {
   const b = active;
   b.controlled = false; b.squint = 0.45;
   active = null; hard = false; carry = null;
-  score += 5; updateHud();
   sfx.lock(); buzz(14);
   spawnDelay = 0.1;
 }
@@ -456,10 +512,8 @@ function clearRows(rows) {
   for (const k of rows) { flashes.push({ k, t: 0 }); hold[k] = 0; }
   const n = rows.length;
   lines += n;
-  score += [0, 100, 300, 500, 800][Math.min(n, 4)] * level + Math.max(0, n - 4) * 400 * level;
-  level = 1 + Math.floor(lines / 8);
   updateHud();
-  sfx.clear(n); buzz([25, 40, 50]);
+  sfx.lost(); buzz([25, 40, 50]);
   shake = 0.25;
 }
 
@@ -471,32 +525,57 @@ function burst(x, y, color, n) {
 }
 
 function resetWorld() {
-  bodies = []; parts = []; active = null; sparks = []; flashes = [];
-  score = 0; lines = 0; level = 1; bag = []; nextType = null;
+  bodies = []; parts = []; active = null; sparks = []; flashes = []; shards = [];
+  lines = 0; bag = []; nextType = null; winHold = 0; outTimer = 0; curHeight = 0;
   lockTimer = 0; overTimer = 0; covTimer = 0; acc = 0; spawnDelay = 0; hard = hardHeld = false; softBtn = softDrag = false;
   fill.fill(0); hold.fill(0);
   press.phase = 'idle'; press.y = PRESS_TOP; heldType = null; grabs.clear(); carry = null;
   if (typeof syncPress === 'function') syncPress();
 }
 
-function startGame() {
-  audio();
-  resetWorld(); updateHud();
+function startGame() { audio(); score = 0; startLevel(1); }
+
+function startLevel(l) {
+  resetWorld();
+  level = l; goal = levelGoal(l); piecesLeft = levelPieces(l); levelStartScore = score;
   state = 'play';
   show(null);
-  spawn();
+  spawn(); updateHud();
   try { history.pushState({ squish: 1 }, ''); } catch {}
   wake(true);
 }
 
-function gameOver() {
+function saveBest() {
+  const b = bestOf(settings.mat);
+  if (score > b.score || (score === b.score && level > b.level)) { store.set('best-' + settings.mat, { score, level }); return true; }
+  return false;
+}
+
+function levelComplete() {
+  state = 'won';
+  const bonus = 1000 * level + 100 * piecesLeft;
+  score += bonus;
+  saveBest();
+  $('wonTitle').textContent = 'Level ' + level + ' done!';
+  $('wonInfo').textContent = '+' + bonus + ' points' + (piecesLeft ? ' (' + piecesLeft + ' pieces to spare)' : '');
+  $('wonScore').textContent = score;
+  $('nextBtn').textContent = 'Level ' + (level + 1) + ': build to ' + levelGoal(level + 1) + ' rows';
+  sfx.win(); buzz([30, 40, 30, 40, 90]);
+  show('won'); wake(false);
+}
+
+function gameOver(reason) {
   state = 'over';
-  if (score > best) { best = score; store.set('best', best); }
+  const isBest = saveBest();
+  $('overTitle').textContent = reason || 'Game over';
   $('finalScore').textContent = score;
-  $('bestOver').textContent = score >= best && score > 0 ? 'New best!' : 'Best: ' + best;
+  const b = bestOf(settings.mat);
+  $('bestOver').textContent = isBest && score > 0 ? 'New best!' : 'Best (' + mat().name + '): ' + b.score;
+  $('retryBtn').textContent = 'Retry level ' + level;
   sfx.over(); buzz([60, 60, 120]);
   show('over'); wake(false);
 }
+function retryLevel() { audio(); score = levelStartScore; startLevel(level); }
 
 function pause() {
   if (state !== 'play') return;
@@ -507,7 +586,7 @@ function resume() {
   state = 'play'; show(null); acc = 0; wake(true);
   try { history.pushState({ squish: 1 }, ''); } catch {}
 }
-function toMenu() { state = 'menu'; resetWorld(); updateHud(); drawNext(); show('menu'); wake(false); }
+function toMenu() { state = 'menu'; score = 0; level = 1; resetWorld(); updateHud(); drawNext(); show('menu'); wake(false); }
 
 function update(dt) {
   if (state === 'play') {
@@ -541,15 +620,30 @@ function update(dt) {
         if (fill[k] >= THRESH) { hold[k] += step; if (hold[k] >= HOLD_T) rows.push(k); } else hold[k] = 0;
       }
       if (rows.length) clearRows(rows);
+      updateHud();
     }
 
-    // Overflow: settled jelly poking above the top for a while.
+    // Goal: the settled stack reaches the gold line and stays there for 2 seconds.
     let top = 1e9;
     for (const p of parts) if (!p.b.controlled && p.y < top) top = p.y;
-    if (top < -0.05 && press.phase === 'idle') { overTimer += dt; if (overTimer > 1.2) gameOver(); } else overTimer = 0;
+    curHeight = top < 1e8 ? Math.max(0, H - (top - R)) : 0;
+    if (curHeight >= goal && press.phase === 'idle' && grabs.size === 0) {
+      winHold += dt;
+      if (winHold >= 2) levelComplete();
+    } else winHold = 0;
+    if (state === 'play' && !active && piecesLeft <= 0 && press.phase === 'idle' && winHold === 0) {
+      outTimer += dt;
+      if (outTimer > 3) gameOver('Out of pieces');
+    } else outTimer = 0;
   }
   for (const s of sparks) { s.t += dt; s.vy += 12 * dt; s.x += s.vx * dt; s.y += s.vy * dt; }
   sparks = sparks.filter(s => s.t < s.life);
+  for (const s of shards) {
+    s.t += dt; s.vy += 22 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.a += s.va * dt;
+    if (s.y > H - 0.05) { s.y = H - 0.05; s.vy *= -0.3; s.vx *= 0.6; s.va *= 0.5; }
+    if (s.x < 0.05 || s.x > W - 0.05) s.vx *= -0.5;
+  }
+  shards = shards.filter(s => s.t < s.life);
   for (const f of flashes) f.t += dt;
   flashes = flashes.filter(f => f.t < 0.4);
   for (const b of bodies) {
@@ -583,6 +677,8 @@ function pathEdges(c, b) {
 }
 
 function drawBody(c, b, look) {
+  if (settings.mat === 'wood') return drawWood(c, b, look);
+  if (settings.mat === 'glass') return drawGlass(c, b, look);
   c.lineCap = c.lineJoin = 'round';
   pathEdges(c, b);
   c.strokeStyle = b.dark; c.lineWidth = D + 0.13; c.stroke();
@@ -594,9 +690,53 @@ function drawBody(c, b, look) {
   if (b.eyes) drawEyes(c, b, look);
 }
 
+function drawWood(c, b, look) {
+  c.lineCap = 'square'; c.lineJoin = 'miter';
+  pathEdges(c, b); c.strokeStyle = b.woodDark; c.lineWidth = D + 0.12; c.stroke();
+  c.fillStyle = c.strokeStyle = b.wood;
+  pathQuads(c, b); c.fill(); c.lineWidth = 0.04; c.stroke();
+  pathEdges(c, b); c.lineWidth = D; c.stroke();
+  // wood grain running along the piece
+  c.save(); pathQuads(c, b); c.clip();
+  const co = Math.cos(b.ang), si = Math.sin(b.ang);
+  c.strokeStyle = 'rgba(60,32,10,0.28)'; c.lineWidth = 0.045; c.lineCap = 'round';
+  for (let k = -6; k <= 6; k++) {
+    c.beginPath();
+    for (let i = 0; i <= 12; i++) {
+      const lx = -3 + i * 0.5, ly = k * 0.32 + Math.sin(i * 0.9 + k * 1.7) * 0.05;
+      const x = b.cx + co * lx - si * ly, y = b.cy + si * lx + co * ly;
+      if (i) c.lineTo(x, y); else c.moveTo(x, y);
+    }
+    c.stroke();
+  }
+  c.restore();
+  if (b.eyes) drawEyes(c, b, look);
+}
+
+function drawGlass(c, b, look) {
+  c.lineCap = 'square'; c.lineJoin = 'miter';
+  pathEdges(c, b); c.strokeStyle = 'rgba(225,240,255,0.85)'; c.lineWidth = D + 0.1; c.stroke();
+  c.fillStyle = c.strokeStyle = b.glass;
+  pathQuads(c, b); c.fill(); c.lineWidth = 0.04; c.stroke();
+  pathEdges(c, b); c.lineWidth = D - 0.06; c.stroke();
+  // shine streaks
+  c.save(); pathQuads(c, b); c.clip();
+  c.globalAlpha = 0.3; c.fillStyle = '#ffffff';
+  const co = Math.cos(b.ang), si = Math.sin(b.ang);
+  for (const [o, w] of [[-0.9, 0.35], [-0.35, 0.12]]) {
+    c.beginPath();
+    for (const [lx, ly] of [[o - 3, 3], [o - 3 + w, 3], [o + 3 + w, -3], [o + 3, -3]]) {
+      const x = b.cx + co * lx - si * ly, y = b.cy + si * lx + co * ly; c.lineTo(x, y);
+    }
+    c.fill();
+  }
+  c.globalAlpha = 1; c.restore();
+  if (b.eyes) drawEyes(c, b, look);
+}
+
 function drawEyes(c, b, look) {
   const co = Math.cos(b.ang), si = Math.sin(b.ang);
-  const squint = b.squint > 0 || b.strain > 0.09;
+  const squint = b.squint > 0 || (settings.mat === 'jelly' && b.strain > 0.09);
   const shut = b.blink < 0 && !squint;
   for (const side of [-1, 1]) {
     const lx = side * 0.24, ly = -0.08;
@@ -655,7 +795,7 @@ function draw() {
     const x = W + 0.28, y = k + 0.12, h = 0.76, f = Math.min(1, fill[k]);
     ctx.fillStyle = 'rgba(255,255,255,0.07)'; roundRect(ctx, x, y, 0.3, h, 0.1); ctx.fill();
     if (f > 0.02) {
-      ctx.fillStyle = f >= THRESH ? '#7dffb3' : f > 0.75 ? '#ffd23f' : '#7f72b8';
+      ctx.fillStyle = f >= THRESH ? '#ff5577' : f > 0.75 ? '#ff9b3d' : '#7f72b8';
       roundRect(ctx, x, y + h * (1 - f), 0.3, h * f, 0.1); ctx.fill();
     }
   }
@@ -672,6 +812,25 @@ function draw() {
     const grow = f.t * 0.6;
     ctx.fillRect(0, f.k - grow, W, 1 + grow * 2);
   }
+  // goal line
+  const gy = H - goal, ok = winHold > 0;
+  ctx.strokeStyle = ok ? '#7dffb3' : '#ffd23f'; ctx.lineWidth = ok ? 0.1 : 0.07; ctx.setLineDash([0.35, 0.18]);
+  ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); ctx.setLineDash([]);
+  if (state !== 'menu') {
+    ctx.font = '800 0.42px system-ui, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = ok ? '#7dffb3' : '#ffd23f';
+    ctx.fillText(ok ? 'HOLD IT… ' + Math.max(0, 2 - winHold).toFixed(1) : 'GOAL', 0.15, gy - 0.08);
+  }
+  for (const s of shards) {
+    ctx.globalAlpha = Math.max(0, 1 - s.t / s.life);
+    const co = Math.cos(s.a), si = Math.sin(s.a);
+    ctx.beginPath();
+    ctx.moveTo(s.x + co * s.s, s.y + si * s.s);
+    ctx.lineTo(s.x - si * s.s * 0.7, s.y + co * s.s * 0.7);
+    ctx.lineTo(s.x - co * s.s * 0.8, s.y - si * s.s * 0.5);
+    ctx.closePath();
+    ctx.fillStyle = s.color; ctx.fill(); ctx.strokeStyle = 'rgba(230,245,255,0.9)'; ctx.lineWidth = 0.03; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   ctx.restore();
   const rings = [...grabs.values()].map(g => ({ x: g.sx, y: g.sy }));
   if (carry) rings.push(carry);
@@ -719,7 +878,7 @@ function drawPress(c) {
 function drawNext() {
   const w = nextCv.width, h = nextCv.height;
   nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, w, h);
-  if (!nextType || state === 'menu') return;
+  if (!nextType || state === 'menu' || piecesLeft <= 0) return;
   const b = makePiece(nextType);
   let mn = 1e9, mx = -1e9, my0 = 1e9, my1 = -1e9;
   for (const p of b.parts) { p.x = p.rx; p.y = p.ry; mn = Math.min(mn, p.x); mx = Math.max(mx, p.x); my0 = Math.min(my0, p.y); my1 = Math.max(my1, p.y); }
@@ -730,30 +889,36 @@ function drawNext() {
 }
 
 function updateHud() {
-  $('score').textContent = score;
-  $('lines').textContent = lines;
   $('level').textContent = level;
+  $('height').textContent = curHeight.toFixed(1) + '/' + goal;
+  $('left').textContent = piecesLeft + (active ? 1 : 0);
 }
 
 // ---------- overlays & settings ----------
 function show(id) {
-  for (const o of ['menu', 'pause', 'over']) $(o).classList.toggle('hidden', o !== id);
-  if (id === 'menu') $('bestMenu').textContent = best ? 'Best: ' + best : '';
+  for (const o of ['menu', 'pause', 'over', 'won']) $(o).classList.toggle('hidden', o !== id);
+  if (id === 'menu') syncSettings();
 }
 function syncSettings() {
-  for (const b of $('squishSeg').children) b.classList.toggle('sel', b.dataset.v === settings.squish);
+  for (const b of $('squishSeg').children) b.classList.toggle('sel', b.dataset.v === settings.mat);
+  $('matInfo').textContent = mat().info;
+  const b = bestOf(settings.mat);
+  $('bestMenu').textContent = b.score ? 'Best with ' + mat().name.toLowerCase() + ': ' + b.score + ' (level ' + b.level + ')' : '';
   for (const id of ['soundBtn', 'soundBtn2']) { $(id).classList.toggle('sel', settings.sound); $(id).textContent = settings.sound ? 'Sound on' : 'Sound off'; }
   for (const id of ['vibeBtn', 'vibeBtn2']) { $(id).classList.toggle('sel', settings.vibe); $(id).textContent = settings.vibe ? 'Vibration on' : 'Vibration off'; }
 }
 $('squishSeg').addEventListener('click', e => {
-  const v = e.target.dataset && e.target.dataset.v;
-  if (v) { settings.squish = v; saveSettings(); syncSettings(); audio(); sfx.rotate(); }
+  const v = e.target.closest('button') && e.target.closest('button').dataset.v;
+  if (v) { settings.mat = v; saveSettings(); syncSettings(); audio(); sfx.rotate(); }
 });
 for (const id of ['soundBtn', 'soundBtn2']) $(id).addEventListener('click', () => { settings.sound = !settings.sound; saveSettings(); syncSettings(); audio(); sfx.move(); });
 for (const id of ['vibeBtn', 'vibeBtn2']) $(id).addEventListener('click', () => { settings.vibe = !settings.vibe; saveSettings(); syncSettings(); buzz(20); });
 $('playBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', startGame);
-$('restartBtn').addEventListener('click', startGame);
+$('restartBtn').addEventListener('click', retryLevel);
+$('retryBtn').addEventListener('click', retryLevel);
+$('nextBtn').addEventListener('click', () => { audio(); startLevel(level + 1); });
+$('wonMenuBtn').addEventListener('click', toMenu);
 $('resumeBtn').addEventListener('click', resume);
 $('quitBtn').addEventListener('click', toMenu);
 $('menuBtn').addEventListener('click', toMenu);
@@ -910,6 +1075,12 @@ const sfx = {
   squish() { tone(300, 0.12, 'sine', 0.1, 140); },
   clunk() { tone(90, 0.35, 'sine', 0.35, 38); noise(0.12, 900, 0.08); },
   hydraulic(d) { tone(52, d, 'sawtooth', 0.05, 46); noise(d, 2600, 0.035); },
+  glass() {
+    noise(0.25, 5200, 0.12);
+    for (let i = 0; i < 6; i++) tone(2200 + Math.random() * 3800, 0.09 + Math.random() * 0.12, 'triangle', 0.05, null, Math.random() * 0.18);
+  },
+  lost() { [523, 415, 330].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, f * 0.9, i * 0.08)); },
+  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, null, i * 0.09)); },
   over() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.05, f * 0.97, i * 0.16)); },
 };
 function noise(dur, freq, vol) {
@@ -945,7 +1116,7 @@ syncSettings(); updateHud(); show('menu');
 requestAnimationFrame(frame);
 
 // Debug hook for automated tests.
-window.__sq = { get state() { return state; }, get bodies() { return bodies.length; }, get parts() { return parts.length; }, get fill() { return Array.from(fill); }, get lines() { return lines; }, get score() { return score; }, hardDrop, moveBy, rotate, gameOver, startPress, get press() { return press.phase; }, get carrying() { return !!carry; },
+window.__sq = { get state() { return state; }, get bodies() { return bodies.length; }, get parts() { return parts.length; }, get fill() { return Array.from(fill); }, get lines() { return lines; }, get score() { return score; }, get height() { return curHeight; }, get goal() { return goal; }, get left() { return piecesLeft; }, startLevel, shatterCount: () => shards.length, hardDrop, moveBy, rotate, gameOver, startPress, get press() { return press.phase; }, get carrying() { return !!carry; },
   dbg() {
     let minD = 9;
     for (const p of parts) for (const q of parts) if (p.b !== q.b) minD = Math.min(minD, Math.hypot(p.x - q.x, p.y - q.y));
