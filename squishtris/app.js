@@ -319,10 +319,13 @@ function moveGrabs() {
 // The hydraulic press restarts the level: it comes down, crushes every piece, then the level starts over.
 function startPress() {
   if (state !== 'play' || press.phase !== 'idle') return;
-  if (active) { active.controlled = false; active = null; }   // the falling piece gets crushed too
+  if (active) {                    // the falling piece is crushed straight away
+    const b = active; active = null; b.controlled = false;
+    if (settings.mat === 'glass') shatter(b); else crushBody(b);
+  }
   carry = null; grabs.clear(); hard = false; softBtn = softDrag = false;
   press.target = H - 0.12; press.phase = 'down'; press.t = 0; press.contact = false; press.y = PRESS_TOP;
-  sfx.hydraulic(2.4); syncPress();
+  sfx.hydraulic(1.6); syncPress();
 }
 function bodyArea(b) {
   let a = 0;
@@ -336,28 +339,60 @@ function crushBody(b) {
     if (settings.mat === 'jelly') burst(p.x, p.y, b.color, 1);
     else if (Math.random() < 0.7) shards.push({
       x: p.x, y: p.y, vx: (Math.random() - 0.5) * 9, vy: -Math.random() * 6, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
-      s: 0.1 + Math.random() * 0.16, t: 0, life: 0.7 + Math.random() * 0.6, color: settings.mat === 'wood' ? b.wood : b.glass,
+      s: 0.1 + Math.random() * 0.16, t: 0, life: 0.7 + Math.random() * 0.6, color: settings.mat === 'wood' ? b.wood : b.glass, edge: settings.mat === 'wood' ? 'rgba(45,25,8,0.7)' : null,
     });
   }
   rebuildParts();
   if (settings.mat === 'glass') sfx.glass(); else sfx.splat();
   buzz(12); shake = Math.max(shake, 0.12);
 }
+// Wood under the press splits into its single blocks.
+function crackBody(b) {
+  if (!bodies.includes(b)) return;
+  const cells = new Map();
+  for (const p of b.parts) {
+    const k = (p.i >> 1) + ',' + (p.j >> 1);
+    if (!cells.has(k)) cells.set(k, []);
+    cells.get(k).push(p);
+  }
+  const out = [];
+  for (const ps of cells.values()) {
+    if (ps.length !== 4) continue;
+    ps.sort((a, c) => a.j - c.j || a.i - c.i);
+    const nb = buildBody(ps, [[ps[0], ps[1], ps[3], ps[2]]], b.type);
+    nb.cracked = true;
+    const kx = (Math.random() - 0.5) * 0.04;
+    for (const p of ps) { p.px -= kx; p.py -= Math.random() * 0.01; }
+    out.push(nb);
+  }
+  for (const [a, c] of b.edges) if (Math.random() < 0.25) shards.push({
+    x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 4, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
+    s: 0.08 + Math.random() * 0.1, t: 0, life: 0.5 + Math.random() * 0.4, color: b.wood, edge: 'rgba(45,25,8,0.7)',
+  });
+  bodies = bodies.filter(x => x !== b).concat(out);
+  for (const [k, g] of grabs) if (g.body === b) grabs.delete(k);
+  rebuildParts();
+  sfx.crack(); buzz(18); shake = Math.max(shake, 0.15);
+}
 function stepPress() {
   if (press.phase === 'idle') return;
   press.t += STEP;
   if (press.phase === 'down') {
     if (press.touch > 0 && !press.contact) { press.contact = true; sfx.clunk(); buzz([30, 30, 60]); shake = 0.2; }
-    press.y = Math.min(press.target, press.y + (press.contact ? 3 : 15) * STEP);
-    // Pieces squashed far enough pop; whatever is left goes when the plate nears the floor.
-    const limit = settings.mat === 'jelly' ? 0.5 : 0.65;
-    for (const b of bodies.slice()) if (b.pressed && bodyArea(b) < b.quads.length * D * D * limit) crushBody(b);
+    press.y = Math.min(press.target, press.y + (press.touch > 0 ? 8 : 18) * STEP);
+    // What the plate touches: glass shatters at once, wood cracks into chunks, jelly gets squeezed flat.
+    for (const b of bodies.slice()) {
+      if (!b.pressed) continue;
+      if (settings.mat === 'glass') shatter(b);
+      else if (settings.mat === 'wood' && !b.cracked) crackBody(b);
+      else if (bodyArea(b) < b.quads.length * D * D * (settings.mat === 'jelly' ? 0.35 : 0.6)) crushBody(b);
+    }
     if (press.y >= H - 0.75 || press.t > 6) for (const b of bodies.slice()) crushBody(b);
     if (press.y >= press.target) { press.phase = 'hold'; press.t = 0; shake = 0.3; sfx.clunk(); buzz(40); }
   } else if (press.phase === 'hold') {
-    if (press.t > 0.35) { press.phase = 'up'; press.t = 0; sfx.hydraulic(0.7); }
+    if (press.t > 0.25) { press.phase = 'up'; press.t = 0; sfx.hydraulic(0.6); }
   } else if (press.phase === 'up') {
-    press.y -= 10 * STEP;
+    press.y -= 20 * STEP;
     if (press.y <= PRESS_TOP) { press.y = PRESS_TOP; press.phase = 'idle'; syncPress(); restartLevel(); }
   }
   press.touch = 0;
@@ -890,7 +925,7 @@ function draw() {
     ctx.lineTo(s.x - si * s.s * 0.7, s.y + co * s.s * 0.7);
     ctx.lineTo(s.x - co * s.s * 0.8, s.y - si * s.s * 0.5);
     ctx.closePath();
-    ctx.fillStyle = s.color; ctx.fill(); ctx.strokeStyle = 'rgba(230,245,255,0.9)'; ctx.lineWidth = 0.03; ctx.stroke();
+    ctx.fillStyle = s.color; ctx.fill(); ctx.strokeStyle = s.edge || 'rgba(230,245,255,0.9)'; ctx.lineWidth = 0.03; ctx.stroke();
   }
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -1212,6 +1247,7 @@ const sfx = {
   },
   lost() { [523, 415, 330].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, f * 0.9, i * 0.08)); },
   win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, null, i * 0.09)); },
+  crack() { noise(0.09, 1800, 0.16); tone(120, 0.12, 'square', 0.05, 60); },
   splat() { tone(160, 0.12, 'sine', 0.14, 70); noise(0.08, 500, 0.06); },
   over() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.05, f * 0.97, i * 0.16)); },
 };
