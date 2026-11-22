@@ -17,7 +17,8 @@ const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const PCOL = ['#ff5fa2', '#36d6ff'];
+const PCOL = ['#f59ac0', '#8ccff0'];   // pastel fills
+const PTXT = ['#d9558c', '#3a94c4'];   // readable text versions
 
 // ---------------------------------------------------------------- Big Five items (original wording, 12 per trait, half reverse-keyed)
 const TRAITS = {
@@ -180,7 +181,7 @@ const Sound = {
 };
 function buzz(ms) { if (!Sound.muted) navigator.vibrate?.(ms); }
 function updateMuteButtons() {
-  $('#btnMute1').textContent = Sound.muted ? '🔇 Sound off' : '🔊 Sound on';
+  $('#btnMute1').textContent = Sound.muted ? '🔇' : '🔊';
   $('#btnMute2').textContent = Sound.muted ? '🔇' : '🔊';
 }
 
@@ -191,7 +192,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x2a1550, 30, 75);
+scene.fog = new THREE.Fog(0xf3e8ff, 34, 80);
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
 const camTarget = new THREE.Vector3(0, 0.9, 0);
 const camBase = new THREE.Vector3(0, 5, 12);
@@ -199,13 +200,13 @@ let shake = 0;
 
 const sky = new THREE.Mesh(new THREE.SphereGeometry(90, 32, 16), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, fog: false,
-  uniforms: { top: { value: new THREE.Color('#2b1466') }, mid: { value: new THREE.Color('#8a2be2') }, bot: { value: new THREE.Color('#ff7eb3') } },
+  uniforms: { top: { value: new THREE.Color('#bfe3fb') }, mid: { value: new THREE.Color('#e4d9ff') }, bot: { value: new THREE.Color('#ffe0ee') } },
   vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bot; varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 c = h > 0.15 ? mix(mid, top, smoothstep(0.15, 0.7, h)) : mix(bot, mid, smoothstep(-0.2, 0.15, h)); gl_FragColor = vec4(c, 1.0);\n#include <colorspace_fragment>\n}',
 }));
 scene.add(sky);
-scene.add(new THREE.HemisphereLight(0xfff0ff, 0x4a2a6a, 1.6));
-const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd9c8f0, 1.9));
+const sun = new THREE.DirectionalLight(0xffffff, 2.0);
 sun.position.set(4, 10, 6); sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 30 });
@@ -214,16 +215,16 @@ scene.add(sun);
 // Arena: a pizza-slice coloured disc with a gold rim
 (function arena() {
   const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
-  const cols = ['#ffb3d9', '#b3ecff', '#fff1a8', '#c9ffb3'];
+  const cols = ['#ffd6e8', '#d4efff', '#fff4c7', '#dcf7e6'];
   for (let i = 0; i < 16; i++) { g.fillStyle = cols[i % 4]; g.beginPath(); g.moveTo(256, 256); g.arc(256, 256, 256, i / 16 * Math.PI * 2, (i + 1) / 16 * Math.PI * 2); g.fill(); }
   g.fillStyle = '#ffffff'; g.beginPath(); g.arc(256, 256, 70, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(256, 256, 55, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#ffd98a'; g.beginPath(); g.arc(256, 256, 55, 0, Math.PI * 2); g.fill();
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-  const side = new THREE.MeshToonMaterial({ color: '#6a3fb0' });
+  const side = new THREE.MeshToonMaterial({ color: '#cbb8ef' });
   const top = new THREE.MeshToonMaterial({ map: tex });
   const floor = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.6, 0.6, 64), [side, top, side]);
   floor.position.y = -0.3; floor.receiveShadow = true; scene.add(floor);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(7.05, 0.22, 12, 80), new THREE.MeshToonMaterial({ color: '#ffd23f' }));
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(7.05, 0.22, 12, 80), new THREE.MeshToonMaterial({ color: '#ffd98a' }));
   rim.rotation.x = Math.PI / 2; scene.add(rim);
   for (let i = 0; i < 12; i++) {
     const a = i / 12 * Math.PI * 2, post = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), new THREE.MeshToonMaterial({ color: cols[i % 4] }));
@@ -237,7 +238,7 @@ const deco = [];
   const r = rng(7);
   const geos = [new THREE.SphereGeometry(1, 16, 12), new THREE.TorusGeometry(0.8, 0.3, 12, 24), new THREE.IcosahedronGeometry(1, 0), new THREE.OctahedronGeometry(1, 0)];
   for (let i = 0; i < 22; i++) {
-    const m = new THREE.Mesh(pickR(r, geos), new THREE.MeshToonMaterial({ color: new THREE.Color().setHSL(r(), 0.8, 0.65) }));
+    const m = new THREE.Mesh(pickR(r, geos), new THREE.MeshToonMaterial({ color: new THREE.Color().setHSL(r(), 0.7, 0.84) }));
     const a = r() * Math.PI * 2, d = 16 + r() * 18;
     m.position.set(Math.cos(a) * d, 1 + r() * 14, Math.sin(a) * d - 6);
     m.scale.setScalar(0.6 + r() * 1.6);
@@ -255,7 +256,7 @@ pMesh.frustumCulled = false; scene.add(pMesh);
 const parts = []; for (let i = 0; i < PMAX; i++) { parts.push({ on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1, s: 1, g: 9, rot: 0 }); pMesh.setColorAt(i, new THREE.Color(1, 1, 1)); }
 let pNext = 0;
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler(), _col = new THREE.Color();
-function emit(pos, { n = 30, colors = ['#ffd23f', '#ff5fa2', '#36d6ff', '#ffffff'], speed = 5, up = 3, size = 1, life = 0.9, grav = 9, spread = 1 } = {}) {
+function emit(pos, { n = 30, colors = ['#ffd98a', '#f59ac0', '#8ccff0', '#ffffff', '#b8ecd0'], speed = 5, up = 3, size = 1, life = 0.9, grav = 9, spread = 1 } = {}) {
   for (let k = 0; k < n; k++) {
     const idx = pNext, pt = parts[idx]; pNext = (pNext + 1) % PMAX;
     pt.on = true; pt.p.copy(pos);
@@ -302,8 +303,8 @@ function updateFx(dt) {
 }
 function explosion(pos, colors, big = false) {
   emit(pos, { n: big ? 140 : 45, colors, speed: big ? 9 : 5, up: big ? 6 : 3, size: big ? 1.5 : 1, life: big ? 1.6 : 0.9 });
-  flash(pos, pick(['#fff6c0', '#ffe0f0', '#d0fbff']), big ? 3.2 : 1.4, big ? 0.55 : 0.3);
-  if (big) setTimeout(() => flash(pos.clone().add(new THREE.Vector3(0, 0.6, 0)), '#ff9a3c', 2.4, 0.5, false), 90);
+  flash(pos, pick(['#fffbe6', '#fff0f7', '#eefaff']), big ? 3.2 : 1.4, big ? 0.55 : 0.3);
+  if (big) setTimeout(() => flash(pos.clone().add(new THREE.Vector3(0, 0.6, 0)), '#ffd0a8', 2.4, 0.5, false), 90);
 }
 
 // ---------------------------------------------------------------- Floating text + name tags
@@ -503,7 +504,7 @@ function buildMonster(spec) {
     rig.add(g);
   }
   let halo = null;
-  if (spec.halo) { halo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.045, 8, 28), new THREE.MeshBasicMaterial({ color: '#ffe36b' })); halo.rotation.x = Math.PI / 2; halo.position.y = topY + (spec.antenna ? 0.8 : 0.35); rig.add(halo); }
+  if (spec.halo) { halo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.045, 8, 28), new THREE.MeshBasicMaterial({ color: '#ffe9a8' })); halo.rotation.x = Math.PI / 2; halo.position.y = topY + (spec.antenna ? 0.8 : 0.35); rig.add(halo); }
   let sweat = null;
   if (spec.sweat) {
     sweat = new THREE.Group();
@@ -527,7 +528,7 @@ function buildMonster(spec) {
   root.scale.setScalar(spec.scale);
   const height = (Math.max(topY, box.max.y) + (spec.halo ? 0.5 : spec.antenna ? 0.65 : 0.05)) * spec.scale;
   const radius = Math.max(hw, hd) * spec.scale;
-  const shield = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: '#9ff3ff', transparent: true, opacity: 0, depthWrite: false }));
+  const shield = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: '#bdeeff', transparent: true, opacity: 0, depthWrite: false }));
   shield.position.y = cy; shield.scale.set(hw * 1.5, hh * 1.4, hw * 1.5); shield.visible = false; rig.add(shield);
   return {
     root, rig, body, eyes, mouth, arms, legs, halo, sweat, tail, shield, mats, cy: cy * spec.scale, height, radius, spec,
@@ -623,7 +624,7 @@ function layout() {
   // keep the monsters between the on-screen UI (HUD/tags on top, cards/ticker at the bottom)
   let top = 0.6, bot = -0.55;
   const ndc = px => 1 - 2 * px / innerHeight;
-  if (mode === 'fight') { top = ndc($('#s-fight .hud').getBoundingClientRect().bottom + 30); bot = ndc($('#ticker').getBoundingClientRect().top - 6); }
+  if (mode === 'fight') { top = ndc($('#s-fight .hud').getBoundingClientRect().bottom + 30); bot = ndc($('#fightCtrls').getBoundingClientRect().top - 6); }
   else if (mode === 'reveal') { top = ndc(46); bot = ndc($('#revealCards').getBoundingClientRect().top - 6); }
   if (!(top - bot > 0.5)) { top = 0.6; bot = -0.55; }
   const baseY = camTarget.y, want = (top + bot) / 2, tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -675,7 +676,7 @@ let pr = null;
 function portrait(m) {
   if (!pr) {
     const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); r.setSize(320, 320, false);
-    const s = new THREE.Scene(); s.add(new THREE.HemisphereLight(0xfff0ff, 0x4a2a6a, 1.8)); const l = new THREE.DirectionalLight(0xffffff, 2.4); l.position.set(3, 6, 6); s.add(l);
+    const s = new THREE.Scene(); s.add(new THREE.HemisphereLight(0xffffff, 0xd9c8f0, 2.0)); const l = new THREE.DirectionalLight(0xffffff, 2.4); l.position.set(3, 6, 6); s.add(l);
     pr = { r, s, c: new THREE.PerspectiveCamera(30, 1, 0.1, 50) };
   }
   const parent = m.root.parent;
@@ -748,12 +749,9 @@ function showTitle() {
 // Handover
 function handover(p) {
   S.phase = 'hand' + p; saveSession();
-  const me = esc(S.names[p]), other = esc(S.names[1 - p]);
-  $('#handTitle').innerHTML = p === 0 ? `${me} goes first!` : `Pass the phone to ${me}!`;
-  $('#handSub').innerHTML = p === 0
-    ? `${other}, look away. Answer honestly, ${me}: your monster is made from your answers.`
-    : `${other}'s monster is incubating 🥚. No peeking at ${me}'s answers!`;
-  $('#btnHand').textContent = `I'M ${S.names[p].toUpperCase()}, LET'S GO`;
+  $('#handTitle').textContent = S.names[p];
+  $('#handSub').textContent = 'No peeking.';
+  $('#btnHand').textContent = 'GO';
   $('#btnHand').onclick = () => { Sound.init(); Sound.pop(); startTest(p, 0); };
   show('hand');
 }
@@ -763,7 +761,7 @@ let qLock = false;
 function startTest(p, qi) { S.player = p; S.qi = qi; S.phase = 'q'; saveSession(); show('q'); renderQ(); }
 function renderQ() {
   const quiz = QUIZ[S.len], q = quiz[S.qi], p = S.player;
-  $('#qChip').textContent = `${S.names[p]}'s test`; $('#qChip').style.background = PCOL[p];
+  $('#qChip').textContent = S.names[p]; $('#qChip').style.background = PCOL[p];
   $('#qCount').textContent = `${S.qi + 1} / ${quiz.length}`;
   $('#qBar').style.width = (S.qi / quiz.length * 100) + '%'; $('#qBar').style.background = PCOL[p];
   const el = $('#qText'); el.textContent = q.text; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
@@ -808,20 +806,20 @@ function spawnMonsters() {
   layout(); makeTags();
 }
 function statRows(m, keys) {
-  return keys.map(k => `<div class="srow"><span>${k}</span><div class="sb"><i style="width:${clamp(m.stats[k] / STAT[k].max * 100, 3, 100)}%;background:${PCOL[m.idx]}"></i></div><span>${m.stats[k]}${STAT[k].unit}</span></div>`).join('');
+  return keys.map(k => `<div class="srow"><span>${STAT[k].icon}</span><div class="sb"><i style="width:${clamp(m.stats[k] / STAT[k].max * 100, 3, 100)}%;background:${PCOL[m.idx]}"></i></div><span>${m.stats[k]}${STAT[k].unit}</span></div>`).join('');
 }
 function startReveal() {
   abortAll(); clearFloaters();
   spawnMonsters();
   mode = 'reveal'; paused = false; speedMul = 1;
-  $('#revealCards').innerHTML = mons.map((m, i) => `<div class="mcard" style="border-color:${PCOL[i]}"><div class="t">${esc(S.names[i])}</div><div class="sub">monster</div>${statRows(m, ['HP', 'ATK', 'DEF', 'SPD'])}<div class="compact">❤️${m.stats.HP} 🦷${m.stats.ATK} 🛡️${m.stats.DEF}% ⚡${m.stats.SPD}</div></div>`).join('');
+  $('#revealCards').innerHTML = mons.map((m, i) => `<div class="mcard" style="border-top-color:${PCOL[i]}"><div class="t">${esc(S.names[i])}</div>${statRows(m, ['HP', 'ATK', 'DEF', 'SPD'])}<div class="compact">❤️${m.stats.HP} 🦷${m.stats.ATK} 🛡️${m.stats.DEF}% ⚡${m.stats.SPD}</div></div>`).join('');
   show('reveal'); resize();
   const b = $('#revealBanner'); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   mons.forEach((m, i) => {
     m.squash = 0.01;
     wait(250 + i * 450).then(() => {
       Sound.boing(); Sound.voice(m.spec.voice);
-      explosion(m.base.clone().add(new THREE.Vector3(0, m.cy, 0)), ['#ffffff', PCOL[i], '#ffd23f']);
+      explosion(m.base.clone().add(new THREE.Vector3(0, m.cy, 0)), ['#ffffff', PCOL[i], '#ffd98a']);
       tween(0.6, p => { m.squash = 0.01 + p * 0.99 + Math.sin(p * Math.PI * 3) * (1 - p) * 0.4; }, ease.out);
     });
   });
@@ -831,10 +829,6 @@ $('#btnFight').addEventListener('click', () => { Sound.init(); startFight(); });
 
 // ---------------------------------------------------------------- Fight
 let F = null;
-const VERBS = ['chomps', 'bonks', 'headbutts', 'slaps', 'wobbles into', 'bites', 'sneezes on', 'belly-flops onto', 'karate-chops', 'nibbles aggressively at', 'boops', 'drop-kicks', 'licks (aggressively)', 'judo-flips'];
-const SFX = ['BONK!', 'SPLAT!', 'POW!', 'WHAM!', 'BOINK!', 'SQUISH!', 'THWACK!', 'ZONK!'];
-function ticker(html) { $('#ticker').innerHTML = html; }
-const nm = i => `<b style="color:${PCOL[i]}">${esc(S.names[i])}</b>`;
 function setHP(i) {
   const m = mons[i], frac = clamp(F.hp[i] / m.stats.HP, 0, 1), el = $('#hp' + (i + 1));
   el.querySelector('i').style.width = (frac * 100) + '%'; el.querySelector('b').style.width = (frac * 100) + '%';
@@ -851,17 +845,15 @@ function startFight() {
   $('#btnSpeed').textContent = '1×'; $('#btnPause').textContent = '❚❚';
   mons.forEach((m, i) => { const el = $('#hp' + (i + 1)); el.querySelector('.nm').textContent = S.names[i]; el.querySelector('.pl').textContent = ''; setHP(i); });
   show('fight'); resize();
-  ticker('3… 2… 1…');
   (async () => {
     await wait(600); banner('FIGHT!'); Sound.kazoo([[392, 0.12], [523, 0.12], [659, 0.25]]); buzz(30);
-    ticker(`${nm(0)} vs ${nm(1)}. Only one leaves the arena!`);
     await wait(900); F.busy = false;
   })();
 }
 function fightTick(dt) {
   if (!F || F.over || paused) return;
   const el = gameTime - F.t0;
-  if (el > 40 && !F.sudden) { F.sudden = true; banner('SUDDEN DEATH!'); Sound.growl(); ticker('🔥 SUDDEN DEATH! Damage keeps rising until someone drops!'); }
+  if (el > 40 && !F.sudden) { F.sudden = true; banner('SUDDEN DEATH!'); Sound.growl(); }
   F.mul = 1.25 * (F.sudden ? 2 + (el - 40) / 6 : 1);
   if (F.busy) return;
   for (let i = 0; i < 2; i++) F.gauge[i] += mons[i].stats.SPD * 0.86 * dt;
@@ -884,7 +876,6 @@ async function attack(a, special) {
   const full = dirTo(a), dist = Math.max(0.3, full.length() - (A.radius + D.radius) * 0.85), dir = full.normalize();
   Sound.voice(A.spec.voice);
   if (!special) {
-    ticker(`${nm(a)} ${pick(VERBS)} ${nm(d)}!`);
     await tween(0.2, p => { A.off.copy(dir).multiplyScalar(-0.35 * p); A.squash = 1 - 0.22 * p; A.mouthOpen = p; A.armUp = p; });
     Sound.whoosh();
     await tween(0.17, p => { A.off.copy(dir).multiplyScalar(-0.35 + (dist + 0.35) * p); A.squash = 0.78 + 0.4 * p; A.walk += 0.6; }, ease.in);
@@ -893,14 +884,13 @@ async function attack(a, special) {
     return res.ko;
   }
   F.rec[a].slams++;
-  ticker(`${nm(a)} goes ✨<b>COSMIC</b>✨ and launches into the sky!`);
-  Sound.boing(); floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height, 0)), '✨ COSMIC! ✨', '#e8a8ff', 26);
+  Sound.boing(); floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height, 0)), '✨', '#ffffff', 40);
   await tween(0.22, p => { A.squash = 1 - 0.35 * p; });
-  emit(A.root.position.clone(), { n: 25, colors: ['#e8a8ff', '#a8f0ff', '#ffffff'], speed: 3, up: 2 });
+  emit(A.root.position.clone(), { n: 25, colors: ['#e6d4ff', '#d4f4ff', '#ffffff'], speed: 3, up: 2 });
   await tween(0.75, p => {
     A.off.copy(dir).multiplyScalar(dist * p * 1.05); A.off.y = Math.sin(p * Math.PI) * 3.2;
     A.spin = p * Math.PI * 4; A.squash = 0.8 + 0.4 * Math.sin(p * Math.PI);
-    if (Math.random() < 0.5) emit(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), { n: 2, colors: ['#e8a8ff', '#ffd23f', '#a8f0ff'], speed: 1, up: 0, life: 0.6, grav: 0 });
+    if (Math.random() < 0.5) emit(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), { n: 2, colors: ['#e6d4ff', '#ffd98a', '#d4f4ff'], speed: 1, up: 0, life: 0.6, grav: 0 });
   }, ease.io);
   A.spin = 0; A.squash = 0.55;
   const res = impact(a, 1.8, true);
@@ -912,14 +902,13 @@ function impact(a, mult, special) {
   const dir = dirTo(a).normalize();
   const hitPos = D.root.position.clone().add(new THREE.Vector3(0, D.cy, 0)).addScaledVector(dir, -D.radius * 0.6);
   let dmg = A.stats.ATK * (0.85 + Math.random() * 0.3) * mult * F.mul;
-  if (A.rage) { dmg *= 2; A.rage = 0; floatText(hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)), 'RAGE ×2', '#ff6b4a', 24); }
+  if (A.rage) { dmg *= 2; A.rage = 0; floatText(hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)), '×2', '#ffb0a0', 30); }
   const crit = !special && Math.random() < 0.08; if (crit) dmg *= 1.5;
   const blocked = Math.random() * 100 < D.stats.BLK;
   if (blocked) {
     F.rec[d].blocks++; D.shieldT = 0.6; Sound.clang(); buzz(15);
-    floatText(hitPos.clone().add(new THREE.Vector3(0, 0.5, 0)), 'BLOCKED!', '#9ff3ff', 28);
-    emit(hitPos, { n: 18, colors: ['#9ff3ff', '#ffffff'], speed: 4, up: 1, size: 0.7, life: 0.5 });
-    ticker(`${nm(d)} pops a shield bubble. <b>BLOCKED!</b>`);
+    floatText(hitPos.clone().add(new THREE.Vector3(0, 0.5, 0)), '🛡️', '#ffffff', 40);
+    emit(hitPos, { n: 18, colors: ['#bdeeff', '#ffffff'], speed: 4, up: 1, size: 0.7, life: 0.5 });
     if (!special) return { ko: null, kb: Promise.resolve() };
     dmg *= 0.5;
   }
@@ -927,37 +916,31 @@ function impact(a, mult, special) {
   F.hp[d] = Math.max(0, F.hp[d] - dmg); setHP(d);
   rec.dmg += dmg; rec.hits++; if (crit) rec.crits++;
   D.flash = 1; shake = special ? 0.5 : crit ? 0.3 : 0.15; buzz(special ? 60 : 25);
-  const colors = ['#ffffff', '#ffd23f', PCOL[a], '#' + new THREE.Color().setHSL(A.spec.hue, 0.9, 0.6).getHexString()];
+  const colors = ['#ffffff', '#ffd98a', PCOL[a], '#' + new THREE.Color().setHSL(A.spec.hue, 0.7, 0.8).getHexString()];
   explosion(hitPos, colors, special);
   if (special) { Sound.boom(false); Sound.bonk(); } else pick([() => Sound.bonk(), () => Sound.splat(), () => Sound.squeak()])();
-  floatText(hitPos, '-' + dmg, crit || special ? '#ffd23f' : '#ffffff', crit || special ? 44 : 34);
-  floatText(hitPos.clone().add(new THREE.Vector3(0, 0.9, 0)), crit ? 'CRITICAL WOBBLE!' : pick(SFX), pick(['#ffd23f', '#ff5fa2', '#36d6ff', '#6cf08a']), crit ? 24 : 20, 0.9);
-  if (crit) ticker(`💥 <b>CRITICAL WOBBLE!</b> ${nm(d)} loses ${dmg} HP!`);
-  else if (special) ticker(`✨ COSMIC SLAM! ${nm(d)} loses ${dmg} HP!`);
+  floatText(hitPos, '-' + dmg, crit || special ? '#ffd98a' : '#ffffff', crit || special ? 46 : 34);
   const ko = F.hp[d] <= 0 ? a : null;
   const kb = ko != null ? Promise.resolve() : tween(0.36, p => { const k = Math.sin(p * Math.PI) * (special ? 0.7 : 0.4); D.off.copy(dir).multiplyScalar(k); D.tilt = Math.sin(p * Math.PI) * 0.35; D.squash = 1 - Math.sin(p * Math.PI) * 0.25; }, ease.lin);
   return { ko, kb };
 }
 async function tantrum(a) {
   const A = mons[a], rec = F.rec[a];
-  ticker(`${nm(a)} throws a <b>TANTRUM</b>! 😤`); Sound.growl(); buzz(40);
+  Sound.growl(); buzz(40);
   floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height + 0.2, 0)), '😤', '#fff', 40);
   await tween(0.7, p => { A.off.set(Math.sin(p * 60) * 0.12, Math.abs(Math.sin(p * 18)) * 0.25, 0); A.armUp = Math.abs(Math.sin(p * 20)); A.mouthOpen = 0.6; A.flash = 0.25; });
   A.off.set(0, 0, 0); A.armUp = 0; A.mouthOpen = 0;
   if (Math.random() < 0.5) {
     rec.rages++; A.rage = 1;
-    ticker(`${nm(a)} is <b style="color:#ff6b4a">FURIOUS</b>. Next hit does double damage!`);
-    floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height, 0)), 'RAGE!', '#ff6b4a', 34);
-    emit(A.root.position.clone().add(new THREE.Vector3(0, A.height * 0.8, 0)), { n: 20, colors: ['#ff3b1f', '#ff9a3c', '#3a3a3a'], speed: 2, up: 3, grav: -1, life: 1 });
+    emit(A.root.position.clone().add(new THREE.Vector3(0, A.height * 0.8, 0)), { n: 20, colors: ['#ff9f8f', '#ffc9a3', '#8a80a3'], speed: 2, up: 3, grav: -1, life: 1 });
     await wait(500); return null;
   }
   rec.trips++;
   const self = Math.max(1, Math.round(A.stats.ATK * 0.45 * F.mul * (1 - A.stats.DEF / 100)));
-  ticker(`${nm(a)} trips over its own feet. Self-own! −${self}`);
   await tween(0.3, p => { A.tilt = p * 1.35; A.off.y = Math.sin(p * Math.PI) * 0.3; }, ease.in);
-  Sound.fart(); shake = 0.12; emit(A.root.position.clone().add(new THREE.Vector3(0, 0.2, 0)), { n: 22, colors: ['#c8e68a', '#a3c45c', '#e8f5c0'], speed: 2, up: 1, life: 1.1, grav: 1 });
+  Sound.fart(); shake = 0.12; emit(A.root.position.clone().add(new THREE.Vector3(0, 0.2, 0)), { n: 22, colors: ['#d8efb0', '#c4e39a', '#f0f9dc'], speed: 2, up: 1, life: 1.1, grav: 1 });
   F.hp[a] = Math.max(0, F.hp[a] - self); rec.selfDmg += self; setHP(a); A.flash = 0.8;
-  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), '-' + self, '#c8e68a', 30);
+  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), '-' + self, '#e4f5c4', 30);
   if (F.hp[a] <= 0) return 1 - a;
   await wait(350);
   await tween(0.35, p => { A.tilt = 1.35 * (1 - p); A.off.y = Math.sin(p * Math.PI) * 0.4; }, ease.out);
@@ -967,11 +950,11 @@ async function hug(a) {
   const A = mons[a], rec = F.rec[a];
   const heal = Math.min(Math.round(A.stats.HP * 0.1 + 4), A.stats.HP - Math.ceil(F.hp[a]));
   rec.hugs++; rec.healed += heal;
-  ticker(`${nm(a)} pauses for a little self-hug. 🤗 +${heal} HP`); Sound.heal();
+  Sound.heal();
   await tween(0.35, p => { A.hug = p; A.squash = 1 - 0.12 * p; });
   F.hp[a] = Math.min(A.stats.HP, F.hp[a] + heal); setHP(a);
-  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height, 0)), '+' + heal + ' 💖', '#6cf08a', 32);
-  emit(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), { n: 30, colors: ['#ff8fc8', '#ff5fa2', '#ffffff', '#6cf08a'], speed: 1.5, up: 3, grav: -1.5, life: 1.3, size: 1.2 });
+  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height, 0)), '+' + heal, '#b8ecd0', 34);
+  emit(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), { n: 30, colors: ['#ffc2da', '#f59ac0', '#ffffff', '#b8ecd0'], speed: 1.5, up: 3, grav: -1.5, life: 1.3, size: 1.2 });
   await tween(0.6, p => { A.squash = 0.88 + Math.sin(p * Math.PI * 4) * 0.06; });
   await tween(0.3, p => { A.hug = 1 - p; A.squash = 0.88 + 0.12 * p; });
 }
@@ -980,20 +963,18 @@ async function finish(w) {
   const l = 1 - w, W = mons[w], L = mons[l];
   L.dead = true;
   const pos = L.root.position.clone().add(new THREE.Vector3(0, L.cy, 0));
-  explosion(pos, ['#ffffff', '#ffd23f', '#ff5fa2', '#36d6ff', '#6cf08a', '#ff6b4a'], true);
+  explosion(pos, ['#ffffff', '#ffd98a', '#f59ac0', '#8ccff0', '#b8ecd0', '#ffb0a0'], true);
   Sound.boom(true); shake = 0.9; buzz([80, 40, 120]);
   banner('K.O.!');
-  ticker(`💥 ${nm(l)} is launched out of the arena!`);
   const away = L.base.clone().sub(W.base).setY(0).normalize();
   setTimeout(() => Sound.ding(), 500);
   await tween(1.3, p => { L.off.copy(away).multiplyScalar(p * 14); L.off.y = Math.sin(p * Math.PI * 0.8) * 9; L.spin = p * 14; L.roll = p * 6; }, ease.lin);
   L.root.visible = false;
-  emit(L.root.position.clone(), { n: 30, colors: ['#ffd23f', '#ffffff'], speed: 3, life: 0.8 });
-  ticker(`🏆 ${nm(w)} wins for <b style="color:${PCOL[w]}">${esc(S.names[w])}</b>!`);
+  emit(L.root.position.clone(), { n: 30, colors: ['#ffd98a', '#ffffff'], speed: 3, life: 0.8 });
   Sound.kazoo([[392, 0.14], [523, 0.14], [659, 0.14], [784, 0.3], [659, 0.14], [784, 0.5]]);
   for (let k = 0; k < 3; k++) {
     await tween(0.22, p => { W.squash = 1 - 0.3 * p; W.armUp = p; });
-    emit(W.root.position.clone().add(new THREE.Vector3(0, W.height + 0.5, 0)), { n: 40, colors: ['#ff5fa2', '#36d6ff', '#ffd23f', '#6cf08a', '#ffffff'], speed: 5, up: 4, life: 1.4 });
+    emit(W.root.position.clone().add(new THREE.Vector3(0, W.height + 0.5, 0)), { n: 40, colors: ['#f59ac0', '#8ccff0', '#ffd98a', '#b8ecd0', '#ffffff'], speed: 5, up: 4, life: 1.4 });
     await tween(0.45, p => { W.off.y = Math.sin(p * Math.PI) * 1.3; W.squash = 0.7 + 0.5 * Math.sin(p * Math.PI); W.spin = (k % 2 ? -1 : 1) * p * Math.PI * 2; });
     W.spin = 0;
   }
@@ -1008,59 +989,30 @@ $('#btnPause').addEventListener('click', () => { Sound.click(); paused = !paused
 $('#btnSkip').addEventListener('click', () => { if (!F || F.over) return; Sound.click(); Sound.quiet = true; speedMul = 12; paused = false; $('#btnSpeed').textContent = '⏭'; });
 
 // ---------------------------------------------------------------- Results
+const SRC = { HP: '🤗 + 📋', DEF: '📋 + calm 🌪️', ATK: 'low 🤗 + 🌪️', SPD: '🎉 + 🌪️', SPC: '🌈', BLK: '📋', HUG: '🤗', TAN: '🌪️' };
 function mirrorRow(label, sub, a, b, max, unit = '') {
   const w = v => clamp(v / max * 100, 2, 100);
-  return `<div class="mrow"><div class="lbl"><b style="color:${PCOL[0]}">${a}${unit}</b><em>${label}${sub ? `<br><span style="font-weight:500">${sub}</span>` : ''}</em><b style="color:${PCOL[1]}">${b}${unit}</b></div>
+  return `<div class="mrow"><div class="lbl"><b style="color:${PTXT[0]}">${a}${unit}</b><em>${label}${sub ? `<span>${sub}</span>` : ''}</em><b style="color:${PTXT[1]}">${b}${unit}</b></div>
     <div class="mbars"><div><i style="width:${w(a)}%;background:${PCOL[0]}"></i></div><div><i style="width:${w(b)}%;background:${PCOL[1]}"></i></div></div></div>`;
-}
-function looks(m) {
-  const s = m.spec, t = m.traits, out = [];
-  out.push(`${s.eyes} eye${s.eyes > 1 ? 's' : ''} (Openness ${t.O})`);
-  if (s.shape === 'mochi') out.push(`squashy mochi body (Openness)`);
-  if (s.antenna) out.push(`${s.antenna === 2 ? 'two cosmic antennae' : 'a cosmic antenna'} (Openness ${t.O})`);
-  out.push(s.spikes ? `${s.spikes} soft back nub${s.spikes > 1 ? 's' : ''} (Agreeableness ${t.A}, lower = more)` : `no back nubs at all (Agreeableness ${t.A})`);
-  out.push(s.sharp ? `a pout with tiny fangs (Agreeableness ${t.A})` : `a sweet smile (Agreeableness ${t.A})`);
-  if (s.brows) out.push(`grumpy little eyebrows (low Agreeableness)`);
-  if (s.halo) out.push(`a halo (very agreeable)`);
-  if (s.plate) out.push(`a tidy tummy patch with buttons (Conscientiousness ${t.C})`);
-  out.push(`size ×${s.scale.toFixed(2)} (Extraversion ${t.E})`);
-  if (s.sweat) out.push(`nervous sweat drop (Neuroticism ${t.N})`);
-  if (t.N > 55) out.push(`shakes and jitters (Neuroticism ${t.N})`);
-  return out;
 }
 function showResults() {
   mode = 'results'; abortAll(); clearFloaters();
-  const w = F.winner, l = 1 - w, W = mons[w];
-  const R = F.rec;
-  let h = `
-  <div class="winner"><div class="crown">🏆</div><h2 style="color:${PCOL[w]}">${esc(W.name)} wins!</h2>
-    <div class="small">${esc(S.names[w])}'s monster survived with ${Math.ceil(F.hp[w])} of ${W.stats.HP} HP after ${Math.round(F.duration)} seconds of chaos.</div></div>
-  <div class="portraits">${mons.map((m, i) => `<div class="portrait ${i === w ? 'won' : 'lost'}" style="border-color:${PCOL[i]}"><img src="${m.portrait}" alt=""><div class="t">${esc(S.names[i])}</div></div>`).join('')}</div>
-  <div class="card"><h3>Personality test (0–100)</h3><div class="mirror">
-    ${TORDER.map(k => mirrorRow(`${TRAITS[k].emoji} ${TRAITS[k].name}`, `low: ${TRAITS[k].lo} · high: ${TRAITS[k].hi}`, mons[0].traits[k], mons[1].traits[k], 100)).join('')}
-  </div>${S.fromDemo ? '<p class="small" style="margin:10px 0 0">(Random demo scores: nobody took the test.)</p>' : ''}</div>
-  <div class="card"><h3>Monster stats</h3><div class="mirror">
-    ${SORDER.map(k => mirrorRow(`${STAT[k].icon} ${STAT[k].name}`, '', mons[0].stats[k], mons[1].stats[k], STAT[k].max, STAT[k].unit)).join('')}
+  const w = F.winner, W = mons[w];
+  const h = `
+  <div class="winner"><h2 style="color:${PTXT[w]}">${esc(S.names[w])} wins</h2></div>
+  <div class="portraits">${mons.map((m, i) => `<div class="portrait ${i === w ? 'won' : 'lost'}" style="border-top-color:${PCOL[i]}"><img src="${m.portrait}" alt=""><div class="t">${esc(S.names[i])}</div></div>`).join('')}</div>
+  <div class="panel"><div class="mirror">
+    ${TORDER.map(k => mirrorRow(`${TRAITS[k].emoji} ${TRAITS[k].name}`, '', mons[0].traits[k], mons[1].traits[k], 100)).join('')}
   </div></div>
-  <div class="card"><h3>How your personality built your monster</h3><div class="explain">
-    ${SORDER.map(k => `<div class="ex"><div class="h">${STAT[k].icon} ${STAT[k].name}</div><div class="why">${STAT[k].why}</div><div class="math">
-      ${mons.map((m, i) => `<div><b style="color:${PCOL[i]}">${esc(S.names[i])}:</b> ${m.stats.parts[k].map(p => p[2] ? `${Math.round(p[1])} from ${p[0]} (${m.traits[p[2]]})` : `${p[1]} ${p[0]}`).join(' + ')} = <b>${m.stats[k]}${STAT[k].unit}</b></div>`).join('')}
-    </div></div>`).join('')}
-    <div class="ex"><div class="h">🎨 Looks</div><div class="why">Colour is random; everything else comes from the test.</div><div class="math">
-      ${mons.map((m, i) => `<div style="margin-bottom:4px"><b style="color:${PCOL[i]}">${esc(S.names[i])}:</b> ${looks(m).join(', ')}.</div>`).join('')}
-    </div></div>
+  <div class="panel"><div class="mirror">
+    ${SORDER.map(k => mirrorRow(`${STAT[k].icon} ${STAT[k].name}`, SRC[k], mons[0].stats[k], mons[1].stats[k], STAT[k].max, STAT[k].unit)).join('')}
   </div></div>
-  <div class="card"><h3>Fight recap</h3><table class="recap">
-    <tr><th style="color:${PCOL[0]}">${esc(S.names[0])}</th><th></th><th style="color:${PCOL[1]}">${esc(S.names[1])}</th></tr>
-    ${[['Damage dealt', 'dmg'], ['Hits landed', 'hits'], ['Critical wobbles', 'crits'], ['Cosmic slams', 'slams'], ['Hits blocked', 'blocks'], ['Self-hugs', 'hugs'], ['HP healed', 'healed'], ['Rage tantrums', 'rages'], ['Tripped over own feet', 'trips']]
-      .map(([lbl, k]) => `<tr><td>${R[0][k]}</td><td>${lbl}</td><td>${R[1][k]}</td></tr>`).join('')}
-  </table></div>
   <div class="btns">
-    <button class="big" id="rRematch">⚔️ REMATCH</button>
-    <button class="btn2" id="rReroll">🎲 Same personalities, new monsters</button>
-    <button class="btn2" id="rNew">👥 New players</button>
+    <button class="btn big" id="rRematch">REMATCH</button>
+    <button class="btn" id="rReroll">🎲 New monsters</button>
+    <button class="btn alt" id="rNew">New players</button>
   </div>
-  <p class="small" style="text-align:center">Just for fun. A real Big Five assessment uses validated questionnaires, and no personality trait is “good” or “bad” in real life, only in monster battles.</p>`;
+  <p class="small" style="text-align:center">${S.fromDemo ? 'Random scores. ' : ''}Just for fun.</p>`;
   $('#resWrap').innerHTML = h;
   show('res'); $('#s-res').scrollTop = 0;
   Sound.kazoo([[523, 0.1], [659, 0.1], [784, 0.2]]);
