@@ -365,8 +365,9 @@ function physStep() {
       ady = (vf - mvy) * 0.5;
       if (hard && active.since > 30) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
       if (!active.landed) {
-        const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
-        adx = (vx - mvx) * 0.25;
+        // Snappy one-column steps, like Tetris.
+        const vm = 22 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 22 * STEP));
+        adx = (vx - mvx) * 0.5;
       }
     }
   }
@@ -950,7 +951,7 @@ function holdButton(id, onDown, onUp, repeat) {
     e.preventDefault(); audio(); el.classList.add('on');
     try { el.setPointerCapture(e.pointerId); } catch {}
     onDown();
-    if (repeat) { const rep = () => { onDown(); timer = setTimeout(rep, 95); }; timer = setTimeout(rep, 200); }
+    if (repeat) { const rep = () => { onDown(); timer = setTimeout(rep, 110); }; timer = setTimeout(rep, 320); }
   });
   el.addEventListener('pointerup', stop);
   el.addEventListener('pointercancel', stop);
