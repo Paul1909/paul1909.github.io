@@ -86,30 +86,18 @@ function scoreQuiz(quiz, answers) {
 }
 
 // ---------------------------------------------------------------- Personality → stats
+// One trait -> one stat, so the monster mirrors the test: a bar at 70% in the test is a bar at 70% on the monster.
 const STAT = {
-  HP: { name: 'Health', icon: '❤️', unit: '', max: 260, why: 'How much punishment it can take. Kind and reliable people grow sturdy monsters.' },
-  DEF: { name: 'Defense', icon: '🛡️', unit: '%', max: 55, why: 'Share of every hit it shrugs off. Organised + emotionally steady = thick skin.' },
-  ATK: { name: 'Attack', icon: '🦷', unit: '', max: 44, why: 'Bite strength. Low Agreeableness (grumpy, competitive) and Neuroticism (stressed) bite hardest.' },
-  SPD: { name: 'Speed', icon: '⚡', unit: '', max: 100, why: 'How often it acts. Extraverts are fast; nervous energy adds jitter-speed.' },
-  SPC: { name: 'Cosmic slam', icon: '✨', unit: '%', max: 22, why: 'Chance of a weird cosmic body-slam for 1.8× damage. Pure Openness.' },
-  BLK: { name: 'Block', icon: '🫧', unit: '%', max: 18, why: 'Chance to raise a shield bubble and cancel a hit. Conscientious = always prepared.' },
-  HUG: { name: 'Self-hug', icon: '🤗', unit: '%', max: 15, why: 'When hurt, chance to stop and hug itself instead of attacking, healing 10% of max health. Agreeableness.' },
-  TAN: { name: 'Tantrum', icon: '😤', unit: '%', max: 20, why: 'Chance to throw a tantrum: either RAGE (next hit ×2) or trip over its own feet. Neuroticism.' },
+  HP: { name: 'Health', icon: '❤️', unit: '', t: 'A', base: 125, k: 0.5 },
+  DEF: { name: 'Defense', icon: '🛡️', unit: '%', t: 'C', base: 5, k: 0.3 },
+  ATK: { name: 'Attack', icon: '🦷', unit: '', t: 'N', base: 22, k: 0.09 },
+  SPD: { name: 'Speed', icon: '⚡', unit: '', t: 'E', base: 55, k: 0.22 },
+  SPC: { name: 'Cosmic slam', icon: '✨', unit: '%', t: 'O', base: 5, k: 0.3 },
 };
-const SORDER = ['HP', 'DEF', 'ATK', 'SPD', 'SPC', 'BLK', 'HUG', 'TAN'];
+const SORDER = ['HP', 'DEF', 'ATK', 'SPD', 'SPC'];
 function computeStats(t) {
-  const parts = {
-    HP: [['base', 85], ['Agreeableness', 1.1 * t.A, 'A'], ['Conscientiousness', 0.65 * t.C, 'C']],
-    DEF: [['base', 5], ['Conscientiousness', 0.24 * t.C, 'C'], ['calm (low Neuroticism)', 0.24 * (100 - t.N), 'N']],
-    ATK: [['base', 13], ['grumpiness (low Agreeableness)', 0.21 * (100 - t.A), 'A'], ['Neuroticism', 0.1 * t.N, 'N']],
-    SPD: [['base', 30], ['Extraversion', 0.4 * t.E, 'E'], ['nervous energy (Neuroticism)', 0.3 * t.N, 'N']],
-    SPC: [['base', 4], ['Openness', 0.18 * t.O, 'O']],
-    BLK: [['Conscientiousness', 0.18 * t.C, 'C']],
-    HUG: [['Agreeableness', 0.15 * t.A, 'A']],
-    TAN: [['Neuroticism', 0.2 * t.N, 'N']],
-  };
-  const s = { parts };
-  for (const k of SORDER) s[k] = parts[k].reduce((a, p) => a + Math.round(p[1]), 0);
+  const s = {};
+  for (const k of SORDER) s[k] = STAT[k].base + Math.round(STAT[k].k * t[STAT[k].t]);
   return s;
 }
 
@@ -806,13 +794,13 @@ function spawnMonsters() {
   layout(); makeTags();
 }
 function statRows(m, keys) {
-  return keys.map(k => `<div class="srow"><span>${STAT[k].icon}</span><div class="sb"><i style="width:${clamp(m.stats[k] / STAT[k].max * 100, 3, 100)}%;background:${PCOL[m.idx]}"></i></div><span>${m.stats[k]}${STAT[k].unit}</span></div>`).join('');
+  return keys.map(k => `<div class="srow"><span>${STAT[k].icon}</span><div class="sb"><i style="width:${clamp(m.traits[STAT[k].t], 3, 100)}%;background:${PCOL[m.idx]}"></i></div><span>${m.stats[k]}${STAT[k].unit}</span></div>`).join('');
 }
 function startReveal() {
   abortAll(); clearFloaters();
   spawnMonsters();
   mode = 'reveal'; paused = false; speedMul = 1;
-  $('#revealCards').innerHTML = mons.map((m, i) => `<div class="mcard" style="border-top-color:${PCOL[i]}"><div class="t">${esc(S.names[i])}</div>${statRows(m, ['HP', 'ATK', 'DEF', 'SPD'])}<div class="compact">❤️${m.stats.HP} 🦷${m.stats.ATK} 🛡️${m.stats.DEF}% ⚡${m.stats.SPD}</div></div>`).join('');
+  $('#revealCards').innerHTML = mons.map((m, i) => `<div class="mcard" style="border-top-color:${PCOL[i]}"><div class="t">${esc(S.names[i])}</div>${statRows(m, SORDER)}<div class="compact">❤️${m.stats.HP} 🦷${m.stats.ATK} 🛡️${m.stats.DEF}% ⚡${m.stats.SPD} ✨${m.stats.SPC}%</div></div>`).join('');
   show('reveal'); resize();
   const b = $('#revealBanner'); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   mons.forEach((m, i) => {
@@ -864,10 +852,7 @@ function fightTick(dt) {
 }
 async function act(a) {
   const m = mons[a], st = m.stats;
-  let ko;
-  if (Math.random() * 100 < st.TAN) ko = await tantrum(a);
-  else if (F.hp[a] < st.HP * 0.8 && Math.random() * 100 < st.HUG) await hug(a);
-  else ko = await attack(a, Math.random() * 100 < st.SPC);
+  const ko = await attack(a, Math.random() * 100 < st.SPC);
   if (ko != null) await finish(ko);
 }
 function dirTo(a) { return mons[1 - a].base.clone().sub(mons[a].base).setY(0); }
@@ -893,7 +878,7 @@ async function attack(a, special) {
     if (Math.random() < 0.5) emit(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), { n: 2, colors: ['#e6d4ff', '#ffd98a', '#d4f4ff'], speed: 1, up: 0, life: 0.6, grav: 0 });
   }, ease.io);
   A.spin = 0; A.squash = 0.55;
-  const res = impact(a, 1.8, true);
+  const res = impact(a, 2.2, true);
   await Promise.all([res.kb, tween(0.5, p => { A.off.copy(dir).multiplyScalar(dist * 1.05 * (1 - p)); A.off.y = Math.sin(p * Math.PI) * 0.8; A.squash = 0.55 + 0.45 * p; }, ease.out)]);
   return res.ko;
 }
@@ -902,16 +887,7 @@ function impact(a, mult, special) {
   const dir = dirTo(a).normalize();
   const hitPos = D.root.position.clone().add(new THREE.Vector3(0, D.cy, 0)).addScaledVector(dir, -D.radius * 0.6);
   let dmg = A.stats.ATK * (0.85 + Math.random() * 0.3) * mult * F.mul;
-  if (A.rage) { dmg *= 2; A.rage = 0; floatText(hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)), '×2', '#ffb0a0', 30); }
   const crit = !special && Math.random() < 0.08; if (crit) dmg *= 1.5;
-  const blocked = Math.random() * 100 < D.stats.BLK;
-  if (blocked) {
-    F.rec[d].blocks++; D.shieldT = 0.6; Sound.clang(); buzz(15);
-    floatText(hitPos.clone().add(new THREE.Vector3(0, 0.5, 0)), '🛡️', '#ffffff', 40);
-    emit(hitPos, { n: 18, colors: ['#bdeeff', '#ffffff'], speed: 4, up: 1, size: 0.7, life: 0.5 });
-    if (!special) return { ko: null, kb: Promise.resolve() };
-    dmg *= 0.5;
-  }
   dmg = Math.max(1, Math.round(dmg * (1 - D.stats.DEF / 100)));
   F.hp[d] = Math.max(0, F.hp[d] - dmg); setHP(d);
   rec.dmg += dmg; rec.hits++; if (crit) rec.crits++;
@@ -923,40 +899,6 @@ function impact(a, mult, special) {
   const ko = F.hp[d] <= 0 ? a : null;
   const kb = ko != null ? Promise.resolve() : tween(0.36, p => { const k = Math.sin(p * Math.PI) * (special ? 0.7 : 0.4); D.off.copy(dir).multiplyScalar(k); D.tilt = Math.sin(p * Math.PI) * 0.35; D.squash = 1 - Math.sin(p * Math.PI) * 0.25; }, ease.lin);
   return { ko, kb };
-}
-async function tantrum(a) {
-  const A = mons[a], rec = F.rec[a];
-  Sound.growl(); buzz(40);
-  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height + 0.2, 0)), '😤', '#fff', 40);
-  await tween(0.7, p => { A.off.set(Math.sin(p * 60) * 0.12, Math.abs(Math.sin(p * 18)) * 0.25, 0); A.armUp = Math.abs(Math.sin(p * 20)); A.mouthOpen = 0.6; A.flash = 0.25; });
-  A.off.set(0, 0, 0); A.armUp = 0; A.mouthOpen = 0;
-  if (Math.random() < 0.5) {
-    rec.rages++; A.rage = 1;
-    emit(A.root.position.clone().add(new THREE.Vector3(0, A.height * 0.8, 0)), { n: 20, colors: ['#ff9f8f', '#ffc9a3', '#8a80a3'], speed: 2, up: 3, grav: -1, life: 1 });
-    await wait(500); return null;
-  }
-  rec.trips++;
-  const self = Math.max(1, Math.round(A.stats.ATK * 0.45 * F.mul * (1 - A.stats.DEF / 100)));
-  await tween(0.3, p => { A.tilt = p * 1.35; A.off.y = Math.sin(p * Math.PI) * 0.3; }, ease.in);
-  Sound.fart(); shake = 0.12; emit(A.root.position.clone().add(new THREE.Vector3(0, 0.2, 0)), { n: 22, colors: ['#d8efb0', '#c4e39a', '#f0f9dc'], speed: 2, up: 1, life: 1.1, grav: 1 });
-  F.hp[a] = Math.max(0, F.hp[a] - self); rec.selfDmg += self; setHP(a); A.flash = 0.8;
-  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), '-' + self, '#e4f5c4', 30);
-  if (F.hp[a] <= 0) return 1 - a;
-  await wait(350);
-  await tween(0.35, p => { A.tilt = 1.35 * (1 - p); A.off.y = Math.sin(p * Math.PI) * 0.4; }, ease.out);
-  return null;
-}
-async function hug(a) {
-  const A = mons[a], rec = F.rec[a];
-  const heal = Math.min(Math.round(A.stats.HP * 0.1 + 4), A.stats.HP - Math.ceil(F.hp[a]));
-  rec.hugs++; rec.healed += heal;
-  Sound.heal();
-  await tween(0.35, p => { A.hug = p; A.squash = 1 - 0.12 * p; });
-  F.hp[a] = Math.min(A.stats.HP, F.hp[a] + heal); setHP(a);
-  floatText(A.root.position.clone().add(new THREE.Vector3(0, A.height, 0)), '+' + heal, '#b8ecd0', 34);
-  emit(A.root.position.clone().add(new THREE.Vector3(0, A.cy, 0)), { n: 30, colors: ['#ffc2da', '#f59ac0', '#ffffff', '#b8ecd0'], speed: 1.5, up: 3, grav: -1.5, life: 1.3, size: 1.2 });
-  await tween(0.6, p => { A.squash = 0.88 + Math.sin(p * Math.PI * 4) * 0.06; });
-  await tween(0.3, p => { A.hug = 1 - p; A.squash = 0.88 + 0.12 * p; });
 }
 async function finish(w) {
   F.over = true;
@@ -989,11 +931,10 @@ $('#btnPause').addEventListener('click', () => { Sound.click(); paused = !paused
 $('#btnSkip').addEventListener('click', () => { if (!F || F.over) return; Sound.click(); Sound.quiet = true; speedMul = 12; paused = false; $('#btnSpeed').textContent = '⏭'; });
 
 // ---------------------------------------------------------------- Results
-const SRC = { HP: '🤗 + 📋', DEF: '📋 + calm 🌪️', ATK: 'low 🤗 + 🌪️', SPD: '🎉 + 🌪️', SPC: '🌈', BLK: '📋', HUG: '🤗', TAN: '🌪️' };
-function mirrorRow(label, sub, a, b, max, unit = '') {
-  const w = v => clamp(v / max * 100, 2, 100);
-  return `<div class="mrow"><div class="lbl"><b style="color:${PTXT[0]}">${a}${unit}</b><em>${label}${sub ? `<span>${sub}</span>` : ''}</em><b style="color:${PTXT[1]}">${b}${unit}</b></div>
-    <div class="mbars"><div><i style="width:${w(a)}%;background:${PCOL[0]}"></i></div><div><i style="width:${w(b)}%;background:${PCOL[1]}"></i></div></div></div>`;
+function mirrorRow(label, sub, va, vb, pa, pb) {
+  const w = v => clamp(v, 2, 100);
+  return `<div class="mrow"><div class="lbl"><b style="color:${PTXT[0]}">${va}</b><em>${label}${sub ? `<span>${sub}</span>` : ''}</em><b style="color:${PTXT[1]}">${vb}</b></div>
+    <div class="mbars"><div><i style="width:${w(pa)}%;background:${PCOL[0]}"></i></div><div><i style="width:${w(pb)}%;background:${PCOL[1]}"></i></div></div></div>`;
 }
 function showResults() {
   mode = 'results'; abortAll(); clearFloaters();
@@ -1001,11 +942,11 @@ function showResults() {
   const h = `
   <div class="winner"><h2 style="color:${PTXT[w]}">${esc(S.names[w])} wins</h2></div>
   <div class="portraits">${mons.map((m, i) => `<div class="portrait ${i === w ? 'won' : 'lost'}" style="border-top-color:${PCOL[i]}"><img src="${m.portrait}" alt=""><div class="t">${esc(S.names[i])}</div></div>`).join('')}</div>
-  <div class="panel"><div class="mirror">
-    ${TORDER.map(k => mirrorRow(`${TRAITS[k].emoji} ${TRAITS[k].name}`, '', mons[0].traits[k], mons[1].traits[k], 100)).join('')}
+  <div class="panel"><h3>Your characters</h3><div class="mirror">
+    ${SORDER.map(k => { const t = STAT[k].t, a = mons[0].traits[t], b = mons[1].traits[t]; return mirrorRow(`${TRAITS[t].emoji} ${TRAITS[t].name}`, '', a, b, a, b); }).join('')}
   </div></div>
-  <div class="panel"><div class="mirror">
-    ${SORDER.map(k => mirrorRow(`${STAT[k].icon} ${STAT[k].name}`, SRC[k], mons[0].stats[k], mons[1].stats[k], STAT[k].max, STAT[k].unit)).join('')}
+  <div class="panel"><h3>Your monsters</h3><div class="mirror">
+    ${SORDER.map(k => { const t = STAT[k].t, u = STAT[k].unit; return mirrorRow(`${STAT[k].icon} ${STAT[k].name}`, `${TRAITS[t].emoji} ${TRAITS[t].name}`, mons[0].stats[k] + u, mons[1].stats[k] + u, mons[0].traits[t], mons[1].traits[t]); }).join('')}
   </div></div>
   <div class="btns">
     <button class="btn big" id="rRematch">REMATCH</button>

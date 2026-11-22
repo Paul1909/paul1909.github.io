@@ -4,16 +4,13 @@ Two players share one phone, tablet or computer. Each takes a Big Five personali
 
 ## How personality becomes stats
 
-| Stat | Comes from |
+| Stat | Comes from (one trait each) |
 |---|---|
-| ❤️ Health | 85 + 1.1 × Agreeableness + 0.65 × Conscientiousness |
-| 🛡️ Defense (% damage shrugged off) | 5 + 0.24 × Conscientiousness + 0.24 × (100 − Neuroticism) |
-| 🦷 Attack | 13 + 0.21 × (100 − Agreeableness) + 0.1 × Neuroticism |
-| ⚡ Speed | 30 + 0.4 × Extraversion + 0.3 × Neuroticism |
-| ✨ Cosmic slam chance (1.8× hit) | 4 + 0.18 × Openness |
-| 🫧 Block chance | 0.18 × Conscientiousness |
-| 🤗 Self-hug heal chance | 0.15 × Agreeableness |
-| 😤 Tantrum chance (rage ×2 or trip) | 0.2 × Neuroticism |
+| ❤️ Health | 125 + 0.5 × Agreeableness |
+| 🛡️ Defense (% damage shrugged off) | 5 + 0.3 × Conscientiousness |
+| 🦷 Attack | 22 + 0.09 × Neuroticism |
+| ⚡ Speed | 55 + 0.22 × Extraversion |
+| ✨ Cosmic slam chance (2.2× hit) | 5 + 0.3 × Openness |
 
 Looks (all cute, pastel and round): Openness → number of eyes, antennae, squashy mochi body; low Agreeableness → soft back nubs, a pout with tiny fangs, grumpy brows; high Agreeableness → smile and halo; Conscientiousness → tummy patch with buttons; Extraversion → size; Neuroticism → sweat drop and jitters. Colour is random. Each monster is simply called after its player.
 
