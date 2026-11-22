@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'squishtris';
-const VERSION = APP + '-v14';
+const VERSION = APP + '-v15';
 const FILES = [
   './',
   './index.html',

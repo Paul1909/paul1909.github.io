@@ -15,11 +15,10 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 
-const settings = Object.assign({ mat: 'wood', sound: true, vibe: true }, store.get('settings', {}));
-if (!['glass', 'wood', 'jelly'].includes(settings.mat)) settings.mat = settings.squish === 'jelly' ? 'jelly' : 'wood';
-delete settings.squish;
+const settings = Object.assign({ sound: true, vibe: true }, store.get('settings', {}));
+delete settings.squish; delete settings.mat;
 const saveSettings = () => store.set('settings', settings);
-const bestOf = m => store.get('best-' + m, { score: 0, level: 0 });
+const getBest = () => store.get('best-jelly', { score: 0, level: 0 });
 
 // ---------- constants (world units: 1 = one cell) ----------
 const W = 10, H = 20;
@@ -27,17 +26,7 @@ const R = 0.25, D = R * 2;               // particle radius / spacing
 const STEP = 1 / 120, ITERS = 4;
 const G = 26, DAMP = 0.992;
 const CTRL_ALPHA = 0.5, CTRL_INVMASS = 1;
-// Materials: alpha = shape stiffness, mu = friction, pack = how hard the press squeezes.
-const MAT = {
-  glass: { alpha: 0.85, mu: 0.1, pack: 0.97, name: 'Glass', info: 'Fragile! Let it fall or bang it and it shatters. Carry it down gently.' },
-  wood: { alpha: 0.85, mu: 0.35, pack: 0.97, name: 'Wood', info: 'Solid blocks that don\'t bounce. Squeeze one and it stays crushed.' },
-  jelly: { alpha: 0.09, mu: 0.18, pack: 0.88, name: 'Jelly', info: 'Squishy! It spreads into every gap, so rows fill up (and vanish) easily.' },
-};
-const mat = () => MAT[settings.mat] || MAT.wood;
-const YIELD = 0.18, CREEP = 0.2;            // wood only dents under a really hard squeeze
-const FIRM = () => settings.mat !== 'jelly';   // wood and glass lock into the grid and stay put
-// The falling piece breaks if it lands fast; pieces already in the tower are tougher.
-const BREAK_DV = 9, CRUSH = 0.25, IMPACT = 5.5, IMPACT_SETTLED = 9;
+const ALPHA = 0.09, MU = 0.18;   // jelly: shape stiffness and friction
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
 const PRESS_TOP = -2.7, PLATE = 0.8;               // parked plate bottom (off screen), plate thickness
@@ -113,8 +102,7 @@ function buildBody(ps, quads, type) {
   const body = {
     parts: ps, quads, type, edges: [], controlled: false,
     color: COLORS[type], dark: mix(COLORS[type], 0.55, false), light: mix(COLORS[type], 0.55, true),
-    wood: mix2(COLORS[type], '#a06a38', 0.5), woodDark: mix2(COLORS[type], '#3a220e', 0.7),
-    glass: mix2(COLORS[type], '#2b3d63', 0.42), touch: 0,
+    touch: 0,
     cx: 0, cy: 0, ang: 0, strain: 0, eyes: false, blink: 1 + Math.random() * 4, squint: 0,
   };
   let sx = 0, sy = 0;
@@ -180,34 +168,22 @@ function shapeMatch(b, alpha) {
   }
   b.ang = ang;
   const c = Math.cos(ang), s = Math.sin(ang);
-  const plastic = settings.mat === 'wood' && b.squeezed;   // only a finger or the press crushes wood
-  let strain = 0, mx = 0, my = 0;
+  let strain = 0;
   for (const p of ps) {
     const gx = gx0 + c * p.qx - s * p.qy, gy = gy0 + s * p.qx + c * p.qy;
     const ex = gx - p.x, ey = gy - p.y;
     strain += Math.abs(ex) + Math.abs(ey);
-    if (plastic) {
-      // Wood yields: a dent beyond a small limit becomes its new shape, so it stays crushed.
-      const lx = -(c * ex + s * ey), ly = -(-s * ex + c * ey), e = Math.hypot(lx, ly);
-      if (e > YIELD) { const k = (e - YIELD) / e * CREEP; p.qx += lx * k; p.qy += ly * k; }
-      mx += p.qx; my += p.qy;
-    }
     p.x += ex * alpha; p.y += ey * alpha;
-  }
-  if (plastic && (mx || my)) {
-    mx /= n; my /= n;
-    for (const p of ps) { p.qx -= mx; p.qy -= my; p.rx = p.qx; p.ry = p.qy; }
   }
   b.strain = strain / n;
 }
 
 const TOUCH2 = (D + 0.06) * (D + 0.06);
 function collide() {
-  const DEAD = settings.mat === 'wood';
-  const n = parts.length, D2 = D * D, MU = mat().mu;
+  const n = parts.length, D2 = D * D;
   for (let i = 0; i < n; i++) {
     const p = parts[i], c = pcell[i], gx = c % GC, gy = (c / GC) | 0;
-    const wa = p.b.asleep ? 0 : p.b.controlled ? CTRL_INVMASS : 1;
+    const wa = p.b.controlled ? CTRL_INVMASS : 1;
     for (let oy = -1; oy <= 1; oy++) {
       const yy = gy + oy; if (yy < 0 || yy >= GR) continue;
       for (let ox = -1; ox <= 1; ox++) {
@@ -217,16 +193,12 @@ function collide() {
           const j = cellItems[k];
           if (j <= i) continue;
           const q = parts[j];
-          if (q.b === p.b || (wa === 0 && q.b.asleep)) continue;
-          if (p.b.asleep !== q.b.asleep) {     // something moving touches a resting piece: wake it so it carries the load
-            const dx0 = q.x - p.x, dy0 = q.y - p.y;
-            if (dx0 * dx0 + dy0 * dy0 < D * D) wake(p.b.asleep ? p.b : q.b);
-          }
+          if (q.b === p.b) continue;
           const dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy;
           if (d2 >= TOUCH2 || d2 < 1e-10) continue;
           p.b.touch++; q.b.touch++;               // resting contact counts too, not just overlap
           if (d2 >= D2) continue;
-          const wb = q.b.asleep ? 0 : q.b.controlled ? CTRL_INVMASS : 1, sa = wa / (wa + wb), sb = 1 - sa;
+          const wb = q.b.controlled ? CTRL_INVMASS : 1, sa = wa / (wa + wb), sb = 1 - sa;
           // A particle that slipped inside the other body's mesh gets pushed back out through the skin.
           if (insideQuads(p, q.qs)) { pushOut(p, q.b, sa, sb); continue; }
           if (insideQuads(q, p.qs)) { pushOut(q, p.b, sb, sa); continue; }
@@ -241,10 +213,6 @@ function collide() {
           const rvx = (q.x - q.px) - (p.x - p.px), rvy = (q.y - q.py) - (p.y - p.py);
           const vn = rvx * nx + rvy * ny, tx = (rvx - vn * nx) * MU, ty = (rvy - vn * ny) * MU;
           p.x += tx * sa; p.y += ty * sa; q.x -= tx * sb; q.y -= ty * sb;
-          if (DEAD && vn > 0) {             // wood: no rebound
-            const k = vn * 0.8;
-            p.x += nx * k * sa; p.y += ny * k * sa; q.x -= nx * k * sb; q.y -= ny * k * sb;
-          }
         }
       }
     }
@@ -253,7 +221,7 @@ function collide() {
     if (p.x < R) { p.x = R; p.py += (p.y - p.py) * 0.1; }
     else if (p.x > W - R) { p.x = W - R; p.py += (p.y - p.py) * 0.1; }
     if (p.y > H - R - 0.06) p.b.touch++;
-    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; if (DEAD && p.py > p.y) p.py = p.y; }
+    if (p.y > H - R) { p.y = H - R; p.px += (p.x - p.px) * 0.5; }
     if (press.phase !== 'idle' && p.y < press.y + R) { p.y = press.y + R; p.px += (p.x - p.px) * 0.4; press.touch++; p.b.pressed = true; }
   }
 }
@@ -306,7 +274,7 @@ function applyGrabs() {
   for (const g of grabs.values()) {
     for (const h of g.ps) {
       const p = h.p;
-      const sq = 1, k = settings.mat === 'jelly' ? 0.2 : 0.25;
+      const sq = 1, k = 0.2;
       p.x += (g.sx + h.ox * sq - p.x) * k;
       p.y += (g.sy + h.oy * sq - p.y) * k;
     }
@@ -314,7 +282,7 @@ function applyGrabs() {
 }
 function moveGrabs() {
   // The squeeze point follows the finger at a limited speed so jelly can't be yanked through other jelly.
-  const m = (settings.mat === 'glass' ? 4 : 14) * STEP;
+  const m = 14 * STEP;
   for (const g of grabs.values()) {
     const dx = g.x - g.sx, dy = g.y - g.sy, d = Math.hypot(dx, dy);
     if (d > m) { g.sx += dx / d * m; g.sy += dy / d * m; } else { g.sx = g.x; g.sy = g.y; }
@@ -327,9 +295,9 @@ function startPress() {
   if (state !== 'play' || press.phase !== 'idle') return;
   if (active) {                    // the falling piece is crushed straight away
     const b = active; active = null; b.controlled = false;
-    if (settings.mat === 'glass') shatter(b); else crushBody(b);
+    crushBody(b);
   }
-  carry = null; grabs.clear(); hard = false; softBtn = softDrag = false; wakeAll();
+  carry = null; grabs.clear(); hard = false; softBtn = softDrag = false;
   press.target = H - 0.12; press.phase = 'down'; press.t = 0; press.contact = false; press.y = PRESS_TOP;
   sfx.hydraulic(1.6); syncPress();
 }
@@ -341,44 +309,10 @@ function bodyArea(b) {
 function crushBody(b) {
   if (!bodies.includes(b)) return;
   bodies = bodies.filter(x => x !== b);
-  for (const p of b.parts) {
-    if (settings.mat === 'jelly') burst(p.x, p.y, b.color, 1);
-    else if (Math.random() < 0.7) shards.push({
-      x: p.x, y: p.y, vx: (Math.random() - 0.5) * 9, vy: -Math.random() * 6, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
-      s: 0.1 + Math.random() * 0.16, t: 0, life: 0.7 + Math.random() * 0.6, color: settings.mat === 'wood' ? b.wood : b.glass, edge: settings.mat === 'wood' ? 'rgba(45,25,8,0.7)' : null,
-    });
-  }
+  for (const p of b.parts) burst(p.x, p.y, b.color, 1);
   rebuildParts();
-  if (settings.mat === 'glass') sfx.glass(); else sfx.splat();
+  sfx.splat();
   buzz(12); shake = Math.max(shake, 0.12);
-}
-// Wood under the press splits into its single blocks.
-function crackBody(b) {
-  if (!bodies.includes(b)) return;
-  const cells = new Map();
-  for (const p of b.parts) {
-    const k = (p.i >> 1) + ',' + (p.j >> 1);
-    if (!cells.has(k)) cells.set(k, []);
-    cells.get(k).push(p);
-  }
-  const out = [];
-  for (const ps of cells.values()) {
-    if (ps.length !== 4) continue;
-    ps.sort((a, c) => a.j - c.j || a.i - c.i);
-    const nb = buildBody(ps, [[ps[0], ps[1], ps[3], ps[2]]], b.type);
-    nb.cracked = true;
-    const kx = (Math.random() - 0.5) * 0.04;
-    for (const p of ps) { p.px -= kx; p.py -= Math.random() * 0.01; }
-    out.push(nb);
-  }
-  for (const [a, c] of b.edges) if (Math.random() < 0.25) shards.push({
-    x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 4, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
-    s: 0.08 + Math.random() * 0.1, t: 0, life: 0.5 + Math.random() * 0.4, color: b.wood, edge: 'rgba(45,25,8,0.7)',
-  });
-  bodies = bodies.filter(x => x !== b).concat(out);
-  for (const [k, g] of grabs) if (g.body === b) grabs.delete(k);
-  rebuildParts();
-  sfx.crack(); buzz(18); shake = Math.max(shake, 0.15);
 }
 function stepPress() {
   if (press.phase === 'idle') return;
@@ -386,13 +320,8 @@ function stepPress() {
   if (press.phase === 'down') {
     if (press.touch > 0 && !press.contact) { press.contact = true; sfx.clunk(); buzz([30, 30, 60]); shake = 0.2; }
     press.y = Math.min(press.target, press.y + (press.touch > 0 ? 8 : 18) * STEP);
-    // What the plate touches: glass shatters at once, wood cracks into chunks, jelly gets squeezed flat.
-    for (const b of bodies.slice()) {
-      if (!b.pressed) continue;
-      if (settings.mat === 'glass') shatter(b);
-      else if (settings.mat === 'wood' && !b.cracked) crackBody(b);
-      else if (bodyArea(b) < b.quads.length * D * D * (settings.mat === 'jelly' ? 0.35 : 0.6)) crushBody(b);
-    }
+    // Jelly under the plate gets squeezed flat, then splats.
+    for (const b of bodies.slice()) if (b.pressed && bodyArea(b) < b.quads.length * D * D * 0.35) crushBody(b);
     if (press.y >= H - 0.75 || press.t > 6) for (const b of bodies.slice()) crushBody(b);
     if (press.y >= press.target) { press.phase = 'hold'; press.t = 0; shake = 0.3; sfx.clunk(); buzz(40); }
   } else if (press.phase === 'hold') {
@@ -425,10 +354,10 @@ function physStep() {
     if (carry) {
       // Follow the finger; slow and gentle once it touches other jelly, so it can be set down softly.
       let vx = (carry.x + carry.ox - cx) * 14 * STEP, vy = (carry.y + carry.oy - cy) * 14 * STEP;
-      const vm = (touching ? (settings.mat === 'glass' ? 1.5 : 3) : 25) * STEP, l = Math.hypot(vx, vy);
+      const vm = (touching ? 3 : 25) * STEP, l = Math.hypot(vx, vy);
       if (l > vm) { vx *= vm / l; vy *= vm / l; }
       adx = (vx - mvx) * 0.35; ady = (vy - mvy) * 0.35;
-      const amax = (settings.mat === 'glass' ? 50 : 250) * STEP * STEP, al = Math.hypot(adx, ady);
+      const amax = 250 * STEP * STEP, al = Math.hypot(adx, ady);
       if (al > amax) { adx *= amax / al; ady *= amax / al; }
     } else if (!active.landed) {
       ady = gravityActive() * ((softBtn || softDrag) ? 4 : 1) * STEP * STEP;
@@ -439,11 +368,9 @@ function physStep() {
       }
     }
   }
-  const held = grabs.size ? new Set([...grabs.values()].map(g => g.body)) : null;
-  for (const b of bodies) { b.squeezed = b.pressed || (held && held.has(b)); b.touch = 0; b.pressed = false; }
+  for (const b of bodies) { b.touch = 0; b.pressed = false; }
   const g = G * STEP * STEP;
   for (const p of parts) {
-    if (p.b.asleep) { p.px = p.x; p.py = p.y; continue; }
     // A landed piece behaves like the rest of the stack (normal gravity), so it doesn't moon-bounce.
     const isA = p.b === active && (carry || !active.landed);
     let vx = (p.x - p.px) * (isA ? 0.998 : DAMP), vy = (p.y - p.py) * (isA ? 0.998 : DAMP);
@@ -454,91 +381,19 @@ function physStep() {
     p.x += vx; p.y += vy;
   }
   buildHash();
-  const alpha = mat().alpha, ctrlAlpha = Math.max(CTRL_ALPHA, alpha);
+  const alpha = ALPHA, ctrlAlpha = CTRL_ALPHA;
   for (let it = 0; it < ITERS; it++) {
-    for (const b of bodies) if (!b.asleep) shapeMatch(b, b.controlled ? ctrlAlpha : alpha);
+    for (const b of bodies) shapeMatch(b, b.controlled ? ctrlAlpha : alpha);
     applyGrabs();
     collide();
   }
   if (active) {
     // On touching something the drop ends and the piece is left to physics, so it settles naturally.
-    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; T.a = T.ta = active.ang; if (FIRM()) for (const p of active.parts) { p.px = p.x; p.py = p.y; } } }   // wood and glass land with a thud, no rebound
+    if (active.touch) { active.contact++; hard = false; if (!carry && !active.landed) { active.landed = true; T.a = T.ta = active.ang; } }
     active.since = active.touch ? 0 : active.since + 1;
   }
-  if (settings.mat === 'glass') checkGlass();
-  // Wood and glass that have come to rest are put to sleep (snapped to the grid if nearly aligned),
-  // so they stand perfectly still and hold firm, like regular Tetris blocks.
-  if (FIRM() && press.phase === 'idle') for (const b of bodies) {
-    if (b.asleep || b.controlled) continue;
-    if (held && held.has(b)) { b.restT = 0; continue; }
-    let mv = 0;
-    for (const p of b.parts) { const v = (p.x - p.px) ** 2 + (p.y - p.py) ** 2; if (v > mv) mv = v; }
-    if (mv < (0.6 * STEP) ** 2) { b.restT = (b.restT || 0) + STEP; if (b.restT > 0.35) settle(b); }
-    else b.restT = 0;
-  }
 }
 
-function snapBody(b) {
-  const a = Math.round(b.ang / (Math.PI / 2)) * (Math.PI / 2);
-  if (Math.abs(b.ang - a) > 0.12) return;
-  const c = Math.cos(a), s = Math.sin(a), n = b.parts.length;
-  let cx = 0, cy = 0;
-  for (const p of b.parts) { cx += p.x; cy += p.y; }
-  cx /= n; cy /= n;
-  let mn = 1e9, my = -1e9;
-  for (const p of b.parts) { mn = Math.min(mn, cx + c * p.qx - s * p.qy); my = Math.max(my, cy + s * p.qx + c * p.qy); }
-  const dx = Math.round(mn - R) - (mn - R), dy = Math.round(my + R) - (my + R);
-  if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) return;
-  for (const p of b.parts) {
-    p.x = p.px = cx + dx + c * p.qx - s * p.qy;
-    p.y = p.py = cy + dy + s * p.qx + c * p.qy;
-  }
-  b.cx = cx + dx; b.cy = cy + dy; b.ang = a;
-}
-function settle(b) { snapBody(b); b.asleep = true; b.restT = 0; for (const p of b.parts) { p.px = p.x; p.py = p.y; } }
-function wake(b) { b.asleep = false; b.restT = 0; b.vh = null; b.free = 0; b.tc = 0; }
-function wakeAll() { for (const b of bodies) { b.asleep = false; b.restT = 0; b.vh = null; b.free = 0; b.tc = 0; } }
-
-// Glass breaks on a hard knock (sudden change of speed while touching something) or when crushed.
-function checkGlass() {
-  let broke = null;
-  const held = new Set([...grabs.values()].map(g => g.body));
-  for (const b of bodies) {
-    if (b.asleep) continue;
-    let vx = 0, vy = 0;
-    for (const p of b.parts) { vx += p.x - p.px; vy += p.y - p.py; }
-    const n = b.parts.length * STEP; vx /= n; vy /= n;
-    const h = b.vh || (b.vh = []);
-    h.push(vx, vy); if (h.length > 8) h.splice(0, 2);
-    b.tc = b.touch ? 6 : (b.tc || 0) - 1;
-    // Landing: how fast it was going the step before it touched down.
-    const impact = b.touch && (b.free || 0) >= 3 && h.length >= 4 && h[h.length - 3] > (b.controlled ? IMPACT : IMPACT_SETTLED);   // falling speed just before touching down
-    b.free = b.touch ? 0 : (b.free || 0) + 1;
-    // Knock: a sudden jolt while touching something (not while you're holding it).
-    const knock = !held.has(b) && !b.controlled && b.tc > 0 && h.length === 8 && Math.hypot(vx - h[0], vy - h[1]) > BREAK_DV;
-    const crushed = !held.has(b) && b.tc > 0 && b.strain > CRUSH;
-    if (impact || knock || crushed) (broke || (broke = [])).push(b);
-  }
-  if (broke) for (const b of broke) shatter(b);
-}
-
-function shatter(b) {
-  if (!bodies.includes(b)) return;
-  bodies = bodies.filter(x => x !== b);
-  if (b === active) { active = null; carry = null; hard = false; spawnDelay = 0.4; }
-  for (const [k, g] of grabs) if (g.body === b) grabs.delete(k);
-  for (const q of b.quads) {
-    const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
-    const vx = (q[0].x - q[0].px) / STEP * 0.4, vy = (q[0].y - q[0].py) / STEP * 0.4;
-    for (let i = 0; i < 3; i++) shards.push({
-      x: cx + (Math.random() - 0.5) * 0.4, y: cy + (Math.random() - 0.5) * 0.4,
-      vx: vx + (Math.random() - 0.5) * 7, vy: vy - Math.random() * 5, a: Math.random() * 6, va: (Math.random() - 0.5) * 18,
-      s: 0.12 + Math.random() * 0.2, t: 0, life: 0.9 + Math.random() * 0.7, color: b.glass,
-    });
-  }
-  rebuildParts(); wakeAll();
-  sfx.glass(); buzz([15, 20, 35]); shake = 0.15;
-}
 
 // ---------- game flow ----------
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -588,7 +443,7 @@ function lockActive() {
 function takeControl() {
   if (!active.landed) return;
   active.landed = false;
-  T.a = active.ang; T.ta = FIRM() ? Math.round(active.ang / (Math.PI / 2)) * (Math.PI / 2) : active.ang;
+  T.a = T.ta = active.ang;
   T.tx = snapX(active.cx); clampTX();
 }
 function moveBy(dx) {
@@ -646,7 +501,7 @@ function clearRows(rows) {
     }
     for (const g of groups.values()) out.push(buildBody([...g.ps], g.quads, b.type));
   }
-  bodies = out; rebuildParts(); grabs.clear(); wakeAll();
+  bodies = out; rebuildParts(); grabs.clear();
   for (const k of rows) { flashes.push({ k, t: 0 }); hold[k] = 0; }
   const n = rows.length;
   lines += n;
@@ -689,8 +544,8 @@ function startLevel(l) {
 }
 
 function saveBest() {
-  const b = bestOf(settings.mat);
-  if (score > b.score || (score === b.score && level > b.level)) { store.set('best-' + settings.mat, { score, level }); return true; }
+  const b = getBest();
+  if (score > b.score || (score === b.score && level > b.level)) { store.set('best-jelly', { score, level }); return true; }
   return false;
 }
 
@@ -712,8 +567,8 @@ function gameOver(reason) {
   const isBest = saveBest();
   $('overTitle').textContent = reason || 'Game over';
   $('finalScore').textContent = score;
-  const b = bestOf(settings.mat);
-  $('bestOver').textContent = isBest && score > 0 ? 'New best!' : 'Best (' + mat().name + '): ' + b.score;
+  const b = getBest();
+  $('bestOver').textContent = isBest && score > 0 ? 'New best!' : 'Best: ' + b.score;
   $('retryBtn').textContent = 'Retry level ' + level;
   sfx.over(); buzz([60, 60, 120]);
   show('over'); wake(false);
@@ -821,8 +676,6 @@ function pathEdges(c, b) {
 }
 
 function drawBody(c, b, look) {
-  if (settings.mat === 'wood') return drawWood(c, b, look);
-  if (settings.mat === 'glass') return drawGlass(c, b, look);
   c.lineCap = c.lineJoin = 'round';
   pathEdges(c, b);
   c.strokeStyle = b.dark; c.lineWidth = D + 0.13; c.stroke();
@@ -834,53 +687,9 @@ function drawBody(c, b, look) {
   if (b.eyes) drawEyes(c, b, look);
 }
 
-function drawWood(c, b, look) {
-  c.lineCap = 'square'; c.lineJoin = 'miter';
-  pathEdges(c, b); c.strokeStyle = b.woodDark; c.lineWidth = D + 0.12; c.stroke();
-  c.fillStyle = c.strokeStyle = b.wood;
-  pathQuads(c, b); c.fill(); c.lineWidth = 0.04; c.stroke();
-  pathEdges(c, b); c.lineWidth = D; c.stroke();
-  // wood grain running along the piece
-  c.save(); pathQuads(c, b); c.clip();
-  const co = Math.cos(b.ang), si = Math.sin(b.ang);
-  c.strokeStyle = 'rgba(60,32,10,0.28)'; c.lineWidth = 0.045; c.lineCap = 'round';
-  for (let k = -6; k <= 6; k++) {
-    c.beginPath();
-    for (let i = 0; i <= 12; i++) {
-      const lx = -3 + i * 0.5, ly = k * 0.32 + Math.sin(i * 0.9 + k * 1.7) * 0.05;
-      const x = b.cx + co * lx - si * ly, y = b.cy + si * lx + co * ly;
-      if (i) c.lineTo(x, y); else c.moveTo(x, y);
-    }
-    c.stroke();
-  }
-  c.restore();
-  if (b.eyes) drawEyes(c, b, look);
-}
-
-function drawGlass(c, b, look) {
-  c.lineCap = 'square'; c.lineJoin = 'miter';
-  pathEdges(c, b); c.strokeStyle = 'rgba(225,240,255,0.85)'; c.lineWidth = D + 0.1; c.stroke();
-  c.fillStyle = c.strokeStyle = b.glass;
-  pathQuads(c, b); c.fill(); c.lineWidth = 0.04; c.stroke();
-  pathEdges(c, b); c.lineWidth = D - 0.06; c.stroke();
-  // shine streaks
-  c.save(); pathQuads(c, b); c.clip();
-  c.globalAlpha = 0.3; c.fillStyle = '#ffffff';
-  const co = Math.cos(b.ang), si = Math.sin(b.ang);
-  for (const [o, w] of [[-0.9, 0.35], [-0.35, 0.12]]) {
-    c.beginPath();
-    for (const [lx, ly] of [[o - 3, 3], [o - 3 + w, 3], [o + 3 + w, -3], [o + 3, -3]]) {
-      const x = b.cx + co * lx - si * ly, y = b.cy + si * lx + co * ly; c.lineTo(x, y);
-    }
-    c.fill();
-  }
-  c.globalAlpha = 1; c.restore();
-  if (b.eyes) drawEyes(c, b, look);
-}
-
 function drawEyes(c, b, look) {
   const co = Math.cos(b.ang), si = Math.sin(b.ang);
-  const squint = b.squint > 0 || (settings.mat === 'jelly' && b.strain > 0.09);
+  const squint = b.squint > 0 || b.strain > 0.09;
   const shut = b.blink < 0 && !squint;
   for (const side of [-1, 1]) {
     const lx = side * 0.24, ly = -0.08;
@@ -1042,17 +851,11 @@ function show(id) {
   if (id === 'menu') syncSettings();
 }
 function syncSettings() {
-  for (const b of $('squishSeg').children) b.classList.toggle('sel', b.dataset.v === settings.mat);
-  $('matInfo').textContent = mat().info;
-  const b = bestOf(settings.mat);
-  $('bestMenu').textContent = b.score ? 'Best with ' + mat().name.toLowerCase() + ': ' + b.score + ' (level ' + b.level + ')' : '';
+  const b = getBest();
+  $('bestMenu').textContent = b.score ? 'Best: ' + b.score + ' (level ' + b.level + ')' : '';
   for (const id of ['soundBtn', 'soundBtn2']) { $(id).classList.toggle('sel', settings.sound); $(id).textContent = settings.sound ? 'Sound on' : 'Sound off'; }
   for (const id of ['vibeBtn', 'vibeBtn2']) { $(id).classList.toggle('sel', settings.vibe); $(id).textContent = settings.vibe ? 'Vibration on' : 'Vibration off'; }
 }
-$('squishSeg').addEventListener('click', e => {
-  const v = e.target.closest('button') && e.target.closest('button').dataset.v;
-  if (v) { settings.mat = v; saveSettings(); syncSettings(); audio(); sfx.rotate(); }
-});
 for (const id of ['soundBtn', 'soundBtn2']) $(id).addEventListener('click', () => { settings.sound = !settings.sound; saveSettings(); syncSettings(); audio(); sfx.move(); });
 for (const id of ['vibeBtn', 'vibeBtn2']) $(id).addEventListener('click', () => { settings.vibe = !settings.vibe; saveSettings(); syncSettings(); buzz(20); });
 $('playBtn').addEventListener('click', startGame);
@@ -1065,7 +868,6 @@ $('shareWon').addEventListener('click', shareResult);
 $('shareOver').addEventListener('click', shareResult);
 
 // ---------- share: a picture of the tower with the score ----------
-const MAT_EMOJI = { glass: '🔷', wood: '🪵', jelly: '🍬' };
 function shareCard() {
   const W2 = 1080, H2 = 1600, c = document.createElement('canvas');
   c.width = W2; c.height = H2;
@@ -1079,7 +881,7 @@ function shareCard() {
   [...title].forEach((ch, i) => { g.fillStyle = cols[i]; g.fillText(ch, x, 140); x += g.measureText(ch).width; });
   const won = state === 'won';
   g.textAlign = 'center'; g.fillStyle = '#f1ecff'; g.font = '800 52px system-ui, -apple-system, sans-serif';
-  g.fillText(MAT_EMOJI[settings.mat] + ' ' + mat().name + ' · ' + (won ? 'Level ' + level + ' done in ' + clock(levelTime) + '!' : $('overTitle').textContent + ' on level ' + level), W2 / 2, 230);
+  g.fillText('🍬 ' + (won ? 'Level ' + level + ' done in ' + clock(levelTime) + '!' : $('overTitle').textContent + ' on level ' + level), W2 / 2, 230);
   // the tower, as it stands on screen
   const top = 270, bottom = H2 - 250, avail = bottom - top;
   // crop to the tower and the goal line, with some sky above
@@ -1109,9 +911,9 @@ async function shareResult() {
   audio();
   const won = state === 'won';
   const url = new URL('./', location.href).href;
-  const text = (won ? 'I built a ' + mat().name.toLowerCase() + ' tower up to level ' + level + ' in ' + clock(levelTime) + ' in Squishtris'
-                    : 'I reached level ' + level + ' with ' + mat().name.toLowerCase() + ' blocks in Squishtris') +
-               ' and scored ' + score + '! ' + MAT_EMOJI[settings.mat] + ' Can you beat it?';
+  const text = (won ? 'I built a jelly tower up to level ' + level + ' in ' + clock(levelTime) + ' in Squishtris'
+                    : 'I reached level ' + level + ' in Squishtris') +
+               ' and scored ' + score + '! 🍬 Can you beat it?';
   // Build the picture synchronously so the share still counts as part of the tap.
   const blob = dataUrlToBlob(shareCard().toDataURL('image/png'));
   const file = new File([blob], 'squishtris-level-' + level + '.png', { type: 'image/png' });
@@ -1195,7 +997,6 @@ cv.addEventListener('pointerdown', e => {
   const g = tryGrab(e);
   if (g) {
     try { cv.setPointerCapture(e.pointerId); } catch {}
-    g.body.asleep = false; g.body.vh = null;
     grabs.set(e.pointerId, g); sfx.squish(); buzz(8);
     return;
   }
@@ -1235,7 +1036,6 @@ const endDrag = e => {
   if (g) {                          // set it down gently: no fling when you let go
     grabs.delete(e.pointerId);
     for (const p of g.body.parts) { p.px = p.x; p.py = p.y; }
-    wakeAll();                      // whatever it was holding up can now fall
     return;
   }
   if (!drag || e.pointerId !== drag.id) return;
@@ -1290,10 +1090,6 @@ const sfx = {
   squish() { tone(300, 0.12, 'sine', 0.1, 140); },
   clunk() { tone(90, 0.35, 'sine', 0.35, 38); noise(0.12, 900, 0.08); },
   hydraulic(d) { tone(52, d, 'sawtooth', 0.05, 46); noise(d, 2600, 0.035); },
-  glass() {
-    noise(0.25, 5200, 0.12);
-    for (let i = 0; i < 6; i++) tone(2200 + Math.random() * 3800, 0.09 + Math.random() * 0.12, 'triangle', 0.05, null, Math.random() * 0.18);
-  },
   lost() { [523, 415, 330].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, f * 0.9, i * 0.08)); },
   win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, null, i * 0.09)); },
   crack() { noise(0.09, 1800, 0.16); tone(120, 0.12, 'square', 0.05, 60); },

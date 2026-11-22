@@ -1,8 +1,6 @@
 # Squishtris
 
-Tower-building with physics blocks. Build up to the gold line and keep the tower there for 2 seconds to finish the level. Each level gives you a few pieces, and a row that gets 90 % full vanishes (the bars on the right warn you).
-
-Materials: **Glass** shatters if it falls or gets knocked too hard, so carry it down gently. **Wood** is a solid block. **Jelly** squishes and spreads into gaps.
+Tower-building with squishy jelly blocks. Build up to the gold line and keep the tower there for 2 seconds to finish the level. Each level gives you a few pieces, and a row that gets 90 % full vanishes (the bars on the right warn you).
 
 ## Controls
 
