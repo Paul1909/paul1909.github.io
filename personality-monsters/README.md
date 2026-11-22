@@ -15,7 +15,7 @@ Two players share one phone, tablet or computer. Each takes a Big Five personali
 | 🤗 Self-hug heal chance | 0.15 × Agreeableness |
 | 😤 Tantrum chance (rage ×2 or trip) | 0.2 × Neuroticism |
 
-Looks: Openness → eyes, antennae, weird body shapes; low Agreeableness → spikes, pointy teeth, angry brows; high Agreeableness → halo; Conscientiousness → armour plate; Extraversion → size; Neuroticism → sweat drop and jitters. Colour is random.
+Looks (all cute, pastel and round): Openness → number of eyes, antennae, squashy mochi body; low Agreeableness → soft back nubs, a pout with tiny fangs, grumpy brows; high Agreeableness → smile and halo; Conscientiousness → tummy patch with buttons; Extraversion → size; Neuroticism → sweat drop and jitters. Colour is random. Each monster is simply called after its player.
 
 ## Files
 

@@ -112,19 +112,11 @@ function computeStats(t) {
   return s;
 }
 
-// ---------------------------------------------------------------- Seeded random + names
+// ---------------------------------------------------------------- Seeded random
 function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const pickR = (r, arr) => arr[Math.floor(r() * arr.length)];
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-const PRE = ['Grum', 'Wob', 'Snor', 'Blib', 'Fizz', 'Mug', 'Zor', 'Plon', 'Squee', 'Gloop', 'Bork', 'Nib', 'Flub', 'Krak', 'Mop', 'Snug', 'Dorf', 'Pud', 'Wib', 'Grog', 'Tum', 'Blor'];
-const MID = ['', '', 'ble', 'ga', 'lo', 'zi', 'wo', 'ka', 'pi', 'bu'];
-const SUF = ['flap', 'tron', 'snout', 'wort', 'bottom', 'gob', 'nugget', 'zilla', 'muffin', 'beak', 'sock', 'pants', 'noodle', 'chops', 'belly', 'toes', 'wump'];
-const TITLE = { O: ['the Sensible', 'the Cosmic'], C: ['the Messy', 'the Tidy'], E: ['the Shy', 'the Loud'], A: ['the Grumpy', 'the Huggable'], N: ['the Chill', 'the Jittery'] };
-function monsterName(r, t) {
-  let best = 'O'; for (const k of TORDER) if (Math.abs(t[k] - 50) > Math.abs(t[best] - 50)) best = k;
-  return pickR(r, PRE) + pickR(r, MID) + pickR(r, SUF) + ' ' + TITLE[best][t[best] >= 50 ? 1 : 0];
-}
 
 // ---------------------------------------------------------------- Sound (all synthesised, nothing to download)
 const Sound = {
@@ -342,22 +334,23 @@ function makeSpec(traits, stats, seed, avoidHue) {
   const O = traits.O / 100, A = traits.A / 100, C = traits.C / 100, E = traits.E / 100, N = traits.N / 100;
   let hue = r();
   if (avoidHue != null) for (let k = 0; k < 20 && Math.min(Math.abs(hue - avoidHue), 1 - Math.abs(hue - avoidHue)) < 0.22; k++) hue = r();
-  const shapes = [['blob', 3], ['pear', 2.2], ['box', 1.2], ['capsule', 1.6], ['cone', 0.4 + O * 1.6], ['lumpy', 0.3 + O * 2.4]];
+  const shapes = [['blob', 3], ['pear', 2], ['bean', 1.6], ['mochi', 0.6 + O * 2]];
   let tot = shapes.reduce((a, s) => a + s[1], 0), x = r() * tot, shape = 'blob';
   for (const [s, w] of shapes) { x -= w; if (x <= 0) { shape = s; break; } }
   return {
-    hue, sat: 0.62 + 0.3 * r(), light: 0.52 + 0.1 * r(), hue2: (hue + 0.3 + r() * 0.4) % 1,
-    shape, w: 0.85 + r() * 0.35, h: 0.85 + r() * 0.45,
+    // soft pastel colours
+    hue, sat: 0.5 + 0.25 * r(), light: 0.64 + 0.08 * r(), hue2: (hue + 0.3 + r() * 0.4) % 1,
+    shape, w: 1.0 + r() * 0.22, h: 0.88 + r() * 0.2,
     scale: 0.82 + E * 0.42,
-    eyes: clamp(1 + Math.round(O * 3.4 + (r() - 0.5) * 1.2), 1, 5), eyeSize: 0.15 + r() * 0.1,
-    spikes: clamp(Math.round((1 - A) * 7.5 + (r() - 0.5) * 1.5), 0, 8), spikeLen: 0.22 + (1 - A) * 0.32,
-    teeth: clamp(Math.round(stats.ATK / 5), 2, 8), sharp: A < 0.5,
-    legs: r() < 0.22 ? 0 : (r() < 0.25 + O * 0.35 ? 4 : 2), legLen: 0.28 + r() * 0.3,
-    arms: r() < 0.88, armLen: 0.45 + r() * 0.35,
-    spots: r() < 0.6 ? Math.round(3 + r() * 6) : 0,
+    eyes: clamp(1 + Math.round(O * 2.6 + (r() - 0.5) * 1.1), 1, 4),
+    spikes: clamp(Math.round((1 - A) * 6 + (r() - 0.5) * 1.5), 0, 6), spikeLen: 0.16 + (1 - A) * 0.18,
+    sharp: A < 0.5,
+    legs: r() < 0.3 + O * 0.3 ? 4 : 2,
+    arms: true,
+    spots: r() < 0.5 ? Math.round(3 + r() * 4) : 0,
     antenna: O > 0.8 ? 2 : O > 0.55 ? 1 : 0,
     plate: C > 0.55, halo: A > 0.72, brows: A < 0.42, sweat: N > 0.62,
-    tail: r() < 0.45, jitter: N,
+    tail: r() < 0.5, jitter: N,
     voice: 130 + (1 - E) * 120 + r() * 90,
   };
 }
@@ -368,34 +361,33 @@ function buildMonster(spec) {
   const mats = [];
   const M = (color, o = {}) => { const m = new THREE.MeshToonMaterial({ color, ...o }); mats.push(m); return m; };
   const cMain = new THREE.Color().setHSL(spec.hue, spec.sat, spec.light);
-  const c2 = new THREE.Color().setHSL(spec.hue2, 0.75, 0.6);
-  const cDark = new THREE.Color().setHSL(spec.hue, 0.55, 0.22);
-  const mBody = M(cMain, { flatShading: spec.shape === 'lumpy' || spec.shape === 'box' });
-  const m2 = M(c2), mDark = M(cDark), mWhite = M('#ffffff'), mBlack = M('#17101f'), mRed = M('#ff4d6d'), mPlate = M('#e6e2f0');
+  const c2 = new THREE.Color().setHSL(spec.hue2, 0.7, 0.76);
+  const cDark = new THREE.Color().setHSL(spec.hue, 0.45, 0.4);
+  const mBody = M(cMain);
+  const m2 = M(c2), mDark = M(cDark), mWhite = M('#ffffff'), mBlack = M('#2a1d33'), mRed = M('#ff7a94');
+  const mBelly = M(new THREE.Color().setHSL(spec.hue, spec.sat * 0.5, 0.86)), mCheek = M('#ff9ec0');
+  const mIris = M(new THREE.Color().setHSL(spec.hue2, 0.55, 0.42));
   const mGlow = new THREE.MeshBasicMaterial({ color: c2 });
+  const mShine = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 
+  // round, squishy bodies only
   let geo;
   switch (spec.shape) {
     case 'pear': {
-      const pts = []; for (let i = 0; i <= 20; i++) { const t = i / 20; const r = 0.15 + Math.sin(t * Math.PI) * (0.95 - 0.45 * t) + 0.05; pts.push(new THREE.Vector2(i === 0 || i === 20 ? 0.001 : r, t * 1.9 - 0.95)); }
-      geo = new THREE.LatheGeometry(pts, 32); break;
+      const pts = []; for (let i = 0; i <= 24; i++) { const t = i / 24; const r = Math.sin(t * Math.PI) * (1.0 - 0.32 * t) + 0.02; pts.push(new THREE.Vector2(i === 0 || i === 24 ? 0.001 : r, t * 1.9 - 0.95)); }
+      geo = new THREE.LatheGeometry(pts, 40); break;
     }
-    case 'box': geo = new THREE.BoxGeometry(1.7, 1.7, 1.5, 2, 2, 2); break;
-    case 'capsule': geo = new THREE.CapsuleGeometry(0.75, 0.6, 8, 20); break;
-    case 'cone': geo = new THREE.ConeGeometry(1.05, 2, 28, 4); break;
-    case 'lumpy': {
-      geo = new THREE.IcosahedronGeometry(1, 1); const r = rng(Math.floor(spec.hue * 1e6)); const pa = geo.attributes.position; const seen = new Map();
-      for (let i = 0; i < pa.count; i++) { const k = `${pa.getX(i).toFixed(3)},${pa.getY(i).toFixed(3)},${pa.getZ(i).toFixed(3)}`; if (!seen.has(k)) seen.set(k, 0.85 + r() * 0.3); const f = seen.get(k); pa.setXYZ(i, pa.getX(i) * f, pa.getY(i) * f, pa.getZ(i) * f); }
-      geo.computeVertexNormals(); break;
-    }
-    default: geo = new THREE.SphereGeometry(1, 32, 24);
+    case 'bean': geo = new THREE.CapsuleGeometry(0.8, 0.35, 10, 28); break;
+    case 'mochi': { geo = new THREE.SphereGeometry(1, 40, 28); geo.scale(1.15, 0.8, 1.05); break; }
+    default: geo = new THREE.SphereGeometry(1, 40, 28);
   }
   const body = new THREE.Mesh(geo, mBody);
   body.scale.set(spec.w, spec.h, spec.w * 0.92);
   rig.add(body);
   rig.updateMatrixWorld(true);
   let box = new THREE.Box3().setFromObject(body);
-  const lift = (spec.legs ? spec.legLen : 0) - box.min.y;
+  const footH = 0.14;
+  const lift = footH - box.min.y;
   body.position.y = lift; rig.updateMatrixWorld(true);
   box = new THREE.Box3().setFromObject(body);
   const cy = (box.min.y + box.max.y) / 2, hh = (box.max.y - box.min.y) / 2, hw = (box.max.x - box.min.x) / 2, hd = (box.max.z - box.min.z) / 2;
@@ -405,85 +397,97 @@ function buildMonster(spec) {
   const place = (obj, h, out = 0) => { obj.position.copy(h.p).addScaledVector(h.n, out); obj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), h.n); };
   const r = rng(Math.floor(spec.hue * 1e7) + spec.eyes);
 
-  // eyes
+  // big shiny eyes
   const eyes = [];
-  const eyeY = cy + hh * 0.38;
+  const eyeY = cy + hh * 0.2;
+  const es = [0, 0.38, 0.28, 0.22, 0.19][spec.eyes] * Math.min(hw, 1.15);
+  const spread = [0, 0, 0.4, 0.56, 0.62][spec.eyes];
   for (let i = 0; i < spec.eyes; i++) {
     const t = spec.eyes === 1 ? 0 : i / (spec.eyes - 1) * 2 - 1;
-    const x = t * hw * 0.5, y = eyeY + (spec.eyes > 2 ? (1 - Math.abs(t)) * hh * 0.18 : 0) + (r() - 0.5) * 0.08;
-    const s = spec.eyeSize * (spec.eyes === 1 ? 1.7 : 1) * (0.85 + r() * 0.35);
+    const x = t * hw * spread, y = eyeY + (spec.eyes > 2 ? (1 - Math.abs(t)) * hh * 0.16 : 0);
+    const s = es * (0.95 + r() * 0.1);
     const h = hit(new THREE.Vector3(x, y, 5), new THREE.Vector3(0, 0, -1)); if (!h) continue;
-    const g = new THREE.Group(); place(g, h, s * 0.35);
-    const white = new THREE.Mesh(new THREE.SphereGeometry(s, 18, 14), mWhite); g.add(white);
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(s * 0.5, 14, 10), mBlack); pupil.position.z = s * 0.62; g.add(pupil);
-    const glint = new THREE.Mesh(new THREE.SphereGeometry(s * 0.14, 8, 6), new THREE.MeshBasicMaterial({ color: '#fff' })); glint.position.set(s * 0.18, s * 0.2, s * 0.98); g.add(glint);
-    if (spec.brows) { const b = new THREE.Mesh(new THREE.BoxGeometry(s * 2.3, s * 0.42, s * 0.4), mDark); b.position.set(0, s * 1.12, s * 0.45); b.rotation.z = t < 0 ? -0.45 : t > 0 ? 0.45 : 0; g.add(b); }
+    const g = new THREE.Group(); place(g, h, s * 0.18);
+    const white = new THREE.Mesh(new THREE.SphereGeometry(s, 24, 18), mWhite); white.scale.z = 0.55; g.add(white);
+    const pupil = new THREE.Group(); pupil.position.z = s * 0.34; g.add(pupil);
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(s * 0.7, 20, 14), mIris); iris.scale.z = 0.4; pupil.add(iris);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(s * 0.42, 16, 12), mBlack); dot.scale.z = 0.4; dot.position.z = s * 0.08; pupil.add(dot);
+    const gl1 = new THREE.Mesh(new THREE.SphereGeometry(s * 0.2, 10, 8), mShine); gl1.position.set(s * 0.24, s * 0.26, s * 0.3); pupil.add(gl1);
+    const gl2 = new THREE.Mesh(new THREE.SphereGeometry(s * 0.09, 8, 6), mShine); gl2.position.set(-s * 0.2, -s * 0.22, s * 0.3); pupil.add(gl2);
+    if (spec.brows) { // little grumpy eyebrows
+      const b = new THREE.Mesh(new THREE.CapsuleGeometry(s * 0.12, s * 0.7, 4, 8), mDark);
+      b.rotation.z = Math.PI / 2 + (t < 0 ? -0.35 : t > 0 ? 0.35 : 0); b.position.set(0, s * 1.15, s * 0.2); g.add(b);
+    }
     rig.add(g); eyes.push({ g, pupil, s, tx: 0, ty: 0 });
   }
-  // mouth + teeth
+  // rosy cheeks
+  for (const sd of [-1, 1]) {
+    const h = hit(new THREE.Vector3(sd * hw * (spec.eyes === 1 ? 0.5 : 0.62), eyeY - es * 1.25, 5), new THREE.Vector3(0, 0, -1)); if (!h) continue;
+    const ck = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mCheek); ck.scale.set(es * 0.55, es * 0.3, 0.03); place(ck, h, 0.01); rig.add(ck);
+  }
+  // small mouth: a smile, or a little pout with tiny fangs if not so agreeable
   let mouth = null;
   {
-    const h = hit(new THREE.Vector3(0, cy - hh * 0.06, 5), new THREE.Vector3(0, 0, -1));
+    const h = hit(new THREE.Vector3(0, eyeY - es * 1.35, 5), new THREE.Vector3(0, 0, -1));
     if (h) {
       mouth = new THREE.Group(); place(mouth, h, 0.02);
-      const mw = hw * 0.48, mh = hh * 0.17;
-      const inner = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), mBlack); inner.scale.set(mw, mh, 0.12); mouth.add(inner);
-      const tongue = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mRed); tongue.scale.set(mw * 0.45, mh * 0.45, 0.08); tongue.position.set(0, -mh * 0.4, 0.06); mouth.add(tongue);
-      const teethG = new THREE.Group(); mouth.add(teethG);
-      for (let i = 0; i < spec.teeth; i++) {
-        const tx = ((i + 0.5) / spec.teeth * 2 - 1) * mw * 0.78;
-        const tooth = spec.sharp ? new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 6), mWhite) : new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.05), mWhite);
-        tooth.position.set(tx, mh * (spec.sharp ? 0.62 : 0.72), 0.1); if (spec.sharp) tooth.rotation.x = Math.PI; teethG.add(tooth);
-        if (spec.sharp && i % 2 === 0) { const b = tooth.clone(); b.rotation.x = 0; b.position.y = -mh * 0.62; teethG.add(b); }
+      const mw = Math.max(0.12, hw * 0.16), mh = mw * 0.75;
+      const smile = new THREE.Mesh(new THREE.TorusGeometry(mw, mw * 0.2, 8, 20, Math.PI), mBlack);
+      smile.rotation.z = Math.PI; if (spec.sharp) { smile.scale.set(0.55, 0.35, 1); smile.position.y = mh * 0.1; } mouth.add(smile);
+      const open = new THREE.Group(); open.visible = false; mouth.add(open);
+      const hole = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), mBlack); hole.scale.set(mw, mh, 0.08); open.add(hole);
+      const tongue = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mRed); tongue.scale.set(mw * 0.55, mh * 0.45, 0.06); tongue.position.set(0, -mh * 0.45, 0.04); open.add(tongue);
+      if (spec.sharp) for (const sd of [-1, 1]) {
+        const f = new THREE.Mesh(new THREE.ConeGeometry(mw * 0.18, mw * 0.4, 8), mWhite); f.rotation.x = Math.PI;
+        f.position.set(sd * mw * 0.45, -mh * 0.05, 0.05); mouth.add(f);
       }
+      mouth.userData = { smile, open };
       rig.add(mouth);
     }
   }
-  // spikes (more = less agreeable)
+  // soft rounded nubs on the back (more = less agreeable)
   for (let i = 0, tries = 0; i < spec.spikes && tries < 60; tries++) {
-    const th = (i / Math.max(1, spec.spikes)) * Math.PI * 1.4 - Math.PI * 0.7 + (r() - 0.5) * 0.3 + Math.PI; // back arc
-    const el = 0.35 + r() * 0.9;
+    const th = (i / Math.max(1, spec.spikes)) * Math.PI * 1.2 - Math.PI * 0.6 + (r() - 0.5) * 0.3 + Math.PI;
+    const el = 0.5 + r() * 0.8;
     const dir = new THREE.Vector3(Math.sin(th) * Math.cos(el), Math.sin(el), Math.cos(th) * Math.cos(el));
     const h = hit(new THREE.Vector3(0, cy, 0).addScaledVector(dir, 6), dir.clone().negate()); if (!h) continue;
-    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.1 + spec.spikeLen * 0.15, spec.spikeLen, 8), i % 2 ? mDark : m2);
-    sp.position.copy(h.p).addScaledVector(h.n, spec.spikeLen * 0.42); sp.quaternion.setFromUnitVectors(UP, h.n);
+    const sp = new THREE.Mesh(new THREE.CapsuleGeometry(0.07 + spec.spikeLen * 0.25, spec.spikeLen, 6, 10), m2);
+    sp.position.copy(h.p).addScaledVector(h.n, spec.spikeLen * 0.45); sp.quaternion.setFromUnitVectors(UP, h.n);
     rig.add(sp); i++;
   }
-  // spots
+  // soft spots
   for (let i = 0, tries = 0; i < spec.spots && tries < 40; tries++) {
     const dir = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize();
-    if (dir.z > 0.3 && dir.y > -0.45) continue;
+    if (dir.z > 0.2 && dir.y > -0.6) continue;
     const h = hit(new THREE.Vector3(0, cy, 0).addScaledVector(dir, 6), dir.clone().negate()); if (!h) continue;
-    const sz = 0.08 + r() * 0.14, sp = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), m2);
+    const sz = 0.08 + r() * 0.12, sp = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), m2);
     sp.scale.set(sz, sz, sz * 0.25); place(sp, h, 0.0); rig.add(sp); i++;
   }
-  // armour plate (conscientious)
+  // tummy patch with two little buttons (conscientious)
   if (spec.plate) {
-    const h = hit(new THREE.Vector3(0, cy - hh * 0.55, 5), new THREE.Vector3(0, 0, -1));
+    const h = hit(new THREE.Vector3(0, cy - hh * 0.5, 5), new THREE.Vector3(0, 0, -1));
     if (h) {
       const g = new THREE.Group(); place(g, h, 0.0);
-      const pl = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), mPlate); pl.scale.set(hw * 0.42, hh * 0.24, 0.07); g.add(pl);
-      for (let k = -1; k <= 1; k += 2) for (let j = -1; j <= 1; j += 2) { const rv = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), mDark); rv.position.set(k * hw * 0.28, j * hh * 0.12, 0.06); g.add(rv); }
+      const pl = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 14), mBelly); pl.scale.set(hw * 0.4, hh * 0.26, 0.05); g.add(pl);
+      for (const j of [0.08, -0.08]) { const bt = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), m2); bt.position.set(0, j * hh, 0.05); g.add(bt); }
       rig.add(g);
     }
   }
-  // arms
+  // stubby little arms
   const arms = [];
   if (spec.arms) for (const sd of [-1, 1]) {
-    const h = hit(new THREE.Vector3(sd * 6, cy - hh * 0.1, 0.1), new THREE.Vector3(-sd, 0, 0)); if (!h) continue;
-    const pivot = new THREE.Group(); pivot.position.copy(h.p);
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, spec.armLen, 8), mDark); arm.position.y = -spec.armLen / 2; pivot.add(arm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), m2); hand.position.y = -spec.armLen; pivot.add(hand);
+    const h = hit(new THREE.Vector3(sd * 6, cy - hh * 0.15, 0.1), new THREE.Vector3(-sd, 0, 0)); if (!h) continue;
+    const pivot = new THREE.Group(); pivot.position.copy(h.p).addScaledVector(h.n, -0.05);
+    const arm = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), mBody); arm.scale.set(0.12, 0.22, 0.12); arm.position.y = -0.16; pivot.add(arm);
     pivot.rotation.z = sd * 0.55; rig.add(pivot); arms.push({ pivot, sd });
   }
-  // legs + feet
+  // round little feet
   const legs = [];
-  if (spec.legs) {
-    const spots = spec.legs === 2 ? [[-0.42, 0], [0.42, 0]] : [[-0.45, 0.32], [0.45, 0.32], [-0.45, -0.32], [0.45, -0.32]];
+  {
+    const spots = spec.legs === 2 ? [[-0.4, 0.15], [0.4, 0.15]] : [[-0.42, 0.38], [0.42, 0.38], [-0.42, -0.3], [0.42, -0.3]];
     for (const [lx, lz] of spots) {
       const g = new THREE.Group(); g.position.set(lx * hw, 0, lz * hd);
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, spec.legLen + 0.15, 8), mDark); leg.position.y = (spec.legLen + 0.15) / 2; g.add(leg);
-      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 8), m2); foot.scale.set(1, 0.5, 1.4); foot.position.set(0, 0.06, 0.07); g.add(foot);
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mDark); foot.scale.set(0.2, 0.13, 0.26); foot.position.set(0, 0.11, 0.04); g.add(foot);
       rig.add(g); legs.push(g);
     }
   }
@@ -495,7 +499,7 @@ function buildMonster(spec) {
     const h = hit(new THREE.Vector3(sx, 10, 0), new THREE.Vector3(0, -1, 0)); if (!h) continue;
     const g = new THREE.Group(); g.position.copy(h.p); g.rotation.z = -sx * 1.5;
     const st = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.55, 6), mDark); st.position.y = 0.27; g.add(st);
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), mGlow); ball.position.y = 0.58; g.add(ball);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), mGlow); ball.position.y = 0.58; g.add(ball);
     rig.add(g);
   }
   let halo = null;
@@ -515,8 +519,7 @@ function buildMonster(spec) {
     const h = hit(new THREE.Vector3(0, cy - hh * 0.4, -6), new THREE.Vector3(0, 0, 1));
     if (h) {
       tail = new THREE.Group(); tail.position.copy(h.p);
-      const tm = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 8), mDark); tm.rotation.x = -Math.PI / 2 - 0.5; tm.position.set(0, -0.12, -0.3); tail.add(tm);
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), m2); tip.position.set(0, -0.3, -0.62); tail.add(tip);
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), m2); puff.position.set(0, 0, -0.1); tail.add(puff);
       rig.add(tail);
     }
   }
@@ -553,7 +556,18 @@ function updateMonster(m, t, dt) {
     e.pupil.position.x += (e.tx - e.pupil.position.x) * Math.min(1, dt * 14);
     e.pupil.position.y += (e.ty - e.pupil.position.y) * Math.min(1, dt * 14);
   }
-  if (m.mouth) m.mouth.scale.set(1 + m.mouthOpen * 0.3, 1 + m.mouthOpen * 1.6, 1);
+  if (m.mouth) {
+    const { smile, open } = m.mouth.userData;
+    open.visible = m.mouthOpen > 0.15; smile.visible = !open.visible;
+    open.scale.set(0.7 + m.mouthOpen * 0.5, 0.5 + m.mouthOpen * 1.2, 1);
+  }
+  // blink now and then
+  if (!m.dead) {
+    m.blink = (m.blink ?? 1 + Math.random() * 3) - dt;
+    const shut = m.blink < 0.12;
+    if (m.blink < 0) m.blink = 2 + Math.random() * 3.5;
+    for (const e of m.eyes) e.g.scale.y = shut ? 0.12 : 1;
+  }
   for (const a of m.arms) {
     const wave = Math.sin(t * 5 + m.phase + a.sd) * 0.12;
     const hugZ = -a.sd * 0.4, hugX = -1.2;
@@ -599,7 +613,7 @@ function layout() {
     if (!m) return; const o = mons[1 - i];
     const toOpp = o ? o.base.clone().sub(m.base).setY(0).normalize() : new THREE.Vector3(0, 0, 1);
     const toCam = new THREE.Vector3(camDir.x, 0, camDir.z).normalize();
-    const f = toOpp.multiplyScalar(1).add(toCam.multiplyScalar(0.9));
+    const f = toOpp.multiplyScalar(1).add(toCam.multiplyScalar(1.7));   // turned towards the viewer so you see their faces
     m.facing = Math.atan2(f.x, f.z);
   });
   // pull the camera back until both monsters (plus room for HUD/ticker) fit
@@ -641,7 +655,7 @@ function makeTags() {
   tags.forEach(t => t?.remove());
   mons.forEach((m, i) => {
     const el = document.createElement('div'); el.className = 'tag'; el.style.background = PCOL[i];
-    el.innerHTML = `${esc(S.names[i])}<small>${esc(m.name)}</small>`;
+    el.textContent = S.names[i];
     $('#floaters').appendChild(el); tags[i] = el;
   });
 }
@@ -653,7 +667,6 @@ function updateTags() {
     const [x, y] = toScreen(m.root.position.clone().add(new THREE.Vector3(0, m.height + 0.15, 0)));
     el.style.left = x + 'px'; el.style.top = y + 'px';
     el.style.fontSize = mode === 'fight' ? '11px' : '14px';
-    el.querySelector('small').style.display = mode === 'fight' ? 'none' : '';
   });
 }
 
@@ -788,7 +801,7 @@ function spawnMonsters() {
     const seed = hashStr(JSON.stringify(t) + S.names[i] + i + ':' + S.seedBump);
     const spec = makeSpec(t, st[i], seed, prevHue); prevHue = spec.hue;
     const m = buildMonster(spec);
-    m.stats = st[i]; m.traits = t; m.name = monsterName(rng(seed + 99), t); m.idx = i;
+    m.stats = st[i]; m.traits = t; m.name = S.names[i] + "'s monster"; m.idx = i;
     return m;
   });
   mons.forEach(m => { m.portrait = portrait(m); scene.add(m.root); });
@@ -801,7 +814,7 @@ function startReveal() {
   abortAll(); clearFloaters();
   spawnMonsters();
   mode = 'reveal'; paused = false; speedMul = 1;
-  $('#revealCards').innerHTML = mons.map((m, i) => `<div class="mcard" style="border-color:${PCOL[i]}"><div class="t">${esc(m.name)}</div><div class="sub">${esc(S.names[i])}'s monster</div>${statRows(m, ['HP', 'ATK', 'DEF', 'SPD'])}<div class="compact">❤️${m.stats.HP} 🦷${m.stats.ATK} 🛡️${m.stats.DEF}% ⚡${m.stats.SPD}</div></div>`).join('');
+  $('#revealCards').innerHTML = mons.map((m, i) => `<div class="mcard" style="border-color:${PCOL[i]}"><div class="t">${esc(S.names[i])}</div><div class="sub">monster</div>${statRows(m, ['HP', 'ATK', 'DEF', 'SPD'])}<div class="compact">❤️${m.stats.HP} 🦷${m.stats.ATK} 🛡️${m.stats.DEF}% ⚡${m.stats.SPD}</div></div>`).join('');
   show('reveal'); resize();
   const b = $('#revealBanner'); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   mons.forEach((m, i) => {
@@ -821,7 +834,7 @@ let F = null;
 const VERBS = ['chomps', 'bonks', 'headbutts', 'slaps', 'wobbles into', 'bites', 'sneezes on', 'belly-flops onto', 'karate-chops', 'nibbles aggressively at', 'boops', 'drop-kicks', 'licks (aggressively)', 'judo-flips'];
 const SFX = ['BONK!', 'SPLAT!', 'POW!', 'WHAM!', 'BOINK!', 'SQUISH!', 'THWACK!', 'ZONK!'];
 function ticker(html) { $('#ticker').innerHTML = html; }
-const nm = i => `<b style="color:${PCOL[i]}">${esc(mons[i].name.split(' ')[0])}</b>`;
+const nm = i => `<b style="color:${PCOL[i]}">${esc(S.names[i])}</b>`;
 function setHP(i) {
   const m = mons[i], frac = clamp(F.hp[i] / m.stats.HP, 0, 1), el = $('#hp' + (i + 1));
   el.querySelector('i').style.width = (frac * 100) + '%'; el.querySelector('b').style.width = (frac * 100) + '%';
@@ -836,7 +849,7 @@ function startFight() {
     rec: mons.map(() => ({ dmg: 0, hits: 0, crits: 0, blocks: 0, slams: 0, hugs: 0, healed: 0, rages: 0, trips: 0, selfDmg: 0 })) };
   mode = 'fight'; speedMul = 1; paused = false; Sound.quiet = false;
   $('#btnSpeed').textContent = '1×'; $('#btnPause').textContent = '❚❚';
-  mons.forEach((m, i) => { const el = $('#hp' + (i + 1)); el.querySelector('.nm').textContent = m.name; el.querySelector('.pl').textContent = S.names[i]; setHP(i); });
+  mons.forEach((m, i) => { const el = $('#hp' + (i + 1)); el.querySelector('.nm').textContent = S.names[i]; el.querySelector('.pl').textContent = ''; setHP(i); });
   show('fight'); resize();
   ticker('3… 2… 1…');
   (async () => {
@@ -1003,13 +1016,13 @@ function mirrorRow(label, sub, a, b, max, unit = '') {
 function looks(m) {
   const s = m.spec, t = m.traits, out = [];
   out.push(`${s.eyes} eye${s.eyes > 1 ? 's' : ''} (Openness ${t.O})`);
-  if (s.shape === 'cone' || s.shape === 'lumpy') out.push(`weird ${s.shape} body (Openness)`);
+  if (s.shape === 'mochi') out.push(`squashy mochi body (Openness)`);
   if (s.antenna) out.push(`${s.antenna === 2 ? 'two cosmic antennae' : 'a cosmic antenna'} (Openness ${t.O})`);
-  out.push(s.spikes ? `${s.spikes} spike${s.spikes > 1 ? 's' : ''} (Agreeableness ${t.A}, lower = spikier)` : `no spikes at all (Agreeableness ${t.A})`);
-  out.push(`${s.sharp ? 'pointy' : 'blunt'} teeth (Agreeableness ${t.A})`);
-  if (s.brows) out.push(`angry eyebrows (low Agreeableness)`);
+  out.push(s.spikes ? `${s.spikes} soft back nub${s.spikes > 1 ? 's' : ''} (Agreeableness ${t.A}, lower = more)` : `no back nubs at all (Agreeableness ${t.A})`);
+  out.push(s.sharp ? `a pout with tiny fangs (Agreeableness ${t.A})` : `a sweet smile (Agreeableness ${t.A})`);
+  if (s.brows) out.push(`grumpy little eyebrows (low Agreeableness)`);
   if (s.halo) out.push(`a halo (very agreeable)`);
-  if (s.plate) out.push(`armour belly plate (Conscientiousness ${t.C})`);
+  if (s.plate) out.push(`a tidy tummy patch with buttons (Conscientiousness ${t.C})`);
   out.push(`size ×${s.scale.toFixed(2)} (Extraversion ${t.E})`);
   if (s.sweat) out.push(`nervous sweat drop (Neuroticism ${t.N})`);
   if (t.N > 55) out.push(`shakes and jitters (Neuroticism ${t.N})`);
@@ -1022,7 +1035,7 @@ function showResults() {
   let h = `
   <div class="winner"><div class="crown">🏆</div><h2 style="color:${PCOL[w]}">${esc(W.name)} wins!</h2>
     <div class="small">${esc(S.names[w])}'s monster survived with ${Math.ceil(F.hp[w])} of ${W.stats.HP} HP after ${Math.round(F.duration)} seconds of chaos.</div></div>
-  <div class="portraits">${mons.map((m, i) => `<div class="portrait ${i === w ? 'won' : 'lost'}" style="border-color:${PCOL[i]}"><img src="${m.portrait}" alt=""><div class="t">${esc(m.name)}</div><div class="sub">${esc(S.names[i])}</div></div>`).join('')}</div>
+  <div class="portraits">${mons.map((m, i) => `<div class="portrait ${i === w ? 'won' : 'lost'}" style="border-color:${PCOL[i]}"><img src="${m.portrait}" alt=""><div class="t">${esc(S.names[i])}</div></div>`).join('')}</div>
   <div class="card"><h3>Personality test (0–100)</h3><div class="mirror">
     ${TORDER.map(k => mirrorRow(`${TRAITS[k].emoji} ${TRAITS[k].name}`, `low: ${TRAITS[k].lo} · high: ${TRAITS[k].hi}`, mons[0].traits[k], mons[1].traits[k], 100)).join('')}
   </div>${S.fromDemo ? '<p class="small" style="margin:10px 0 0">(Random demo scores: nobody took the test.)</p>' : ''}</div>
@@ -1034,7 +1047,7 @@ function showResults() {
       ${mons.map((m, i) => `<div><b style="color:${PCOL[i]}">${esc(S.names[i])}:</b> ${m.stats.parts[k].map(p => p[2] ? `${Math.round(p[1])} from ${p[0]} (${m.traits[p[2]]})` : `${p[1]} ${p[0]}`).join(' + ')} = <b>${m.stats[k]}${STAT[k].unit}</b></div>`).join('')}
     </div></div>`).join('')}
     <div class="ex"><div class="h">🎨 Looks</div><div class="why">Colour is random; everything else comes from the test.</div><div class="math">
-      ${mons.map((m, i) => `<div style="margin-bottom:4px"><b style="color:${PCOL[i]}">${esc(m.name.split(' ')[0])}:</b> ${looks(m).join(', ')}.</div>`).join('')}
+      ${mons.map((m, i) => `<div style="margin-bottom:4px"><b style="color:${PCOL[i]}">${esc(S.names[i])}:</b> ${looks(m).join(', ')}.</div>`).join('')}
     </div></div>
   </div></div>
   <div class="card"><h3>Fight recap</h3><table class="recap">
