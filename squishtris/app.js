@@ -26,7 +26,7 @@ const R = 0.25, D = R * 2;               // particle radius / spacing
 const STEP = 1 / 120, ITERS = 4;
 const G = 26, DAMP = 0.992;
 const CTRL_ALPHA = 0.5, CTRL_INVMASS = 1;
-const ALPHA = 0.09, MU = 0.18;   // jelly: shape stiffness and friction
+const ALPHA = 0.22, MU = 0.45;   // jelly: shape stiffness (firmer) and friction (grippy)
 const THRESH = 0.9, HOLD_T = 0.2, LOCK_DELAY = 0.5, MAX_RESETS = 12;
 const VX0 = -0.15, VX1 = 10.8, VY0 = -2.3, VY1 = 20.15;
 const PRESS_TOP = -2.7, PLATE = 0.8;               // parked plate bottom (off screen), plate thickness
@@ -336,7 +336,8 @@ function syncPress() { $('pressBtn').classList.toggle('busy', press.phase !== 'i
 
 function fallSpeed() { return Math.min(0.9 + 0.22 * (level - 1), 6); }
 
-function gravityActive() { return Math.min(3 + 0.9 * (level - 1), 20); }
+// Like Tetris: the falling piece drops at a steady speed that rises with the level.
+function fallSpeed() { return Math.min(1.6 + 0.35 * (level - 1), 8); }
 
 function physStep() {
   stepPress();
@@ -360,7 +361,8 @@ function physStep() {
       const amax = 250 * STEP * STEP, al = Math.hypot(adx, ady);
       if (al > amax) { adx *= amax / al; ady *= amax / al; }
     } else if (!active.landed) {
-      ady = gravityActive() * ((softBtn || softDrag) ? 4 : 1) * STEP * STEP;
+      const vf = fallSpeed() * ((softBtn || softDrag) ? 4 : 1) * STEP;
+      ady = (vf - mvy) * 0.5;
       if (hard && active.since > 30) { const vh = (hardHeld ? 40 : 24) * STEP; if (mvy < vh) ady += (vh - mvy) * 0.5; aMax = 0.34; }
       if (!active.landed) {
         const vm = 10 * STEP, vx = Math.max(-vm, Math.min(vm, (T.tx - cx) * 8 * STEP));
