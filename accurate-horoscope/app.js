@@ -23,12 +23,6 @@ const pad = n => String(n).padStart(2, '0');
 const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fmtDate = (iso, o = { day: 'numeric', month: 'long', year: 'numeric' }) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', Object.assign({ timeZone: 'UTC' }, o));
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function rng(str) {        // FNV-1a hash -> mulberry32: same text in, same numbers out
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  let a = h >>> 0;
-  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
 
 // Fallback when the birthplace is unknown: the phone's time zone, placed at its main city.
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
@@ -179,54 +173,18 @@ function runChart() {
   }, 1300);
 }
 
-// ---------- horoscope: a daily column, written as if published on that date ----------
-// Each building block has its own shuffled order per birth date; the day number walks through it,
-// so the text is identical all day, changes every day, and no block repeats two days in a row.
-function shuffled(n, seed) {
-  const r = rng(seed), a = [...Array(n).keys()];
-  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
-}
-function horoscope(dob, day, sign) {
-  const [y, m, d] = day.split('-').map(Number), n = Math.round(Date.UTC(y, m - 1, d) / 86400000);
-  const pick = key => { const list = H[key]; return list[shuffled(list.length, `accurate|${key}|${dob}`)[n % list.length]]; };
-  const wd = k => new Date(Date.UTC(y, m - 1, d + k)).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
-  const mon = k => new Date(Date.UTC(y, m - 1 + k, 1)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
-  const T = { sign, SIGN: sign.toUpperCase(), y: wd(-1), t: wd(0), t1: wd(1), t2: wd(2), month0: mon(0), month: mon(1), year0: y, year: y + 1 };
-  const fill = str => str.replace(/\{(\w+)\}/g, (_, k) => k in T ? T[k] : _);
-  const [pace, traits, work, mind, love, love2, single, couple, friends, well, reflect] =
-    ['pace', 'traits', 'work', 'mind', 'love', 'love2', 'single', 'couple', 'friends', 'well', 'reflect'].map(pick);
-  return {
-    headline: pick('headlines'),
-    main: [
-      [pick('openers'), pace[0]],
-      [traits[0], work[0]],
-      [love[0], love2[0], single[0], couple[0]],
-      [mind[0], reflect[0]],
-    ].map(p => fill(p.join(' '))),
-    closer: [[work[1], pace[1]], [traits[1], love[1], single[1], couple[1]], [friends[1], well[1], mind[1]]].map(p => fill(p.join(' '))),
-    reflect: fill(reflect[1]),
-  };
-}
+// ---------- horoscope: Forer's 1949 profile, identical for everyone ----------
 const dayOffset = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
-function fillCard(card, h, label) {
-  card.innerHTML = '';
-  const meta = el('div', 'meta'); meta.append(el('span', '', label[0]), el('span', '', label[1])); card.appendChild(meta);
-  card.appendChild(el('h2', '', h.headline));
-  h.main.forEach(t => card.appendChild(el('p', '', t)));
-  card.appendChild(el('p', 'look', "Reflections and a closer look at today's astrological landscape"));
-  h.closer.forEach((t, i) => { const p = el('p', ''); if (!i) p.appendChild(el('b', '', natal.sun.toUpperCase() + ': ')); p.append(t); card.appendChild(p); });
-  card.appendChild(el('p', 'look', 'Something to reflect on'));
-  card.appendChild(el('p', 'muse', h.reflect));
-}
 function renderScope() {
   if (!natal) natal = computeNatal();
   const d = dayOffset(0);
-  fillCard($('scope-card'), horoscope(st.dob, dayKey(d), natal.sun), [natal.sun.toUpperCase(), d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]);
+  const card = $('scope-card'); card.innerHTML = '';
+  const meta = el('div', 'meta'); meta.append(el('span', '', natal.sun.toUpperCase()), el('span', '', d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })));
+  card.append(meta, el('p', '', FORER));
 }
 
 // ---------- rating ----------
-const STATEMENTS = ['It matched my day.', 'It felt written for me.', 'The advice was useful.', "I'd read it again tomorrow."];
+const STATEMENTS = ['It describes me accurately.', 'It felt written for me.', 'It captures my personality.', "I'd read it again tomorrow."];
 function renderRate() {
   const box = $('rate-list'); box.innerHTML = '';
   answers = answers.length ? answers : STATEMENTS.map(() => 0);
@@ -248,7 +206,10 @@ function renderRate() {
 function renderReveal() {
   const mean = answers.reduce((a, b) => a + b, 0) / answers.length;
   $('score').textContent = Math.round((mean - 1) / 4 * 100) + '%';
-  $('how').textContent = 'Each horoscope was assembled from shuffled lists, using one number made from your birth date and the day\'s date. Your sign was only pasted in by name.';
+  const how = $('how'); how.innerHTML = '';
+  how.append('Every sign gets these exact words, every day. This is the text from the Forer study of 1949. ');
+  const a = el('a', '', 'Bertram Forer on Wikipedia'); a.href = 'https://en.wikipedia.org/wiki/Bertram_Forer'; a.target = '_blank'; a.rel = 'noopener';
+  how.appendChild(a);
 }
 
 // ---------- the real sky ----------
@@ -261,7 +222,8 @@ function renderSky() {
   const out = $('sky-out'), sky = Astro.sky(natal.utc), year = +st.dob.slice(0, 4);
   out.innerHTML = '';
   const fact = html => { const p = el('p', 'fact'); p.innerHTML = html; out.appendChild(p); };
-  out.appendChild(el('p', 'small', 'Your birthday · ' + fmtDate(st.dob)));
+  const head = el('p', 'q', 'Some interesting facts about celestial objects on the day you were born:'); head.style.fontSize = '22px'; out.appendChild(head);
+  out.appendChild(el('p', 'small', fmtDate(st.dob)));
 
   const real = Astro.constellation(natal.sunJ2000), drift = Math.round(23.86 + 0.01397 * (year - 2000));
   if (real === (IAU[natal.sun] || natal.sun)) fact(`The Sun stood in front of <b>${real}</b>, but only by luck: Earth's axis has wobbled ~${drift}° since horoscope dates were fixed, 2,000 years ago.`);

@@ -60,11 +60,7 @@
   .spin { width: 46px; height: 46px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: r 1s linear infinite; margin: 0 auto; }
   @keyframes r { to { transform: rotate(360deg); } }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-  .card h2 { margin: 0; font: italic 400 26px Georgia, serif; color: var(--gold); }
   .card p { margin: 0; line-height: 1.5; }
-  .card p.look { color: var(--gold); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-top: 6px; line-height: 1.4; }
-  .card p.muse { font: italic 17px/1.55 Georgia, serif; border-left: 2px solid var(--gold); padding-left: 12px; }
-  .card b { color: var(--gold); letter-spacing: .04em; }
   .meta { display: flex; justify-content: space-between; color: var(--mute); font-size: 13px; letter-spacing: .04em; }
   .lik { display: flex; flex-direction: column; gap: 8px; }
   .lik p { margin: 0; font-size: 17px; }
@@ -82,6 +78,7 @@
   td small { color: var(--mute); }
   .scroll { gap: 16px; padding-top: 8px; }
   .fact { margin: 0; line-height: 1.5; }
+  .fact a { color: var(--gold); }
   .fact b { color: var(--gold); font-weight: 600; }
   .skymap { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .skymap canvas { touch-action: manipulation; }
@@ -183,7 +180,7 @@
       <p class="big" id="score"></p>
       <p class="small center">accurate</p>
       <div class="sep"></div>
-      <p class="stamp">It was random.</p>
+      <p class="stamp">Everyone gets the same text.</p>
       <p class="fact center" id="how"></p>
     </div>
     <button class="go" data-next>Where was everything, really?</button>
