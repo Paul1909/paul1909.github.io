@@ -208,7 +208,7 @@ function renderReveal() {
   $('score').textContent = Math.round((mean - 1) / 4 * 100) + '%';
   const how = $('how'); how.innerHTML = '';
   how.append('Every sign gets these exact words, every day. This is the text from the Forer study of 1949. ');
-  const a = el('a', '', 'Bertram Forer on Wikipedia'); a.href = 'https://en.wikipedia.org/wiki/Bertram_Forer'; a.target = '_blank'; a.rel = 'noopener';
+  const a = el('a', '', 'The Barnum effect on Wikipedia'); a.href = 'https://en.wikipedia.org/wiki/Barnum_effect'; a.target = '_blank'; a.rel = 'noopener';
   how.appendChild(a);
 }
 
