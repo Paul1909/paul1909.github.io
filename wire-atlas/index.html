@@ -21,7 +21,7 @@
     display: flex; overflow: hidden; }
   button { font: inherit; color: inherit; cursor: pointer; -webkit-user-select: none; user-select: none; }
   #app { flex: 1; display: flex; flex-direction: column; min-height: 0; width: 100%; max-width: 1300px; margin: 0 auto; }
-  #stage { position: relative; flex: 1 1 auto; min-height: 220px; }
+  #stage { position: relative; flex: 1 1 auto; min-height: 160px; }
   #globe { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
   .ctl { position: absolute; display: flex; flex-direction: column; gap: 8px; }
   #zoomctl { right: 12px; bottom: 12px; }
@@ -30,7 +30,8 @@
     display: grid; place-items: center; font-size: 22px; line-height: 1; color: #666; padding: 0; }
   .round svg { width: 20px; height: 20px; stroke: #777; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   /* the pane is as tall as its content, the globe takes the rest */
-  #pane { flex: 0 0 auto; max-height: 64dvh; overflow-y: auto; padding: 12px 16px 4px;
+  /* flex-shrink + min-height 0: on short screens the pane scrolls instead of pushing the buttons off-screen */
+  #pane { flex: 0 1 auto; min-height: 0; max-height: 64dvh; overflow-y: auto; padding: 12px 16px 4px;
     border-top: 1px solid var(--bd); -webkit-overflow-scrolling: touch; }
   footer { flex: 0 0 auto; display: flex; gap: 10px; padding: 8px 16px 12px; }
   .btn { flex: 1; min-height: 52px; border-radius: 14px; font-size: 17px; font-weight: 600; border: 1px solid var(--bd);

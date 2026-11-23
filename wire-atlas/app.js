@@ -48,8 +48,16 @@ function prep(f, point) {
   inc.forEach(q => q.p[0].forEach(pt => { const d = d3.geoDistance(centroid, pt); if (d > a) a = d; }));
   return { id: f.id, f, main, area: d3.geoArea(f), centroid, a: Math.max(a, 0.001), point: !!point };
 }
+// Some countries come in several map pieces with the same code (Australia + Ashmore and Cartier
+// Islands): merge them into one country instead of letting the last piece win.
+const pieces = {};
 topojson.feature(topo, topo.objects.countries).features.forEach(f => {
-  if (f.id && C[f.id]) F[f.id] = prep(f);
+  if (!f.id || !C[f.id] || !f.geometry) return;
+  const g = f.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  (pieces[f.id] = pieces[f.id] || []).push(...polys);
+});
+Object.entries(pieces).forEach(([id, polys]) => {
+  F[id] = prep({ type: 'Feature', id, geometry: polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys } });
 });
 D.countries.forEach(c => {         // countries missing from the 1:50m map (Tuvalu) get a small circle
   if (!F[c.id] && c.ll) {
@@ -68,7 +76,7 @@ const path = d3.geoPath(proj, ctx);
 const view = { lam: -10, phi: -32, zoom: 1 };
 let W = 0, H = 0, DPR = 1, dirty = true;
 let spin = true, inertia = null, anim = null, lastInteract = 0;
-let selected = null;               // highlighted country id
+let selected = null, wrongSel = null;               // highlighted country id
 let mode = 'browse';               // browse | menu | quiz | end
 const ZMIN = 1, ZMAX = 80, SPIN = 7; // deg/s
 const Y = '#ffd400';
@@ -182,6 +190,9 @@ function draw() {
   traceFill(LAND_P, R, land);
   ctx.beginPath(); ctx.arc(W / 2, H / 2, R, 0, 2 * Math.PI); ctx.fillStyle = WATER; ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fill(land);
+  if (wrongSel && F[wrongSel]) {
+    ctx.beginPath(); path(F[wrongSel].f); ctx.fillStyle = '#f4a6a9'; ctx.fill();
+  }
   if (selected && F[selected]) {
     ctx.beginPath(); path(F[selected].f); ctx.fillStyle = Y; ctx.fill();
   }
@@ -303,7 +314,7 @@ function pick(x, y) {
   let hit = null;
   for (const id of IDS) {
     const it = F[id];
-    if (!it.point && d3.geoContains(it.f, ll) && (!hit || it.area < hit.area)) hit = it;
+    if (d3.geoContains(it.f, ll) && (!hit || it.area < hit.area)) hit = it;
   }
   // dots for tiny countries: nearest one within reach
   let near = null, nd = 1e9;
@@ -318,8 +329,15 @@ function pick(x, y) {
 }
 
 function onTap(x, y) {
-  if (mode !== 'browse') return;
+  const quizPick = mode === 'quiz' && quiz.a === 'loc' && !quiz.answered;
+  if (mode !== 'browse' && !quizPick) return;
   const id = pick(x, y);
+  if (quizPick) {
+    selected = id; dirty = true;
+    const nb = document.getElementById('next'); if (nb) nb.disabled = !id;
+    if (id) blip();
+    return;
+  }
   select(id);
   if (id) blip();
 }
@@ -415,7 +433,7 @@ function renderBrowse() {
 const KINDS = ['name', 'flag', 'shape', 'loc', 'cap'];
 const LBL = { name: 'Name', flag: 'Flag', shape: 'Shape', loc: 'Location', cap: 'Capital' };
 const ASK = { name: 'Which country is it?', flag: 'Which is its flag?', shape: 'Which is its shape?',
-  loc: 'Where is it on the globe?', cap: 'What is its capital?' };
+  loc: 'Find it on the globe.', cap: 'What is its capital?' };
 // What can still be asked when `show` is on screen. Shape is never asked while the globe
 // shows the location, because the highlighted country already shows its shape.
 const askable = show => KINDS.filter(k => !show.includes(k) && !(k === 'shape' && show.includes('loc')));
@@ -461,7 +479,7 @@ function renderMenu() {
         : 'Greyed out: at least one thing has to be left to ask.'}</div>` : ''}</div>
     <div class="sec"><h3>Ask me</h3><div class="choices">${KINDS.map(k =>
       chip('ask', k, can.includes(k) && cfg.ask.includes(k), !can.includes(k), LBL[k])).join('')}</div>
-      <div class="hint">${cfg.ask.length > 1 ? 'Each question asks one of these at random.' : '&nbsp;'}</div></div>
+      ${cfg.ask.length > 1 ? '<div class="hint">Each question asks one of these at random.</div>' : ''}</div>
     <div class="sec"><h3>Region</h3><div class="choices">${REGIONS.map(r => chip('region', r, cfg.region === r, false, r)).join('')}</div></div>
     <div class="sec"><h3>Questions</h3><div class="choices">${LENS.map(l =>
       chip('len', l, cfg.len === l, false, l === 'All' ? 'All ' + n : l)).join('')}</div></div>`;
@@ -538,8 +556,10 @@ function ask() {
   const choices = cfg.ask.filter(k => !(F[c.id].point && k === 'shape'));
   const a = choices[Math.floor(Math.random() * choices.length)];
   quiz.a = a; quiz.answered = false;
-  quiz.opts = shuffle([c, ...others(c, a)]);
+  const onGlobe = a === 'loc';      // answer by tapping the country on the big globe, then Confirm
+  quiz.opts = onGlobe ? [] : shuffle([c, ...others(c, a)]);
   quiz.globe = show.includes('loc');
+  wrongSel = null;
   if (quiz.globe) {
     selected = c.id; dirty = true;
     animateTo(c.id, zoomFor(c.id));
@@ -552,7 +572,7 @@ function ask() {
     <div class="bar"><i style="width:${(quiz.i / n) * 100}%"></i></div>
     ${promptHTML(c, show)}
     <p class="q">${ASK[a]}</p>
-    <div class="opts">${quiz.opts.map((x, i) => optHTML(x, a, i)).join('')}</div>`;
+    ${onGlobe ? '' : `<div class="opts">${quiz.opts.map((x, i) => optHTML(x, a, i)).join('')}</div>`}`;
   pane.scrollTop = 0;
   const qs = pane.querySelector('.qshape'); if (qs) drawShape(qs, c.id);
   pane.querySelectorAll('.opt').forEach(b => {
@@ -562,13 +582,19 @@ function ask() {
     if (cl) drawLocation(cl, x.id, true);
     b.onclick = () => answer(+b.dataset.i);
   });
-  footer([{ label: 'Quit', on: () => history.back() }, { label: 'Next', primary: true, disabled: true, id: 'next', on: next }]);
+  footer([{ label: 'Quit', on: () => history.back() },
+    { label: onGlobe ? 'Confirm' : 'Next', primary: true, disabled: true, id: 'next', on: () => quiz.answered ? next() : confirmPick() }]);
+}
+
+function confirmPick() {
+  if (mode !== 'quiz' || quiz.a !== 'loc' || quiz.answered || !selected) return;
+  answer(C[selected]);
 }
 
 function answer(i) {
   if (quiz.answered) return;
   quiz.answered = true;
-  const c = quiz.items[quiz.i], a = quiz.a, x = quiz.opts[i];
+  const c = quiz.items[quiz.i], a = quiz.a, x = typeof i === 'number' ? quiz.opts[i] : i;
   const ok = x.id === c.id;
   if (ok) quiz.score++; else quiz.missed.push(c.id);
   ok ? good() : wrong();
@@ -577,7 +603,8 @@ function answer(i) {
     if (quiz.opts[j].id === c.id) b.classList.add('ok');
     else if (j === i) b.classList.add('bad');
   });
-  const picked = a === 'name' ? esc(x.n) : a === 'cap' ? esc(x.cap[0]) : `the ${LBL[a].toLowerCase()} of ${esc(x.n)}`;
+  const picked = a === 'name' || a === 'loc' ? esc(x.n) : a === 'cap' ? esc(x.cap[0]) : `the ${LBL[a].toLowerCase()} of ${esc(x.n)}`;
+  if (a === 'loc' && !ok) wrongSel = x.id;    // the wrong pick stays on the globe in red
   // Recap: name, capital, flag, shape, location (also on the big globe)
   selected = c.id; dirty = true;
   animateTo(c.id, zoomFor(c.id));
@@ -590,7 +617,7 @@ function answer(i) {
       ${cardHTML(c.id, false)}`;
     pane.scrollTop = 0;
     fillCard(pane, c.id);
-  }, isVisual(a) ? 1000 : 700);
+  }, a === 'loc' ? 250 : isVisual(a) ? 1000 : 700);
   const nb = document.getElementById('next');
   nb.disabled = false;
   nb.textContent = quiz.i + 1 >= quiz.items.length ? 'See results' : 'Next';
@@ -603,7 +630,7 @@ function next() {
 }
 
 function results() {
-  mode = 'end'; selected = null; dirty = true; spin = true;
+  mode = 'end'; selected = null; wrongSel = null; dirty = true; spin = true;
   if (view.zoom > 1.5) zoomBy(1 / view.zoom);
   const n = quiz.items.length, pct = Math.round(100 * quiz.score / n);
   const tkey = cfg.show.join('+') + '>' + cfg.ask.join('+');
@@ -626,7 +653,7 @@ function results() {
 
 function setQuizLook(on) { document.body.classList.toggle('quizzing', on); }
 function toBrowse() {
-  setQuizLook(false);
+  setQuizLook(false); wrongSel = null;
   mode = 'browse'; selected = null; dirty = true; spin = true; anim = null;
   if (view.zoom > 1.5) zoomBy(1 / view.zoom);
   renderBrowse();
