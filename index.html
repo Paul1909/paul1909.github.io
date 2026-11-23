@@ -85,6 +85,25 @@
   }
   .soon { opacity: .55; pointer-events: none; border-style: dashed; }
 
+  /* Split card: two games sharing one card, each half with its own button */
+  .card.split { grid-column: span 2; padding: 20px 20px 18px; }
+  .card.split:hover { transform: none; }
+  .card.split > h3 { padding-right: 48px; }
+  .card.split > p { flex: 0; margin-bottom: 14px; }
+  .halves { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; flex: 1; }
+  .half { display: flex; flex-direction: column; padding: 14px; background: color-mix(in srgb, var(--half) 7%, transparent); }
+  .half + .half { border-left: 1px solid var(--line); }
+  .half .icon { --accent: var(--half); width: 46px; height: 46px; font-size: 25px; margin-bottom: 10px; }
+  .half h4 { font-size: 17px; margin-bottom: 4px; }
+  .half p { color: var(--muted); font-size: 14px; flex: 1; margin-bottom: 12px; }
+  .btn {
+    display: block; text-align: center; text-decoration: none; font-weight: 700; font-size: 15px;
+    color: #0a0716; background: var(--half); border-radius: 10px; padding: 10px 8px;
+    box-shadow: 0 0 18px -4px var(--half); transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover, .btn:focus-visible { transform: translateY(-2px); box-shadow: 0 0 24px 0 var(--half); outline: none; }
+  @media (max-width: 600px) { .card.split { grid-column: auto; } .half { padding: 12px; } }
+
   .log { list-style: none; padding: 0; border-left: 2px solid var(--line); margin-left: 6px; }
   .log li { position: relative; padding: 0 0 18px 22px; }
   .log li::before {
@@ -126,8 +145,33 @@
    - added: date it joined the arcade (YYYY-MM-DD)
    - color: card glow colour (any CSS colour)
    - soon:  true = shows as "coming soon", not clickable
+   - split: [gameA, gameB] = two games in one card, each half
+            with its own title, emoji, desc, url, colour + button
    =========================================================== */
 const GAMES = [
+  {
+    title: "Suika × 2048: The Swap",
+    desc: "Two classics trade places: Suika with numbers, 2048 with fruits.",
+    added: "2026-11-23",
+    tags: ["1 player", "puzzle", "offline"],
+    color: "#ffb74d",
+    split: [
+      {
+        title: "Number Suika",
+        emoji: "🔢",
+        desc: "Drop numbered balls into the box. Two equal numbers merge, 2 + 2 = 4, all the way to 2048. Don't overflow the red line.",
+        url: "./number-suika/",
+        color: "#ffb74d"
+      },
+      {
+        title: "Fruit 2048",
+        emoji: "🍉",
+        desc: "Swipe to slide. Two equal fruits merge into the next one, cherry to watermelon. Two watermelons pop for a bonus.",
+        url: "./fruit-2048/",
+        color: "#8fdc8f"
+      }
+    ]
+  },
   {
     title: "Personality Monsters",
     emoji: "👾",
@@ -291,14 +335,31 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
 
 const games = [...GAMES].sort((a, b) => b.added.localeCompare(a.added));
 const live = games.filter(g => !g.soon);
+const count = live.reduce((n, g) => n + (g.split ? g.split.length : 1), 0);
 const isNew = g => (Date.now() - new Date(g.added + "T12:00:00")) / 864e5 <= NEW_DAYS;
 
 document.getElementById("stats").innerHTML = `
-  <div class="stat"><b>${live.length}</b> games and counting</div>
+  <div class="stat"><b>${count}</b> games and counting</div>
   ${live.length ? `<div class="stat">Latest: <b>${esc(live[0].title)}</b></div>` : ""}
   ${live.length ? `<div class="stat">Since <b>${fmt(live[live.length - 1].added)}</b></div>` : ""}`;
 
-document.getElementById("grid").innerHTML = games.map(g => `
+const splitCard = g => `
+  <div class="card split" style="--accent:${esc(g.color || "#3ef2ff")}">
+    ${isNew(g) ? '<span class="badge">NEW</span>' : ""}
+    <h3>${esc(g.title)}</h3>
+    ${g.desc ? `<p>${esc(g.desc)}</p>` : ""}
+    <div class="halves">${g.split.map(h => `
+      <div class="half" style="--half:${esc(h.color || g.color || "#3ef2ff")}">
+        <div class="icon">${esc(h.emoji || "🎮")}</div>
+        <h4>${esc(h.title)}</h4>
+        <p>${esc(h.desc)}</p>
+        <a class="btn" href="${esc(h.url)}">Play ▶</a>
+      </div>`).join("")}
+    </div>
+    <div class="meta"><div class="tags">${(g.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div></div>
+  </div>`;
+
+document.getElementById("grid").innerHTML = games.map(g => g.split ? splitCard(g) : `
   <a class="card${g.soon ? " soon" : ""}" href="${esc(g.url)}" ${g.soon ? 'aria-disabled="true"' : ""} style="--accent:${esc(g.color || "#3ef2ff")}">
     ${g.soon ? '<span class="badge" style="background:#9a92c4">SOON</span>' : isNew(g) ? '<span class="badge">NEW</span>' : ""}
     <div class="icon">${esc(g.emoji || "🎮")}</div>
@@ -311,7 +372,7 @@ document.getElementById("grid").innerHTML = games.map(g => `
   </a>`).join("");
 
 document.getElementById("log").innerHTML = live.map(g => `
-  <li><time datetime="${esc(g.added)}">${fmt(g.added)}</time><span>${esc(g.emoji || "🎮")} <b>${esc(g.title)}</b> joined the arcade</span></li>`).join("");
+  <li><time datetime="${esc(g.added)}">${fmt(g.added)}</time><span>${g.split ? g.split.map(h => `${esc(h.emoji || "🎮")} <b>${esc(h.title)}</b>`).join(" and ") + " joined" : `${esc(g.emoji || "🎮")} <b>${esc(g.title)}</b> joined`} the arcade</span></li>`).join("");
 </script>
 </body>
 </html>

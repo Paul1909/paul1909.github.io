@@ -1,0 +1,18 @@
+{
+  "name": "Number Suika",
+  "short_name": "Num Suika",
+  "description": "Suika-style drop-and-merge game with numbers instead of fruits: 2 + 2 = 4, all the way to 2048.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#f6e3b4",
+  "theme_color": "#f6e3b4",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

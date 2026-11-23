@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f6e3b4">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Num Suika">
+<title>Number Suika</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --bg: #f6e3b4; --ink: #5b3a1e; --wood: #c98b4f; --wood-dark: #8a5528; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: radial-gradient(circle at 30% 10%, #fff3d1 0, var(--bg) 55%, #ecd093 100%);
+    color: var(--ink); overflow: hidden;
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+    display: flex; flex-direction: column; height: 100dvh;
+  }
+  header { display: flex; align-items: center; gap: 8px; padding: 8px 12px 4px; }
+  .box { background: #fff8e6; border: 2px solid var(--wood); border-radius: 14px; padding: 4px 10px; min-width: 64px; text-align: center; box-shadow: 0 2px 0 var(--wood-dark); }
+  .box small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+  .box b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .next { display: flex; align-items: center; gap: 6px; }
+  #nextBall { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; box-shadow: inset -3px -4px 0 rgba(0,0,0,.15); }
+  .spacer { flex: 1; }
+  button.icon { width: 44px; height: 44px; border-radius: 12px; border: 2px solid var(--wood); background: #fff8e6; color: var(--ink); font-size: 20px; box-shadow: 0 2px 0 var(--wood-dark); }
+  button.icon:active { transform: translateY(2px); box-shadow: none; }
+  #stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 4px 10px; }
+  canvas { touch-action: none; display: block; }
+  #ladder { display: flex; justify-content: center; align-items: center; gap: 3px; padding: 6px 8px 10px; flex-wrap: nowrap; }
+  #ladder span { border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 8px; opacity: .35; transition: opacity .3s, transform .3s; box-shadow: inset -2px -2px 0 rgba(0,0,0,.15); }
+  #ladder span.got { opacity: 1; }
+  #ladder span.pop { transform: scale(1.35); }
+  .overlay { position: fixed; inset: 0; display: none; place-items: center; background: rgba(60,35,10,.45); backdrop-filter: blur(3px); z-index: 5; }
+  .overlay.show { display: grid; }
+  .card { background: #fff8e6; border: 3px solid var(--wood); border-radius: 22px; padding: 22px 26px; text-align: center; width: min(320px, 86vw); box-shadow: 0 6px 0 var(--wood-dark); }
+  .card h2 { margin: 0 0 6px; font-size: 26px; }
+  .card p { margin: 6px 0 16px; line-height: 1.4; }
+  .card button { font: inherit; font-weight: 800; font-size: 18px; padding: 12px 22px; border-radius: 14px; border: none; background: #ff8a65; color: #fff; box-shadow: 0 4px 0 #c75b3c; min-width: 160px; }
+  .card button:active { transform: translateY(3px); box-shadow: 0 1px 0 #c75b3c; }
+  .card .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .card button.alt { background: #8d6e63; box-shadow: 0 4px 0 #5d4037; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="box"><small>Score</small><b id="score">0</b></div>
+    <div class="box"><small>Best</small><b id="best">0</b></div>
+    <div class="box next"><div><small>Next</small></div><div id="nextBall"></div></div>
+    <div class="spacer"></div>
+    <button class="icon" id="muteBtn" aria-label="Sound">🔊</button>
+    <button class="icon" id="pauseBtn" aria-label="Pause">⏸</button>
+  </header>
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="ladder"></div>
+
+  <div class="overlay show" id="startOv">
+    <div class="card">
+      <h2>Number Suika</h2>
+      <p>Drag to aim, let go to drop.<br>Two equal numbers merge: <b>2 + 2 = 4</b>.<br>Reach <b>2048</b> — and don't overflow the red line!</p>
+      <button id="startBtn">Play</button>
+    </div>
+  </div>
+  <div class="overlay" id="pauseOv">
+    <div class="card">
+      <h2>Paused</h2>
+      <div class="row"><button id="resumeBtn">Resume</button><button class="alt" id="restartBtn">Restart</button></div>
+    </div>
+  </div>
+  <div class="overlay" id="overOv">
+    <div class="card">
+      <h2>Overflow!</h2>
+      <p id="overText"></p>
+      <button id="againBtn">Play again</button>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
