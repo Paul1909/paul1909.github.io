@@ -10,33 +10,33 @@ const store = {
   set(k, v) { try { localStorage.setItem(APP + ':' + k, JSON.stringify(v)); } catch {} },
 };
 
+const { Engine, Bodies, Body, Composite, Events } = Matter;
+
 // ---------- World ----------
 const W = 400, H = 640;          // world units (box interior)
-const AIM_Y = 48;                // where the held ball hangs
-const LINE_Y = 96;               // overflow line
-const GRAVITY = 1500;
+const AIM_Y = 50;                // where the held tile hangs
+const LINE_Y = 100;              // overflow line
+// s = tile side in world units
 const LEVELS = [
-  { v: 2,    r: 15, c: '#ff8a80', t: '#5b1f1a' },
-  { v: 4,    r: 20, c: '#ffb74d', t: '#5a3200' },
-  { v: 8,    r: 26, c: '#ffe066', t: '#5a4600' },
-  { v: 16,   r: 32, c: '#aed581', t: '#2f4a12' },
-  { v: 32,   r: 39, c: '#4db6ac', t: '#ffffff' },
-  { v: 64,   r: 47, c: '#4fc3f7', t: '#0b3550' },
-  { v: 128,  r: 56, c: '#7986cb', t: '#ffffff' },
-  { v: 256,  r: 65, c: '#ba68c8', t: '#ffffff' },
-  { v: 512,  r: 75, c: '#f06292', t: '#ffffff' },
-  { v: 1024, r: 86, c: '#e53935', t: '#ffffff' },
-  { v: 2048, r: 98, c: '#2e7d32', t: '#ffffff' },
+  { v: 2,    s: 28,  c: '#ff8a80', t: '#5b1f1a' },
+  { v: 4,    s: 36,  c: '#ffb74d', t: '#5a3200' },
+  { v: 8,    s: 46,  c: '#ffe066', t: '#5a4600' },
+  { v: 16,   s: 56,  c: '#aed581', t: '#2f4a12' },
+  { v: 32,   s: 68,  c: '#4db6ac', t: '#ffffff' },
+  { v: 64,   s: 81,  c: '#4fc3f7', t: '#0b3550' },
+  { v: 128,  s: 96,  c: '#7986cb', t: '#ffffff' },
+  { v: 256,  s: 111, c: '#ba68c8', t: '#ffffff' },
+  { v: 512,  s: 127, c: '#f06292', t: '#ffffff' },
+  { v: 1024, s: 145, c: '#e53935', t: '#ffffff' },
+  { v: 2048, s: 165, c: '#2e7d32', t: '#ffffff' },
 ];
 const MAX = LEVELS.length - 1;
-const DROPPABLE = 5;             // 2..32 can be dropped
 
-let balls = [], particles = [], popups = [];
+let engine, tiles = [], particles = [], popups = [], pendingMerges = [];
 let score = 0, best = store.get('best', 0), topLevel = 0;
 let aimX = W / 2, holding = null, nextLevel = 0, cooldown = 0;
 let running = false, paused = false, over = false, dangerFlash = 0;
 let muted = store.get('muted', false);
-let idSeq = 1;
 
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
@@ -50,87 +50,68 @@ function randDrop() {
   return 0;
 }
 
-function newGame() {
-  balls = []; particles = []; popups = [];
-  score = 0; topLevel = 0; over = false; paused = false; cooldown = 0.3;
-  holding = randDrop(); nextLevel = randDrop();
-  aimX = W / 2;
-  updateHud(); buildLadder();
-  hideAll(); running = true;
-  wake();
-}
-
-// ---------- Physics (position-based, fixed step) ----------
-const STEP = 1 / 120, SUB = 4, ITER = 4, VMAX = 1600, VUP = 420, VSIDE = 700;
-
-function addBall(lv, x, y, vx = 0, vy = 0, grow = false) {
-  const b = { id: idSeq++, lv, x, y, vx, vy, r: grow ? LEVELS[lv].r * 0.55 : LEVELS[lv].r, age: 0, danger: 0, dead: false, merged: false };
-  balls.push(b);
-  return b;
-}
-
-function step(dt) {
-  const h = dt / SUB;
-  for (let s = 0; s < SUB; s++) {
-    for (const b of balls) {
-      b.px = b.x; b.py = b.y;
-      b.vy += GRAVITY * h;
-      b.x += b.vx * h; b.y += b.vy * h;
-      const target = LEVELS[b.lv].r;
-      if (b.r < target) b.r = Math.min(target, b.r + target * 6 * h);
-      b.floor = false;
-    }
-    const merges = [];
-    for (let it = 0; it < ITER; it++) {
-      for (let i = 0; i < balls.length; i++) {
-        const a = balls[i];
-        if (a.dead) continue;
-        for (let j = i + 1; j < balls.length; j++) {
-          const b = balls[j];
-          if (b.dead) continue;
-          let dx = b.x - a.x, dy = b.y - a.y;
-          const rr = a.r + b.r;
-          if (dx > rr || dx < -rr || dy > rr || dy < -rr) continue;
-          let d2 = dx * dx + dy * dy;
-          if (d2 >= rr * rr) continue;
-          if (a.lv === b.lv && !a.merged && !b.merged && it === 0) {
-            a.merged = b.merged = true; merges.push([a, b]);
-            continue;
-          }
-          let d = Math.sqrt(d2);
-          if (d < 1e-4) { dx = Math.random() - 0.5; dy = -1; d = Math.hypot(dx, dy); }
-          const nx = dx / d, ny = dy / d, ov = rr - d;
-          const ma = a.r * a.r, mb = b.r * b.r, tot = ma + mb;
-          a.x -= nx * ov * (mb / tot); a.y -= ny * ov * (mb / tot);
-          b.x += nx * ov * (ma / tot); b.y += ny * ov * (ma / tot);
-        }
-      }
-      for (const b of balls) {
-        if (b.x < b.r) b.x = b.r;
-        if (b.x > W - b.r) b.x = W - b.r;
-        if (b.y > H - b.r) { b.y = H - b.r; b.floor = true; }
-        if (b.y < -300) b.y = -300;
+// ---------- Physics (Matter.js, fixed step) ----------
+function makeEngine() {
+  engine = Engine.create({ positionIterations: 10, velocityIterations: 8, enableSleeping: false });
+  engine.gravity.y = 1; engine.gravity.scale = 0.0016;
+  const T = 200, opts = { isStatic: true, friction: 0.4, restitution: 0.05, label: 'wall' };
+  Composite.add(engine.world, [
+    Bodies.rectangle(W / 2, H + T / 2, W + T * 2, T, opts),          // floor
+    Bodies.rectangle(-T / 2, H / 2 - 400, T, H + 800, opts),         // left wall
+    Bodies.rectangle(W + T / 2, H / 2 - 400, T, H + 800, opts),      // right wall
+  ]);
+  const collide = e => {
+    for (const p of e.pairs) {
+      const a = p.bodyA.tile, b = p.bodyB.tile;
+      if (a && b && a.lv === b.lv && !a.merging && !b.merging && !a.dead && !b.dead) {
+        a.merging = b.merging = true; pendingMerges.push([a, b]);
       }
     }
-    for (const b of balls) {
-      b.vx = (b.x - b.px) / h; b.vy = (b.y - b.py) / h;
-      // Position corrections turn into velocity; cap it so a crowded box can't launch balls.
-      if (b.vy < -VUP) b.vy = -VUP;
-      if (b.vx > VSIDE) b.vx = VSIDE; else if (b.vx < -VSIDE) b.vx = -VSIDE;
-      if (b.vy > VMAX) b.vy = VMAX;
-      const damp = Math.exp(-(b.floor ? 3.5 : 0.35) * h);
-      b.vx *= damp; b.vy *= Math.exp(-0.2 * h);
+  };
+  Events.on(engine, 'collisionStart', collide);
+  Events.on(engine, 'collisionActive', collide);
+}
+
+function addTile(lv, x, y, vx = 0, vy = 0, angle = 0, grow = false) {
+  const full = LEVELS[lv].s, start = grow ? full * 0.6 : full;
+  const body = Bodies.rectangle(x, y, start, start, {
+    chamfer: { radius: start * 0.14 }, friction: 0.25, frictionStatic: 0.4,
+    restitution: 0.12, density: 0.0012, angle,
+  });
+  Body.setVelocity(body, { x: vx, y: vy });
+  const t = { lv, body, side: start, age: 0, danger: 0, dead: false, merging: false };
+  body.tile = t;
+  Composite.add(engine.world, body);
+  tiles.push(t);
+  return t;
+}
+
+function removeTile(t) { t.dead = true; Composite.remove(engine.world, t.body); }
+
+function physicsStep(ms) {
+  // Grow freshly merged tiles towards full size, so they don't explode out of a pile.
+  for (const t of tiles) {
+    const full = LEVELS[t.lv].s;
+    if (t.side < full) {
+      const ns = Math.min(full, t.side + full * 0.006 * ms);
+      Body.scale(t.body, ns / t.side, ns / t.side);
+      t.side = ns;
     }
-    for (const [a, b] of merges) doMerge(a, b);
-    if (merges.length) balls = balls.filter(b => !b.dead);
-    for (const b of balls) b.merged = false;
   }
+  Engine.update(engine, ms);
+  if (pendingMerges.length) {
+    const list = pendingMerges; pendingMerges = [];
+    for (const [a, b] of list) doMerge(a, b);
+    tiles = tiles.filter(t => !t.dead);
+  }
+  for (const t of tiles) t.merging = false;
 }
 
 function doMerge(a, b) {
-  a.dead = b.dead = true;
-  const x = (a.x + b.x) / 2, y = (a.y + b.y) / 2;
-  const vx = (a.vx + b.vx) / 2, vy = (a.vy + b.vy) / 2;
+  removeTile(a); removeTile(b);
+  const pa = a.body.position, pb = b.body.position;
+  const x = (pa.x + pb.x) / 2, y = (pa.y + pb.y) / 2;
+  const va = a.body.velocity, vb = b.body.velocity;
   if (a.lv === MAX) {
     // Two 2048s: they vanish for a huge bonus, like two watermelons in Suika.
     gain(4096, x, y);
@@ -139,11 +120,24 @@ function doMerge(a, b) {
     return;
   }
   const lv = a.lv + 1;
-  addBall(lv, x, y, vx, vy * 0.5, true);
+  const angle = (a.body.angle + b.body.angle) / 2;
+  addTile(lv, x, y, (va.x + vb.x) / 2, (va.y + vb.y) / 4, angle, true);
   gain(LEVELS[lv].v, x, y);
   burst(x, y, LEVELS[lv].c, 10 + lv * 3);
   sfx.merge(lv); buzz(lv >= 8 ? 40 : 15);
   if (lv > topLevel) { topLevel = lv; buildLadder(lv); }
+}
+
+function newGame() {
+  if (engine) { Events.off(engine); Composite.clear(engine.world, false); Engine.clear(engine); }
+  makeEngine();
+  tiles = []; particles = []; popups = []; pendingMerges = [];
+  score = 0; topLevel = 0; over = false; paused = false; cooldown = 0.3;
+  holding = randDrop(); nextLevel = randDrop();
+  aimX = W / 2;
+  updateHud(); buildLadder();
+  hideAll(); running = true;
+  wake();
 }
 
 function gain(n, x, y) {
@@ -160,30 +154,36 @@ function burst(x, y, color, n) {
   }
 }
 
+const clampAim = lv => { const h = LEVELS[lv].s / 2; return Math.max(h, Math.min(W - h, aimX)); };
+
 function drop() {
   if (!running || paused || over || cooldown > 0 || holding === null) return;
-  const r = LEVELS[holding].r;
-  const x = Math.max(r, Math.min(W - r, aimX));
-  addBall(holding, x, AIM_Y, 0, 60);
+  addTile(holding, clampAim(holding), AIM_Y, 0, 1);
   holding = null; cooldown = 0.5;
   sfx.drop(); buzz(8);
 }
 
+const STEP_MS = 1000 / 120;
+let stepAcc = 0;
 function update(dt) {
   if (cooldown > 0) {
     cooldown -= dt;
     if (cooldown <= 0 && holding === null) { holding = nextLevel; nextLevel = randDrop(); updateHud(); }
   }
-  let acc = dt;
-  while (acc > 1e-6) { const s = Math.min(STEP, acc); step(s); acc -= s; }
+  // Matter.js needs an exact, constant step; leftover time carries over to the next frame.
+  stepAcc += dt * 1000;
+  let n = 0;
+  while (stepAcc >= STEP_MS && n++ < 8) { physicsStep(STEP_MS); stepAcc -= STEP_MS; }
+  if (n >= 8) stepAcc = 0;
 
   let danger = false;
-  for (const b of balls) {
-    b.age += dt;
-    if (b.age > 1.2 && b.y - b.r < LINE_Y && Math.abs(b.vy) < 120) {
-      b.danger += dt; danger = true;
-      if (b.danger > 2.2) { gameOver(); break; }
-    } else b.danger = Math.max(0, b.danger - dt * 2);
+  for (const t of tiles) {
+    t.age += dt;
+    const b = t.body;
+    if (t.age > 1.2 && b.bounds.min.y < LINE_Y && Math.abs(b.velocity.y) < 2) {
+      t.danger += dt; danger = true;
+      if (t.danger > 2.2) { gameOver(); break; }
+    } else t.danger = Math.max(0, t.danger - dt * 2);
   }
   dangerFlash = danger ? dangerFlash + dt : 0;
 
@@ -201,52 +201,52 @@ function gameOver() {
 }
 
 // ---------- Rendering ----------
+const PAD = 14; // wall thickness in world units
 function resize() {
   const st = $('stage').getBoundingClientRect();
   const availW = st.width - 20, availH = st.height - 8;
-  const pad = 14; // wall thickness in world units on each side
-  scale = Math.min(availW / (W + pad * 2), availH / (H + pad));
+  scale = Math.min(availW / (W + PAD * 2), availH / (H + PAD));
   dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const cw = (W + pad * 2) * scale, ch = (H + pad) * scale;
+  const cw = (W + PAD * 2) * scale, ch = (H + PAD) * scale;
   cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
   cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
 }
 
-function drawBall(x, y, r, lv, alpha = 1) {
-  const L = LEVELS[lv];
-  ctx.globalAlpha = alpha;
-  const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
-  g.addColorStop(0, lighten(L.c, 0.45));
-  g.addColorStop(0.7, L.c);
-  g.addColorStop(1, darken(L.c, 0.18));
+function drawTile(x, y, s, angle, lv) {
+  const L = LEVELS[lv], h = s / 2, r = s * 0.14;
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(angle);
+  // body with a little bottom "lip" like a 2048 tile
+  ctx.fillStyle = darken(L.c, 0.22);
+  roundRect(-h, -h, s, s, r); ctx.fill();
+  const g = ctx.createLinearGradient(0, -h, 0, h);
+  g.addColorStop(0, lighten(L.c, 0.3));
+  g.addColorStop(1, L.c);
   ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.strokeStyle = darken(L.c, 0.3); ctx.stroke();
+  roundRect(-h, -h, s, s - Math.max(2, s * 0.07), r); ctx.fill();
   // shine
-  ctx.fillStyle = 'rgba(255,255,255,.45)';
-  ctx.beginPath(); ctx.ellipse(x - r * 0.38, y - r * 0.45, r * 0.22, r * 0.13, -0.6, 0, Math.PI * 2); ctx.fill();
-  const s = String(L.v);
-  const f = r * (s.length <= 1 ? 1.05 : s.length === 2 ? 0.9 : s.length === 3 ? 0.7 : 0.56);
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  roundRect(-h + s * 0.1, -h + s * 0.08, s * 0.32, s * 0.09, s * 0.045); ctx.fill();
+  const str = String(L.v);
+  const f = s * (str.length <= 1 ? 0.58 : str.length === 2 ? 0.5 : str.length === 3 ? 0.4 : 0.31);
   ctx.font = `800 ${f}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = L.t;
-  ctx.fillText(s, x, y + f * 0.06);
-  ctx.globalAlpha = 1;
+  ctx.fillText(str, 0, f * 0.04 - s * 0.02);
+  ctx.restore();
 }
 
 function render() {
-  const pad = 14;
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
-  ctx.clearRect(0, 0, W + pad * 2, H + pad);
+  ctx.clearRect(0, 0, W + PAD * 2, H + PAD);
   // box
   ctx.fillStyle = '#8a5528';
-  roundRect(0, 0, W + pad * 2, H + pad, 18); ctx.fill();
+  roundRect(0, 0, W + PAD * 2, H + PAD, 18); ctx.fill();
   ctx.fillStyle = '#c98b4f';
-  roundRect(3, 0, W + pad * 2 - 6, H + pad - 4, 16); ctx.fill();
-  ctx.translate(pad, 0);
+  roundRect(3, 0, W + PAD * 2 - 6, H + PAD - 4, 16); ctx.fill();
+  ctx.translate(PAD, 0);
   ctx.fillStyle = '#fff4d6';
   ctx.fillRect(0, 0, W, H);
-  // subtle grid
   ctx.strokeStyle = 'rgba(201,139,79,.12)'; ctx.lineWidth = 1;
   for (let y = 40; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
@@ -257,20 +257,19 @@ function render() {
   ctx.beginPath(); ctx.moveTo(0, LINE_Y); ctx.lineTo(W, LINE_Y); ctx.stroke();
   ctx.setLineDash([]);
 
-  // aim guide + held ball
+  // aim guide + held tile
   if (holding !== null && !over) {
-    const r = LEVELS[holding].r;
-    const x = Math.max(r, Math.min(W - r, aimX));
+    const s = LEVELS[holding].s, x = clampAim(holding);
     ctx.strokeStyle = 'rgba(91,58,30,.18)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x, AIM_Y + r); ctx.lineTo(x, H); ctx.stroke();
-    drawBall(x, AIM_Y, r, holding);
+    ctx.beginPath(); ctx.moveTo(x, AIM_Y + s / 2); ctx.lineTo(x, H); ctx.stroke();
+    drawTile(x, AIM_Y, s, 0, holding);
   }
 
-  for (const b of balls) drawBall(b.x, b.y, b.r, b.lv);
+  for (const t of tiles) drawTile(t.body.position.x, t.body.position.y, t.side, t.body.angle, t.lv);
 
   for (const p of particles) {
     ctx.globalAlpha = 1 - p.t / p.life; ctx.fillStyle = p.c;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
   }
   ctx.globalAlpha = 1;
   ctx.font = '800 22px system-ui, -apple-system, sans-serif';
@@ -318,7 +317,7 @@ function buildLadder(pop) {
 // ---------- Input ----------
 function toWorldX(clientX) {
   const r = cv.getBoundingClientRect();
-  return ((clientX - r.left) / r.width) * (W + 28) - 14;
+  return ((clientX - r.left) / r.width) * (W + PAD * 2) - PAD;
 }
 let aiming = false;
 cv.addEventListener('pointerdown', e => {
@@ -403,8 +402,9 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 window.addEventListener('resize', () => { resize(); buildLadder(); });
+makeEngine();
 resize(); updateHud(); buildLadder();
 requestAnimationFrame(loop);
 
 // Exposed for automated testing only.
-window.__suika = { get balls() { return balls; }, get score() { return score; }, get over() { return over; }, addBall, LEVELS };
+window.__suika = { get tiles() { return tiles; }, get score() { return score; }, get over() { return over; }, addTile, LEVELS };

@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="112" fill="#f6e3b4"/>
   <rect x="56" y="70" width="400" height="390" rx="40" fill="#fff4d6" stroke="#c98b4f" stroke-width="22"/>
-  <circle cx="300" cy="320" r="118" fill="#ffb74d" stroke="#b9772a" stroke-width="10"/>
-  <circle cx="150" cy="360" r="78" fill="#ff8a80" stroke="#c0554c" stroke-width="10"/>
-  <ellipse cx="262" cy="262" rx="30" ry="16" fill="#fff" opacity=".5" transform="rotate(-35 262 262)"/>
-  <text x="300" y="362" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="120" text-anchor="middle" fill="#5a3200">4</text>
-  <text x="150" y="388" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="80" text-anchor="middle" fill="#5b1f1a">2</text>
+  <g transform="rotate(-8 300 330)"><rect x="196" y="226" width="210" height="210" rx="30" fill="#c98b3a"/><rect x="196" y="226" width="210" height="196" rx="30" fill="#ffb74d"/>
+  <text x="301" y="372" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="140" text-anchor="middle" fill="#5a3200">4</text></g>
+  <rect x="80" y="318" width="124" height="124" rx="18" fill="#c0554c"/><rect x="80" y="318" width="124" height="116" rx="18" fill="#ff8a80"/>
+  <text x="142" y="410" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="86" text-anchor="middle" fill="#5b1f1a">2</text>
 </svg>
