@@ -511,7 +511,7 @@ qIn.addEventListener('keydown', e => {
 resEl.addEventListener('click', e => { const li = e.target.closest('li[data-id]'); if (li) goTo(li.dataset.id); });
 qClear.addEventListener('click', () => { qIn.value = ''; showResults(); qIn.focus(); });
 cv.addEventListener('pointerdown', () => { if (!resEl.hidden || document.activeElement === qIn) closeSearch(false); });
-function syncSearch() { searchEl.hidden = mode !== 'browse'; if (mode !== 'browse') closeSearch(true); }
+function syncSearch() { searchEl.hidden = document.getElementById('dbbtn').hidden = mode !== 'browse'; if (mode !== 'browse') closeSearch(true); }
 
 /* ---------------- browse ---------------- */
 function renderBrowse() {
@@ -752,7 +752,42 @@ function toBrowse() {
   if (view.zoom > 1.5) zoomBy(1 / view.zoom);
   renderBrowse();
 }
-window.addEventListener('popstate', () => { if (mode !== 'browse') toBrowse(); });
+/* ---------------- country list ---------------- */
+// All quiz countries, A to Z. Tapping a row flies the globe there, zoomed in so the outline fills the view.
+const dbEl = document.getElementById('db'), dbList = document.getElementById('dblist');
+const dbBtn = document.getElementById('dbbtn');
+let dbGo = null;
+function openDb() {
+  if (mode !== 'browse' || !dbEl.hidden) return;
+  closeSearch(true);
+  if (!dbList.firstChild) {
+    document.getElementById('dbcount').textContent = QUIZ.length;
+    dbList.innerHTML = QUIZ.map(c => `<div class="dbrow" data-id="${c.id}"><b>${esc(c.n)}</b>
+      <img src="${flagSrc(c.id)}" alt="" loading="lazy"><span>${capText(c)}</span></div>`).join('');
+  }
+  dbEl.hidden = false;
+  history.pushState({ s: 'db' }, '');
+}
+dbBtn.onclick = openDb;
+document.getElementById('dbclose').onclick = () => history.back();
+dbList.addEventListener('click', e => {
+  const row = e.target.closest('.dbrow[data-id]'); if (!row) return;
+  dbGo = row.dataset.id; history.back();
+});
+function showShape(id) {             // centre the country and zoom until it fills about 40% of the globe
+  tappedPart = null; spin = false; lastInteract = performance.now();
+  select(id);
+  animateTo(id, Math.max(1, Math.min(ZMAX, 0.4 / Math.sin(Math.min(F[id].a, 1.5)))), 1200);
+  blip();
+}
+window.addEventListener('popstate', () => {
+  if (!dbEl.hidden) {
+    dbEl.hidden = true;
+    if (dbGo) { const id = dbGo; dbGo = null; showShape(id); }
+    return;
+  }
+  if (mode !== 'browse') toBrowse();
+});
 
 /* ---------------- sound + vibration ---------------- */
 let muted = store.get('muted', false), actx = null;
