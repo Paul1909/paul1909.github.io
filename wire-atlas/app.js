@@ -496,8 +496,7 @@ function renderBrowse() {
     pane.innerHTML = cardHTML(selected);
     fillCard(pane, selected);
   } else {
-    pane.innerHTML = `<div class="hint"><b>Wire Atlas</b><br>Spin the globe, pinch or use + / − to zoom, and tap any country, or search for one at the top.
-      Its name, capital, flag and shape show up here.<br><br>Small island countries are drawn as little circles.</div>`;
+    pane.innerHTML = '';
   }
   footer([{ label: 'Start quiz', primary: true, on: openMenu }]);
 }
