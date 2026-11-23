@@ -353,16 +353,39 @@ function prepCanvas(c) {
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   return [g, w, h];
 }
+// Detailed 1:10m outlines of small countries (shapes.js), used for shape pictures only
+const HI = {};
+if (window.WA_SHAPES) topojson.feature(WA_SHAPES, WA_SHAPES.objects.s).features.forEach(f => {
+  // rounding can turn a tiny atoll inside-out (d3 then reads it as the whole globe): flip those back
+  const g = f.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  f.geometry = { type: 'MultiPolygon', coordinates: polys.map(p =>
+    d3.geoArea({ type: 'Polygon', coordinates: p }) > 2 * Math.PI ? p.map(r => r.slice().reverse()) : p) };
+  HI[f.id] = { f, c: d3.geoCentroid(f) };
+});
+const noShape = id => F[id].point && !HI[id];
 function drawShape(c, id) {
   const [g, w, h] = prepCanvas(c), it = F[id];
-  if (it.point) {
+  const hi = HI[id], shp = hi ? hi.f : it.main, ctr = hi ? hi.c : it.centroid;
+  if (!hi && it.point) {
     g.beginPath(); g.arc(w / 2, h / 2, 5, 0, 2 * Math.PI); g.fillStyle = Y; g.fill(); g.strokeStyle = '#8e8e92'; g.stroke();
     return;
   }
-  const p = d3.geoAzimuthalEqualArea().rotate([-it.centroid[0], -it.centroid[1]]).fitExtent([[6, 6], [w - 6, h - 6]], it.main);
+  const p = d3.geoAzimuthalEqualArea().rotate([-ctr[0], -ctr[1]]).fitExtent([[6, 6], [w - 6, h - 6]], shp);
   const gp = d3.geoPath(p, g);
-  g.beginPath(); gp(it.main); g.fillStyle = Y; g.fill();
-  g.lineJoin = 'round'; g.strokeStyle = '#6e6e72'; g.lineWidth = 1; g.stroke();
+  g.beginPath(); gp(shp); g.fillStyle = Y; g.fill();
+  g.lineJoin = 'round'; g.strokeStyle = '#6e6e72'; g.lineWidth = hi ? 0.8 : 1; g.stroke();
+  // islands smaller than a couple of pixels (atolls) get a dot, so island chains stay visible
+  const polys = shp.geometry.type === 'Polygon' ? [shp.geometry.coordinates] : shp.geometry.coordinates;
+  if (polys.length > 1) {
+    g.beginPath();
+    for (const pc of polys) {
+      const pg = { type: 'Polygon', coordinates: pc }, [[x0, y0], [x1, y1]] = gp.bounds(pg);
+      if (!(x1 - x0 < 3 && y1 - y0 < 3)) continue;
+      const qx = (x0 + x1) / 2, qy = (y0 + y1) / 2;
+      if (isFinite(qx) && isFinite(qy)) { g.moveTo(qx + 2, qy); g.arc(qx, qy, 2, 0, 2 * Math.PI); }
+    }
+    g.fillStyle = Y; g.fill(); g.lineWidth = 0.8; g.stroke();
+  }
 }
 // dot = true: mark the place with a dot instead of filling the country (so the shape isn't given away)
 function drawLocation(c, id, dot) {
@@ -529,7 +552,7 @@ const quiz = { items: [], i: 0, score: 0, missed: [], answered: false, globe: fa
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // Tuvalu has no outline in the map data, so it sits out quizzes that show or ask for a shape
 const shapeOnly = () => cfg.show.includes('shape') || (cfg.ask.length === 1 && cfg.ask[0] === 'shape');
-const poolFor = r => QUIZ.filter(c => (r === 'World' || c.r === r) && !(F[c.id].point && shapeOnly()));
+const poolFor = r => QUIZ.filter(c => (r === 'World' || c.r === r) && !(noShape(c.id) && shapeOnly()));
 
 function openMenu() {
   if (mode === 'browse') history.pushState({ s: 'menu' }, '');
@@ -590,7 +613,7 @@ function others(c, a) {
   const bad = new Set(a === 'cap' ? c.cap : [val(c)]);
   const twins = id => (FLAG_TWINS.find(p => p.includes(id)) || []);
   if (a === 'flag') twins(c.id).forEach(id => bad.add(id));
-  const pool = QUIZ.filter(x => x.id !== c.id && val(x) && !(a === 'shape' && F[x.id].point));
+  const pool = QUIZ.filter(x => x.id !== c.id && val(x) && !(a === 'shape' && noShape(x.id)));
   const tiers = [shuffle(pool.filter(x => x.s === c.s)).slice(0, 2),
     shuffle(pool.filter(x => x.r === c.r && x.s !== c.s)), shuffle(pool.filter(x => x.r !== c.r))];
   const out = [];
@@ -624,7 +647,7 @@ function promptHTML(c, show) {
 function ask() {
   const c = quiz.items[quiz.i];
   const show = cfg.show;
-  const choices = cfg.ask.filter(k => !(F[c.id].point && k === 'shape'));
+  const choices = cfg.ask.filter(k => !(noShape(c.id) && k === 'shape'));
   const a = choices[Math.floor(Math.random() * choices.length)];
   quiz.a = a; quiz.answered = false;
   const onGlobe = a === 'loc';      // answer by tapping the country on the big globe, then Confirm

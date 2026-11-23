@@ -1,11 +1,12 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'wire-atlas';
-const VERSION = APP + '-v7';
+const VERSION = APP + '-v8';
 const FILES = [
   './',
   './index.html',
   './app.js',
   './data.js',
+  './shapes.js',
   './lib/d3-array.min.js',
   './lib/d3-geo.min.js',
   './lib/topojson-client.min.js',
