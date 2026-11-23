@@ -14,7 +14,13 @@ const store = {
 const D = window.WA_DATA;
 const topo = D.topo;
 const MESH = topojson.mesh(topo, topo.objects.countries);
-const GRAT = d3.geoGraticule10();
+// Land for the white fill over blue water. Country by country (not merged), so no single ring is
+// big enough to wrap around the far side of the globe.
+const LAND = topojson.feature(topo, topo.objects.countries);
+const LAND_RINGS = [];
+LAND.features.forEach(f => { const g = f.geometry; if (!g) return;
+  (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(poly => poly.forEach(r => LAND_RINGS.push(r))); });
+const WATER = '#d4ebfa';
 const SPHERE = { type: 'Sphere' };
 const C = {};                       // id -> {id, n, cap, r, s, q, ll}
 D.countries.forEach(c => { C[c.id] = c; });
@@ -102,7 +108,7 @@ function pack(lines) {
   return { xyz, starts, lens };
 }
 const MESH_P = pack(MESH.coordinates);
-const GRAT_P = pack(GRAT.coordinates);
+const LAND_P = pack(LAND_RINGS);
 
 function trace(P, R, front, back) {
   const { xyz, starts, lens } = P;
@@ -127,7 +133,7 @@ function trace(P, R, front, back) {
       if (k) {
         if (side === pside) seg(side, psx, psy, sx, sy);
         else {
-          const t = pd / (pd - d), hy = py + t * (ya - py), hz = pz + t * (zb - pz), nn = Math.hypot(hy, hz) || 1;
+          const t = pd / (pd - d), hy = py + t * (ya - py), hz = pz + t * (zb - pz), nn = Math.sqrt(hy * hy + hz * hz) || 1;
           const hx = cx + R * hy / nn, hyy = cy - R * hz / nn;
           seg(pside, psx, psy, hx, hyy); seg(side, hx, hyy, sx, sy);
         }
@@ -137,23 +143,45 @@ function trace(P, R, front, back) {
   }
 }
 
+// Land fill: rings with no visible point are skipped; hidden points are pushed onto the rim,
+// which closes each partly visible ring along the edge of the globe.
+function traceFill(P, R, out) {
+  const { xyz, starts, lens } = P;
+  const l = view.lam * RAD, f = view.phi * RAD;
+  const cl = Math.cos(l), sl = Math.sin(l), cp = Math.cos(f), sp = Math.sin(f);
+  const cx = W / 2, cy = H / 2;
+  for (let li = 0; li < starts.length; li++) {
+    const s = starts[li], n = lens[li];
+    let any = false;
+    for (let k = 0; k < n && !any; k++) {
+      const i = (s + k) * 3, xa = xyz[i] * cl - xyz[i + 1] * sl;
+      if (xa * cp - xyz[i + 2] * sp > 0) any = true;
+    }
+    if (!any) continue;
+    for (let k = 0; k < n; k++) {
+      const i = (s + k) * 3, x = xyz[i], y = xyz[i + 1], z = xyz[i + 2];
+      const xa = x * cl - y * sl, ya = x * sl + y * cl;
+      const d = xa * cp - z * sp, zb = z * cp + xa * sp;
+      let sx, sy;
+      if (d > 0) { sx = cx + R * ya; sy = cy - R * zb; }
+      else { const nn = Math.sqrt(ya * ya + zb * zb) || 1; sx = cx + R * ya / nn; sy = cy - R * zb / nn; }
+      if (k) out.lineTo(sx, sy); else out.moveTo(sx, sy);
+    }
+    // no closePath(): fill() closes each ring anyway, and closePath is very slow on big paths
+  }
+}
+
 function draw() {
   if (!W) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0, 0, W, H);
   const R = setView();
   ctx.lineJoin = 'round';
-  const showBack = view.zoom < 1.8;
-  const meshF = new Path2D(), meshB = showBack ? new Path2D() : null, grat = new Path2D();
-  trace(MESH_P, R, meshF, meshB);
-  trace(GRAT_P, R, grat, null);
-  // far side, seen through the wireframe
-  if (showBack) {
-    ctx.globalAlpha = Math.min(1, (1.8 - view.zoom) / 0.6);
-    ctx.strokeStyle = '#ececee'; ctx.lineWidth = 0.7; ctx.stroke(meshB);
-    ctx.globalAlpha = 1;
-  }
-  ctx.strokeStyle = '#e4e4e6'; ctx.lineWidth = 0.6; ctx.stroke(grat);
+  const meshF = new Path2D(), land = new Path2D();
+  trace(MESH_P, R, meshF, null);
+  traceFill(LAND_P, R, land);
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, R, 0, 2 * Math.PI); ctx.fillStyle = WATER; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fill(land);
   if (selected && F[selected]) {
     ctx.beginPath(); path(F[selected].f); ctx.fillStyle = Y; ctx.fill();
   }
@@ -326,6 +354,8 @@ function drawLocation(c, id, dot) {
   const p = d3.geoOrthographic().clipAngle(90).precision(0.8).scale(r).translate([w / 2, h / 2]).rotate([-it.centroid[0], -it.centroid[1]]);
   const gp = d3.geoPath(p, g);
   g.lineJoin = 'round';
+  g.beginPath(); gp(SPHERE); g.fillStyle = WATER; g.fill();
+  g.beginPath(); gp(LAND); g.fillStyle = '#fff'; g.fill();
   if (!dot) { g.beginPath(); gp(it.f); g.fillStyle = Y; g.fill(); }
   g.beginPath(); gp(MESH); g.strokeStyle = '#a2a2a6'; g.lineWidth = 0.5; g.stroke();
   g.beginPath(); gp(SPHERE); g.strokeStyle = '#c2c2c6'; g.lineWidth = 1; g.stroke();
@@ -343,21 +373,19 @@ const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;'
 const flagSrc = id => 'flags/' + id.toLowerCase() + '.svg';
 const capText = c => c.cap.length ? c.cap.map(esc).join(', ') : '—';
 
-function cardHTML(id) {
+function cardHTML(id, meta = true) {
   const c = C[id];
   return `<div class="name">${esc(c.n)}</div>
     <div class="cap"><span>Capital</span>${capText(c)}</div>
     <div class="thumbs">
       <figure><div class="box"><img src="${flagSrc(id)}" alt=""></div><figcaption>Flag</figcaption></figure>
       <figure><div class="box"><canvas class="shape"></canvas></div><figcaption>Shape</figcaption></figure>
-      <figure><div class="box"><canvas class="loc"></canvas></div><figcaption>Location</figcaption></figure>
     </div>
-    <div class="meta">${esc(c.s)}${c.s !== c.r ? ' · ' + esc(c.r) : ''}${c.q ? '' : ' · territory'}</div>`;
+    ${meta ? `<div class="meta">${esc(c.s)}${c.s !== c.r ? ' · ' + esc(c.r) : ''}${c.q ? '' : ' · territory'}</div>` : ''}`;
 }
 function fillCard(root, id) {
-  const s = root.querySelector('canvas.shape'), l = root.querySelector('canvas.loc');
+  const s = root.querySelector('canvas.shape');
   if (s) drawShape(s, id);
-  if (l) drawLocation(l, id);
 }
 function footer(btns) {
   foot.innerHTML = '';
@@ -392,7 +420,6 @@ const ASK = { name: 'Which country is it?', flag: 'Which is its flag?', shape: '
 // shows the location, because the highlighted country already shows its shape.
 const askable = show => KINDS.filter(k => !show.includes(k) && !(k === 'shape' && show.includes('loc')));
 const list = ks => KINDS.filter(k => ks.includes(k)).map(k => LBL[k]);
-const typeLabel = (show, a) => `${list(show).join(' + ')} → ${LBL[a]}`;
 const FLAG_TWINS = [['TD', 'RO'], ['MC', 'ID']];   // near-identical flags never appear together
 const REGIONS = ['World', 'Europe', 'Asia', 'Africa', 'Americas', 'Oceania'];
 const LENS = [10, 20, 'All'];
@@ -464,7 +491,7 @@ function startQuiz() {
   const pool = shuffle(poolFor(cfg.region).slice());
   quiz.items = cfg.len === 'All' ? pool : pool.slice(0, cfg.len);
   quiz.i = 0; quiz.score = 0; quiz.missed = [];
-  mode = 'quiz';
+  mode = 'quiz'; setQuizLook(true);
   ask();
 }
 
@@ -502,7 +529,6 @@ function promptHTML(c, show) {
   else if (has('name')) h += `<div class="qbig">${esc(c.n)}</div>`;
   if (has('cap')) h += `<div class="lbl">Capital</div><div class="qbig">${capText(c)}</div>`;
   if (has('shape')) h += `<canvas class="qshape${show.length > 1 ? ' sm' : ''}"></canvas>`;
-  if (has('loc')) h += `<div class="hint">${show.length > 1 ? 'Location: the yellow country on the globe.' : 'Look at the yellow country on the globe.'}</div>`;
   return h;
 }
 
@@ -523,7 +549,6 @@ function ask() {
   }
   const n = quiz.items.length;
   pane.innerHTML = `
-    <div class="prog"><span>Question ${quiz.i + 1} of ${n}</span><span>${typeLabel(show, a)} · ✓ ${quiz.score}</span></div>
     <div class="bar"><i style="width:${(quiz.i / n) * 100}%"></i></div>
     ${promptHTML(c, show)}
     <p class="q">${ASK[a]}</p>
@@ -560,10 +585,9 @@ function answer(i) {
     if (!quiz.answered || quiz.items[quiz.i] !== c || mode !== 'quiz') return;
     const n = quiz.items.length;
     pane.innerHTML = `
-      <div class="prog"><span>Question ${quiz.i + 1} of ${n}</span><span>✓ ${quiz.score}</span></div>
       <div class="bar"><i style="width:${((quiz.i + 1) / n) * 100}%"></i></div>
       <p class="verdict ${ok ? 'ok' : 'bad'}">${ok ? '✓ Correct' : '✗ Not quite'}${ok ? '' : ` <small>you picked ${picked}</small>`}</p>
-      ${cardHTML(c.id)}`;
+      ${cardHTML(c.id, false)}`;
     pane.scrollTop = 0;
     fillCard(pane, c.id);
   }, isVisual(a) ? 1000 : 700);
@@ -600,7 +624,9 @@ function results() {
   footer([{ label: 'Globe', on: () => history.back() }, { label: 'Play again', primary: true, on: startQuiz }]);
 }
 
+function setQuizLook(on) { document.body.classList.toggle('quizzing', on); }
 function toBrowse() {
+  setQuizLook(false);
   mode = 'browse'; selected = null; dirty = true; spin = true; anim = null;
   if (view.zoom > 1.5) zoomBy(1 / view.zoom);
   renderBrowse();
