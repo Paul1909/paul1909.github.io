@@ -1,7 +1,7 @@
 {
   "name": "Number Suika",
   "short_name": "Num Suika",
-  "description": "Suika-style drop-and-merge game with number tiles instead of fruits: 2 + 2 = 4, all the way to 2048.",
+  "description": "Suika-style drop-and-merge game with numbers instead of fruits, as circles or squares: 2 + 2 = 4, all the way to 2048.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

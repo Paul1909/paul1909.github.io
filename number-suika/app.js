@@ -16,24 +16,35 @@ const { Engine, Bodies, Body, Composite, Events } = Matter;
 const W = 400, H = 640;          // world units (box interior)
 const AIM_Y = 50;                // where the held tile hangs
 const LINE_Y = 100;              // overflow line
-// s = tile side in world units
+// s = tile side (squares), r = radius (circles), in world units
 const LEVELS = [
-  { v: 2,    s: 28,  c: '#ff8a80', t: '#5b1f1a' },
-  { v: 4,    s: 36,  c: '#ffb74d', t: '#5a3200' },
-  { v: 8,    s: 46,  c: '#ffe066', t: '#5a4600' },
-  { v: 16,   s: 56,  c: '#aed581', t: '#2f4a12' },
-  { v: 32,   s: 68,  c: '#4db6ac', t: '#ffffff' },
-  { v: 64,   s: 81,  c: '#4fc3f7', t: '#0b3550' },
-  { v: 128,  s: 96,  c: '#7986cb', t: '#ffffff' },
-  { v: 256,  s: 111, c: '#ba68c8', t: '#ffffff' },
-  { v: 512,  s: 127, c: '#f06292', t: '#ffffff' },
-  { v: 1024, s: 145, c: '#e53935', t: '#ffffff' },
-  { v: 2048, s: 165, c: '#2e7d32', t: '#ffffff' },
+  { v: 2,    s: 28, r: 15,  c: '#ff8a80', t: '#5b1f1a' },
+  { v: 4,    s: 36, r: 20,  c: '#ffb74d', t: '#5a3200' },
+  { v: 8,    s: 46, r: 26,  c: '#ffe066', t: '#5a4600' },
+  { v: 16,   s: 56, r: 32,  c: '#aed581', t: '#2f4a12' },
+  { v: 32,   s: 68, r: 39,  c: '#4db6ac', t: '#ffffff' },
+  { v: 64,   s: 81, r: 47,  c: '#4fc3f7', t: '#0b3550' },
+  { v: 128,  s: 96, r: 56,  c: '#7986cb', t: '#ffffff' },
+  { v: 256,  s: 111, r: 65, c: '#ba68c8', t: '#ffffff' },
+  { v: 512,  s: 127, r: 75, c: '#f06292', t: '#ffffff' },
+  { v: 1024, s: 145, r: 86, c: '#e53935', t: '#ffffff' },
+  { v: 2048, s: 165, r: 98, c: '#2e7d32', t: '#ffffff' },
 ];
 const MAX = LEVELS.length - 1;
 
 let engine, tiles = [], particles = [], popups = [], pendingMerges = [];
-let score = 0, best = store.get('best', 0), topLevel = 0;
+// Shape mode: 'circles' or 'squares', each with its own best score.
+let mode = store.get('mode', 'circles') === 'squares' ? 'squares' : 'circles';
+(function migrateOldBest() {
+  // v1 was circles-only and saved one 'best'; keep it as the circles record.
+  const old = store.get('best', null);
+  if (old !== null) {
+    if (store.get('best-circles', 0) < old) store.set('best-circles', old);
+    try { localStorage.removeItem(APP + ':best'); } catch {}
+  }
+})();
+const bestOf = m => store.get('best-' + m, 0);
+let score = 0, best = bestOf(mode), topLevel = 0;
 let aimX = W / 2, holding = null, nextLevel = 0, cooldown = 0;
 let running = false, paused = false, over = false, dangerFlash = 0;
 let muted = store.get('muted', false);
@@ -72,12 +83,19 @@ function makeEngine() {
   Events.on(engine, 'collisionActive', collide);
 }
 
+// Full size of a piece: side length for squares, diameter for circles.
+const size = lv => (mode === 'squares' ? LEVELS[lv].s : LEVELS[lv].r * 2);
+
 function addTile(lv, x, y, vx = 0, vy = 0, angle = 0, grow = false) {
-  const full = LEVELS[lv].s, start = grow ? full * 0.6 : full;
-  const body = Bodies.rectangle(x, y, start, start, {
-    chamfer: { radius: start * 0.14 }, friction: 0.25, frictionStatic: 0.4,
-    restitution: 0.12, density: 0.0012, angle,
-  });
+  const full = size(lv), start = grow ? full * 0.6 : full;
+  const body = mode === 'squares'
+    ? Bodies.rectangle(x, y, start, start, {
+        chamfer: { radius: start * 0.14 }, friction: 0.25, frictionStatic: 0.4,
+        restitution: 0.12, density: 0.0012, angle,
+      })
+    : Bodies.circle(x, y, start / 2, {
+        friction: 0.06, frictionStatic: 0.2, restitution: 0.15, density: 0.0012, angle,
+      }, 40);
   Body.setVelocity(body, { x: vx, y: vy });
   const t = { lv, body, side: start, age: 0, danger: 0, dead: false, merging: false };
   body.tile = t;
@@ -91,7 +109,7 @@ function removeTile(t) { t.dead = true; Composite.remove(engine.world, t.body); 
 function physicsStep(ms) {
   // Grow freshly merged tiles towards full size, so they don't explode out of a pile.
   for (const t of tiles) {
-    const full = LEVELS[t.lv].s;
+    const full = size(t.lv);
     if (t.side < full) {
       const ns = Math.min(full, t.side + full * 0.006 * ms);
       Body.scale(t.body, ns / t.side, ns / t.side);
@@ -133,6 +151,7 @@ function newGame() {
   makeEngine();
   tiles = []; particles = []; popups = []; pendingMerges = [];
   score = 0; topLevel = 0; over = false; paused = false; cooldown = 0.3;
+  best = bestOf(mode); stepAcc = 0;
   holding = randDrop(); nextLevel = randDrop();
   aimX = W / 2;
   updateHud(); buildLadder();
@@ -143,7 +162,7 @@ function newGame() {
 function gain(n, x, y) {
   score += n;
   popups.push({ x, y, txt: '+' + n, t: 0 });
-  if (score > best) { best = score; store.set('best', best); }
+  if (score > best) { best = score; store.set('best-' + mode, best); }
   updateHud();
 }
 
@@ -154,7 +173,7 @@ function burst(x, y, color, n) {
   }
 }
 
-const clampAim = lv => { const h = LEVELS[lv].s / 2; return Math.max(h, Math.min(W - h, aimX)); };
+const clampAim = lv => { const h = size(lv) / 2; return Math.max(h, Math.min(W - h, aimX)); };
 
 function drop() {
   if (!running || paused || over || cooldown > 0 || holding === null) return;
@@ -196,7 +215,7 @@ function update(dt) {
 function gameOver() {
   over = true; running = false;
   sfx.over(); buzz([60, 60, 120]);
-  $('overText').innerHTML = `Score <b>${score}</b><br>Biggest number: <b>${LEVELS[topLevel].v}</b>` + (score >= best && score > 0 ? '<br>🏆 New best!' : '');
+  $('overText').innerHTML = `${mode === 'squares' ? '■ Squares' : '● Circles'}<br>Score <b>${score}</b><br>Biggest number: <b>${LEVELS[topLevel].v}</b>` + (score >= best && score > 0 ? '<br>🏆 New best!' : '');
   setTimeout(() => $('overOv').classList.add('show'), 600);
 }
 
@@ -236,6 +255,29 @@ function drawTile(x, y, s, angle, lv) {
   ctx.restore();
 }
 
+function drawBall(x, y, d, angle, lv) {
+  const L = LEVELS[lv], r = d / 2;
+  const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+  g.addColorStop(0, lighten(L.c, 0.45));
+  g.addColorStop(0.7, L.c);
+  g.addColorStop(1, darken(L.c, 0.18));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.strokeStyle = darken(L.c, 0.3); ctx.stroke();
+  // shine stays at the top-left (light source); the number rolls with the ball
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.beginPath(); ctx.ellipse(x - r * 0.38, y - r * 0.45, r * 0.22, r * 0.13, -0.6, 0, Math.PI * 2); ctx.fill();
+  const str = String(L.v);
+  const f = r * (str.length <= 1 ? 1.05 : str.length === 2 ? 0.9 : str.length === 3 ? 0.7 : 0.56);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+  ctx.font = `800 ${f}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = L.t;
+  ctx.fillText(str, 0, f * 0.06);
+  ctx.restore();
+}
+const drawPiece = (x, y, d, angle, lv) => (mode === 'squares' ? drawTile : drawBall)(x, y, d, angle, lv);
+
 function render() {
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
   ctx.clearRect(0, 0, W + PAD * 2, H + PAD);
@@ -259,13 +301,13 @@ function render() {
 
   // aim guide + held tile
   if (holding !== null && !over) {
-    const s = LEVELS[holding].s, x = clampAim(holding);
+    const s = size(holding), x = clampAim(holding);
     ctx.strokeStyle = 'rgba(91,58,30,.18)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x, AIM_Y + s / 2); ctx.lineTo(x, H); ctx.stroke();
-    drawTile(x, AIM_Y, s, 0, holding);
+    drawPiece(x, AIM_Y, s, 0, holding);
   }
 
-  for (const t of tiles) drawTile(t.body.position.x, t.body.position.y, t.side, t.body.angle, t.lv);
+  for (const t of tiles) drawPiece(t.body.position.x, t.body.position.y, t.side, t.body.angle, t.lv);
 
   for (const p of particles) {
     ctx.globalAlpha = 1 - p.t / p.life; ctx.fillStyle = p.c;
@@ -295,6 +337,8 @@ function darken(h, k) { const [r, g, b] = hexToRgb(h); return `rgb(${r * (1 - k)
 function updateHud() {
   $('score').textContent = score;
   $('best').textContent = best;
+  $('bestLabel').textContent = mode === 'squares' ? 'Best ■' : 'Best ●';
+  document.body.dataset.mode = mode;
   const nb = $('nextBall'), L = LEVELS[nextLevel];
   nb.style.background = L.c; nb.style.color = L.t; nb.textContent = L.v;
 }
@@ -353,6 +397,21 @@ function resume() {
   paused = false; hideAll(); last = performance.now();
   history.pushState({ game: 1 }, '');
 }
+function showStart() {
+  running = false; paused = false; hideAll();
+  $('bestCircles').textContent = bestOf('circles');
+  $('bestSquares').textContent = bestOf('squares');
+  setMode(mode);
+  $('startOv').classList.add('show');
+}
+function setMode(m) {
+  mode = m; store.set('mode', m);
+  document.querySelectorAll('.pick').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  best = bestOf(m); updateHud(); buildLadder();
+}
+document.querySelectorAll('.pick').forEach(b => b.onclick = () => { audio(); setMode(b.dataset.mode); sfx.drop(); });
+$('shapeBtn').onclick = () => { if (engine) { Composite.clear(engine.world, false); } tiles = []; particles = []; popups = []; holding = null; over = false; showStart(); };
+$('overShapeBtn').onclick = () => $('shapeBtn').onclick();
 $('startBtn').onclick = () => { audio(); history.pushState({ game: 1 }, ''); newGame(); };
 $('againBtn').onclick = () => { newGame(); };
 $('resumeBtn').onclick = resume;
@@ -403,8 +462,8 @@ function loop(now) {
 }
 window.addEventListener('resize', () => { resize(); buildLadder(); });
 makeEngine();
-resize(); updateHud(); buildLadder();
+resize(); showStart();
 requestAnimationFrame(loop);
 
 // Exposed for automated testing only.
-window.__suika = { get tiles() { return tiles; }, get score() { return score; }, get over() { return over; }, addTile, LEVELS };
+window.__suika = { get tiles() { return tiles; }, get score() { return score; }, get over() { return over; }, addTile, LEVELS, get mode() { return mode; } };
