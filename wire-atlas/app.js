@@ -416,14 +416,88 @@ function footer(btns) {
   });
 }
 
+/* ---------------- search (start page) ---------------- */
+// Matches country names, capitals and other names (official, native, it/de/fr/es), ignoring accents and case.
+const searchEl = document.getElementById('search'), qIn = document.getElementById('q');
+const resEl = document.getElementById('results'), qClear = document.getElementById('qclear');
+const norm = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const INDEX = D.countries.filter(c => F[c.id]).map(c => ({
+  c, n: norm(c.n), caps: c.cap.map(norm), alt: (c.alt || []).map(norm),
+}));
+function scoreText(t, q, base) {               // lower is better, Infinity = no match
+  if (t === q) return base;
+  if (t.startsWith(q)) return base + 1;
+  if ((' ' + t).includes(' ' + q)) return base + 2;  // a later word starts with the query
+  if (q.length >= 3 && t.includes(q)) return base + 3;
+  return Infinity;
+}
+function search(raw) {
+  const q = norm(raw); if (!q) return [];
+  const out = [];
+  for (const e of INDEX) {
+    let best = scoreText(e.n, q, 0), why = 'name';
+    for (const k of e.caps) { const sc = scoreText(k, q, 0.5); if (sc < best) { best = sc; why = 'cap'; } }
+    for (const k of e.alt) {
+      // an exact other name ("usa", "uk", "deutschland") ranks near the top; codes only match exactly
+      const sc = k === q ? 0.3 : k.length <= 3 ? Infinity : scoreText(k, q, 4);
+      if (sc < best) { best = sc; why = 'alt'; }
+    }
+    if (best < Infinity) out.push({ c: e.c, best, why, quiz: e.c.q ? 0 : 1 });
+  }
+  out.sort((a, b) => a.best - b.best || a.quiz - b.quiz || a.c.n.localeCompare(b.c.n));
+  return out.slice(0, 8);
+}
+let hits = [];
+function showResults() {
+  const v = qIn.value;
+  qClear.hidden = !v;
+  hits = search(v);
+  if (!v.trim()) { resEl.hidden = true; resEl.innerHTML = ''; return; }
+  resEl.innerHTML = hits.length ? hits.map((h, i) => `<li data-id="${h.c.id}"${i ? '' : ' class="on"'}>
+      <img src="${flagSrc(h.c.id)}" alt=""><div><b>${esc(h.c.n)}</b><small>${h.c.cap.length ? 'Capital: ' + capText(h.c) : '&nbsp;'}</small></div></li>`).join('')
+    : '<li class="none">No country or capital found</li>';
+  fitResults();
+  resEl.hidden = false;
+}
+// keep the list above the phone keyboard
+function fitResults() {
+  const vv = window.visualViewport, top = resEl.getBoundingClientRect().top;
+  const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  resEl.style.maxHeight = Math.max(120, bottom - top - 12) + 'px';
+}
+window.visualViewport?.addEventListener('resize', () => { if (!resEl.hidden) fitResults(); });
+function closeSearch(clear) {
+  if (clear) qIn.value = '';
+  qClear.hidden = !qIn.value;
+  resEl.hidden = true; qIn.blur();
+}
+function goTo(id) {
+  closeSearch(true);
+  spin = false; lastInteract = performance.now();
+  select(id);
+  animateTo(id, zoomFor(id));
+  blip();
+}
+qIn.addEventListener('input', showResults);
+qIn.addEventListener('focus', () => { if (qIn.value) showResults(); });
+qIn.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); if (hits[0]) goTo(hits[0].c.id); }
+  else if (e.key === 'Escape') closeSearch(true);
+});
+resEl.addEventListener('click', e => { const li = e.target.closest('li[data-id]'); if (li) goTo(li.dataset.id); });
+qClear.addEventListener('click', () => { qIn.value = ''; showResults(); qIn.focus(); });
+cv.addEventListener('pointerdown', () => { if (!resEl.hidden || document.activeElement === qIn) closeSearch(false); });
+function syncSearch() { searchEl.hidden = mode !== 'browse'; if (mode !== 'browse') closeSearch(true); }
+
 /* ---------------- browse ---------------- */
 function renderBrowse() {
+  syncSearch();
   if (selected && C[selected]) {
     pane.innerHTML = cardHTML(selected);
     fillCard(pane, selected);
   } else {
-    pane.innerHTML = `<div class="hint"><b>Wire Atlas</b><br>Spin the globe with a finger, pinch or use + / − to zoom, and tap any country to highlight it.
-      Its name, capital, flag and shape will show up here.<br><br>Small island countries are drawn as little circles.</div>`;
+    pane.innerHTML = `<div class="hint"><b>Wire Atlas</b><br>Spin the globe, pinch or use + / − to zoom, and tap any country, or search for one at the top.
+      Its name, capital, flag and shape show up here.<br><br>Small island countries are drawn as little circles.</div>`;
   }
   footer([{ label: 'Start quiz', primary: true, on: openMenu }]);
 }
@@ -460,6 +534,7 @@ const poolFor = r => QUIZ.filter(c => (r === 'World' || c.r === r) && !(F[c.id].
 function openMenu() {
   if (mode === 'browse') history.pushState({ s: 'menu' }, '');
   mode = 'menu'; selected = null; dirty = true;
+  syncSearch();
   renderMenu();
 }
 function renderMenu() {
