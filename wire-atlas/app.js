@@ -13,7 +13,7 @@ const store = {
 /* ---------------- data ---------------- */
 const D = window.WA_DATA;
 const topo = D.topo;
-const MESH = topojson.mesh(topo, topo.objects.countries);
+const MESH = topojson.mesh(topo, topo.objects.countries, (a, b) => a === b || a.id !== b.id || !a.id);
 // Land for the white fill over blue water. Country by country (not merged), so no single ring is
 // big enough to wrap around the far side of the globe.
 const LAND = topojson.feature(topo, topo.objects.countries);
@@ -28,25 +28,18 @@ const QUIZ = D.countries.filter(c => c.q);
 
 // Per-country geometry: full feature, "main" part (for shape + centring), area, centroid, angular radius
 const F = {};
-function prep(f, point) {
+// main: indices of the polygons that form the country's main body (worked out when the data is built,
+// see build-data.js); far-away parts like Réunion or Hawaii are left out of the shape thumbnail.
+function prep(f, point, main) {
   const g = f.geometry;
   const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
-  const parts = polys.map(p => { const pg = { type: 'Polygon', coordinates: p }; return { p, area: d3.geoArea(pg), c: d3.geoCentroid(pg) }; });
-  parts.sort((a, b) => b.area - a.area);
-  // Keep the largest polygon plus islands chained within ~900 km of it (drops overseas territories)
-  const inc = [parts[0]], rest = parts.slice(1);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let i = rest.length - 1; i >= 0; i--) {
-      if (inc.some(q => d3.geoDistance(q.c, rest[i].c) < 0.14)) { inc.push(rest.splice(i, 1)[0]); changed = true; }
-    }
-  }
-  const main = { type: 'Feature', geometry: { type: 'MultiPolygon', coordinates: inc.map(q => q.p) } };
-  const centroid = d3.geoCentroid(main);
+  const inc = main ? main.map(i => polys[i]) : polys;
+  const mainF = { type: 'Feature', geometry: { type: 'MultiPolygon', coordinates: inc } };
+  const centroid = d3.geoCentroid(mainF);
   let a = 0;
-  inc.forEach(q => q.p[0].forEach(pt => { const d = d3.geoDistance(centroid, pt); if (d > a) a = d; }));
-  return { id: f.id, f, main, area: d3.geoArea(f), centroid, a: Math.max(a, 0.001), point: !!point };
+  inc.forEach(p => p[0].forEach(pt => { const d = d3.geoDistance(centroid, pt); if (d > a) a = d; }));
+  const over = (D.over[f.id] || []).map(o => ({ n: o.n, polys: o.i.map(i => ({ type: 'Polygon', coordinates: polys[i] })) }));
+  return { id: f.id, f, main: mainF, area: d3.geoArea(f), centroid, a: Math.max(a, 0.001), point: !!point, over };
 }
 // Some countries come in several map pieces with the same code (Australia + Ashmore and Cartier
 // Islands): merge them into one country instead of letting the last piece win.
@@ -57,7 +50,7 @@ topojson.feature(topo, topo.objects.countries).features.forEach(f => {
   (pieces[f.id] = pieces[f.id] || []).push(...polys);
 });
 Object.entries(pieces).forEach(([id, polys]) => {
-  F[id] = prep({ type: 'Feature', id, geometry: polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys } });
+  F[id] = prep({ type: 'Feature', id, geometry: polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys } }, false, D.main[id]);
 });
 D.countries.forEach(c => {         // countries missing from the 1:50m map (Tuvalu) get a small circle
   if (!F[c.id] && c.ll) {
@@ -332,6 +325,12 @@ function onTap(x, y) {
   const quizPick = mode === 'quiz' && quiz.a === 'loc' && !quiz.answered;
   if (mode !== 'browse' && !quizPick) return;
   const id = pick(x, y);
+  tappedPart = null;
+  if (id && !quizPick) {           // tapped a far-away part (Réunion, Hawaii...)? name it in the card
+    const ll = proj.invert([x, y]);
+    const part = ll && F[id].over.find(o => o.polys.some(pg => d3.geoContains(pg, ll)));
+    if (part) tappedPart = part.n;
+  }
   if (quizPick) {
     selected = id; dirty = true;
     const nb = document.getElementById('next'); if (nb) nb.disabled = !id;
@@ -391,10 +390,12 @@ const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;'
 const flagSrc = id => 'flags/' + id.toLowerCase() + '.svg';
 const capText = c => c.cap.length ? c.cap.map(esc).join(', ') : '—';
 
+let tappedPart = null;            // name of the far-away part the user tapped (e.g. Réunion), shown in bold
 function cardHTML(id, meta = true) {
-  const c = C[id];
+  const c = C[id], over = F[id].over;
   return `<div class="name">${esc(c.n)}</div>
     <div class="cap"><span>Capital</span>${capText(c)}</div>
+    ${over.length ? `<div class="also"><span>Also includes</span>${over.map(o => o.n === tappedPart ? `<b>${esc(o.n)}</b>` : esc(o.n)).join(', ')}</div>` : ''}
     <div class="thumbs">
       <figure><div class="box"><img src="${flagSrc(id)}" alt=""></div><figcaption>Flag</figcaption></figure>
       <figure><div class="box"><canvas class="shape"></canvas></div><figcaption>Shape</figcaption></figure>
@@ -472,7 +473,7 @@ function closeSearch(clear) {
   resEl.hidden = true; qIn.blur();
 }
 function goTo(id) {
-  closeSearch(true);
+  closeSearch(true); tappedPart = null;
   spin = false; lastInteract = performance.now();
   select(id);
   animateTo(id, zoomFor(id));
