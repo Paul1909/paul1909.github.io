@@ -548,13 +548,9 @@ function renderMenu() {
       // can't show all five, and can't leave nothing to ask
       const dis = !on && !askable([...cfg.show, k]).length;
       return chip('show', k, on, dis, LBL[k]);
-    }).join('')}</div>${KINDS.some(k => !cfg.show.includes(k) && !askable([...cfg.show, k]).length)
-      ? `<div class="hint">${cfg.show.includes('loc') || cfg.show.length < 4
-        ? 'Greyed out: only Shape would be left to ask, and the globe already shows the shape.'
-        : 'Greyed out: at least one thing has to be left to ask.'}</div>` : ''}</div>
+    }).join('')}</div></div>
     <div class="sec"><h3>Ask me</h3><div class="choices">${KINDS.map(k =>
-      chip('ask', k, can.includes(k) && cfg.ask.includes(k), !can.includes(k), LBL[k])).join('')}</div>
-      ${cfg.ask.length > 1 ? '<div class="hint">Each question asks one of these at random.</div>' : ''}</div>
+      chip('ask', k, can.includes(k) && cfg.ask.includes(k), !can.includes(k), LBL[k])).join('')}</div></div>
     <div class="sec"><h3>Region</h3><div class="choices">${REGIONS.map(r => chip('region', r, cfg.region === r, false, r)).join('')}</div></div>
     <div class="sec"><h3>Questions</h3><div class="choices">${LENS.map(l =>
       chip('len', l, cfg.len === l, false, l === 'All' ? 'All ' + n : l)).join('')}</div></div>`;
