@@ -538,7 +538,12 @@ const list = ks => KINDS.filter(k => ks.includes(k)).map(k => LBL[k]);
 const FLAG_TWINS = [['TD', 'RO'], ['MC', 'ID']];   // near-identical flags never appear together
 const REGIONS = ['World', 'Europe', 'Asia', 'Africa', 'Americas', 'Oceania'];
 const LENS = [10, 20, 'All'];
-const cfg = Object.assign({ show: ['flag'], ask: ['name'], region: 'World', len: 10 }, store.get('cfg3', {}));
+const cfg = Object.assign({ show: ['flag'], ask: ['name'], regions: [], len: 10 }, store.get('cfg3', {}));
+// regions: [] means World (all of them). Older saves had a single region.
+if (!Array.isArray(cfg.regions)) cfg.regions = [];
+if (cfg.region) { if (cfg.region !== 'World' && !cfg.regions.length) cfg.regions = [cfg.region]; delete cfg.region; }
+const AREAS = REGIONS.filter(r => r !== 'World');
+const regionLabel = () => cfg.regions.length ? AREAS.filter(r => cfg.regions.includes(r)).join(' + ') : 'World';
 function fixCfg() {
   cfg.show = KINDS.filter(k => cfg.show.includes(k));
   if (!cfg.show.length || !askable(cfg.show).length) cfg.show = ['flag'];
@@ -552,7 +557,7 @@ const quiz = { items: [], i: 0, score: 0, missed: [], answered: false, globe: fa
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // Tuvalu has no outline in the map data, so it sits out quizzes that show or ask for a shape
 const shapeOnly = () => cfg.show.includes('shape') || (cfg.ask.length === 1 && cfg.ask[0] === 'shape');
-const poolFor = r => QUIZ.filter(c => (r === 'World' || c.r === r) && !(noShape(c.id) && shapeOnly()));
+const poolFor = () => QUIZ.filter(c => (!cfg.regions.length || cfg.regions.includes(c.r)) && !(noShape(c.id) && shapeOnly()));
 
 function openMenu() {
   if (mode === 'browse') history.pushState({ s: 'menu' }, '');
@@ -561,7 +566,7 @@ function openMenu() {
   renderMenu();
 }
 function renderMenu() {
-  const n = poolFor(cfg.region).length;
+  const n = poolFor().length;
   const chip = (attr, k, on, dis, text) =>
     `<button class="choice${on ? ' on' : ''}" data-${attr}="${k}"${dis ? ' disabled' : ''}>${text}</button>`;
   const can = askable(cfg.show);
@@ -574,7 +579,7 @@ function renderMenu() {
     }).join('')}</div></div>
     <div class="sec"><h3>Ask me</h3><div class="choices">${KINDS.map(k =>
       chip('ask', k, can.includes(k) && cfg.ask.includes(k), !can.includes(k), LBL[k])).join('')}</div></div>
-    <div class="sec"><h3>Region</h3><div class="choices">${REGIONS.map(r => chip('region', r, cfg.region === r, false, r)).join('')}</div></div>
+    <div class="sec"><h3>Region</h3><div class="choices">${REGIONS.map(r => chip('region', r, r === 'World' ? !cfg.regions.length : cfg.regions.includes(r), false, r)).join('')}</div></div>
     <div class="sec"><h3>Questions</h3><div class="choices">${LENS.map(l =>
       chip('len', l, cfg.len === l, false, l === 'All' ? 'All ' + n : l)).join('')}</div></div>`;
   pane.querySelectorAll('[data-show]').forEach(b => b.onclick = () => {
@@ -592,7 +597,13 @@ function renderMenu() {
     cfg.ask = on ? cfg.ask.filter(x => x !== k) : [...cfg.ask, k];
     saveCfg();
   });
-  pane.querySelectorAll('[data-region]').forEach(b => b.onclick = () => { cfg.region = b.dataset.region; saveCfg(); });
+  pane.querySelectorAll('[data-region]').forEach(b => b.onclick = () => {
+    const r = b.dataset.region;
+    if (r === 'World') cfg.regions = [];
+    else cfg.regions = cfg.regions.includes(r) ? cfg.regions.filter(x => x !== r) : [...cfg.regions, r];
+    if (cfg.regions.length === AREAS.length) cfg.regions = [];     // all five = World
+    saveCfg();
+  });
   pane.querySelectorAll('[data-len]').forEach(b => b.onclick = () => { cfg.len = b.dataset.len === 'All' ? 'All' : +b.dataset.len; saveCfg(); });
   footer([{ label: 'Back', on: () => history.back() }, { label: 'Start', primary: true, on: startQuiz }]);
 }
@@ -600,7 +611,7 @@ function saveCfg() { fixCfg(); store.set('cfg3', cfg); const top = pane.scrollTo
 
 function startQuiz() {
   history.replaceState({ s: 'quiz' }, '');
-  const pool = shuffle(poolFor(cfg.region).slice());
+  const pool = shuffle(poolFor().slice());
   quiz.items = cfg.len === 'All' ? pool : pool.slice(0, cfg.len);
   quiz.i = 0; quiz.score = 0; quiz.missed = [];
   mode = 'quiz'; setQuizLook(true);
@@ -728,10 +739,10 @@ function results() {
   if (view.zoom > 1.5) zoomBy(1 / view.zoom);
   const n = quiz.items.length, pct = Math.round(100 * quiz.score / n);
   const tkey = cfg.show.join('+') + '>' + cfg.ask.join('+');
-  const bkey = `best:${tkey}:${cfg.region}:${cfg.len}`;
+  const bkey = `best:${tkey}:${regionLabel()}:${cfg.len}`;
   const best = Math.max(store.get(bkey, 0), pct); store.set(bkey, best);
   pane.innerHTML = `
-    <div class="lbl">${list(cfg.show).join(' + ')} → ${list(cfg.ask).join(' / ')} · ${cfg.region}</div>
+    <div class="lbl">${list(cfg.show).join(' + ')} → ${list(cfg.ask).join(' / ')} · ${regionLabel()}</div>
     <p class="big">${quiz.score} / ${n}</p>
     <div class="hint">${pct}% correct · best ${best}%</div>
     ${quiz.missed.length ? `<div class="lbl" style="margin-top:12px">To review (tap to see on the globe)</div>
