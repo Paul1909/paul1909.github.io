@@ -154,6 +154,11 @@
   .missed li.on { background: #fff8d6; }
   .missed img { height: 24px; border: 1px solid var(--bd); border-radius: 2px; }
   .missed small { color: var(--mut); display: block; }
+  /* quiz menu on phones: no globe, the chips get the whole screen */
+  @media (max-width: 759px) {
+    body.menuing #stage { display: none; }
+    body.menuing #pane { flex: 1 1 auto; max-height: none; border-top: 0; padding-top: 16px; }
+  }
   /* wide screens: globe uses the full width, card and buttons stay a comfortable width, centred */
   @media (min-width: 760px) {
     #pane, footer { width: 100%; max-width: 640px; margin-left: auto; margin-right: auto; }

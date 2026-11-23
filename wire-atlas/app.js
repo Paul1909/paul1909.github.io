@@ -562,6 +562,7 @@ const poolFor = () => QUIZ.filter(c => (!cfg.regions.length || cfg.regions.inclu
 function openMenu() {
   if (mode === 'browse') history.pushState({ s: 'menu' }, '');
   mode = 'menu'; selected = null; dirty = true;
+  document.body.classList.add('menuing');     // phones hide the globe on this page
   syncSearch();
   renderMenu();
 }
@@ -614,7 +615,7 @@ function startQuiz() {
   const pool = shuffle(poolFor().slice());
   quiz.items = cfg.len === 'All' ? pool : pool.slice(0, cfg.len);
   quiz.i = 0; quiz.score = 0; quiz.missed = [];
-  mode = 'quiz'; setQuizLook(true);
+  mode = 'quiz'; setQuizLook(true); document.body.classList.remove('menuing');
   ask();
 }
 
@@ -758,7 +759,7 @@ function results() {
 
 function setQuizLook(on) { document.body.classList.toggle('quizzing', on); }
 function toBrowse() {
-  setQuizLook(false); wrongSel = null;
+  setQuizLook(false); document.body.classList.remove('menuing'); wrongSel = null;
   mode = 'browse'; selected = null; dirty = true; spin = true; anim = null;
   if (view.zoom > 1.5) zoomBy(1 / view.zoom);
   renderBrowse();
