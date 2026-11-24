@@ -460,9 +460,12 @@ function loop(now) {
   render();
   requestAnimationFrame(loop);
 }
-window.addEventListener('resize', () => { resize(); buildLadder(); });
+// Build the number row first, then size the box to the space that is really left.
+window.addEventListener('resize', () => { buildLadder(); resize(); });
 makeEngine();
-resize(); showStart();
+showStart(); resize();
+// Re-fit whenever the play area changes size (rotation, tablet toolbars, the number row growing).
+if ('ResizeObserver' in window) new ResizeObserver(() => resize()).observe($('stage'));
 requestAnimationFrame(loop);
 
 // Exposed for automated testing only.
