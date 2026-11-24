@@ -746,6 +746,7 @@ function results() {
     <div class="lbl">${list(cfg.show).join(' + ')} → ${list(cfg.ask).join(' / ')} · ${regionLabel()}</div>
     <p class="big">${quiz.score} / ${n}</p>
     <div class="hint">${pct}% correct · best ${best}%</div>
+    <button class="btn sharebtn" id="share"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>Share result</button>
     ${quiz.missed.length ? `<div class="lbl" style="margin-top:12px">To review (tap to see on the globe)</div>
     <ul class="missed">${quiz.missed.map(id => `<li data-id="${id}"><img src="${flagSrc(id)}" alt=""><div><b>${esc(C[id].n)}</b><small>${capText(C[id])}</small></div></li>`).join('')}</ul>`
     : '<div class="hint">Perfect round. Nothing to review.</div>'}`;
@@ -754,7 +755,91 @@ function results() {
     pane.querySelectorAll('.missed li').forEach(y => y.classList.toggle('on', y === li));
     selected = li.dataset.id; dirty = true; animateTo(selected, zoomFor(selected));
   });
+  // the picture is made straight away, so tapping Share opens the share sheet at once
+  const shot = shareImage(quiz.score, n, pct);
+  document.getElementById('share').onclick = () => shareResult(shot, quiz.score, n);
   footer([{ label: 'Globe', on: () => history.back() }, { label: 'Play again', primary: true, on: startQuiz }]);
+}
+
+/* ---------------- share the result ---------------- */
+const GAME_URL = new URL('./', location.href).href;
+const loadImg = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+// A 1080x1350 picture of the round: score, settings and a flat map with right (yellow) and missed (red) countries.
+async function shareImage(score, n, pct) {
+  const Wc = 1080, Hc = 1350, c = document.createElement('canvas'); c.width = Wc; c.height = Hc;
+  const g = c.getContext('2d');
+  const missed = new Set(quiz.missed), asked = quiz.items.map(x => x.id).filter(id => F[id]);
+  const icon = await loadImg('icon-192.png');
+  const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, Wc, Hc);
+  g.fillStyle = '#1d1d1f';
+  let x = 64;
+  if (icon) { g.drawImage(icon, x, 62, 64, 64); x += 82; }
+  g.font = font(800, 54); g.fillText('Wire Atlas', x, 112);
+  g.font = font(700, 40); g.fillText(regionLabel(), 64, 188);
+  g.font = font(800, 150); g.fillText(`${score} / ${n}`, 60, 360);
+  g.fillStyle = '#8a8a8e'; g.font = font(500, 36);
+  g.fillText(`${pct}% · ${list(cfg.show).join(' + ')} → ${list(cfg.ask).join(' / ')}`, 64, 418, Wc - 128);
+  // flat map: the whole world, or the area of the round
+  const box = { x: 64, y: 460, w: Wc - 128, h: 720 };
+  roundRect(g, box.x, box.y, box.w, box.h, 28); g.save(); g.clip();
+  g.fillStyle = '#f7f7f8'; g.fillRect(box.x, box.y, box.w, box.h);
+  const ext = [[box.x + 20, box.y + 20], [box.x + box.w - 20, box.y + box.h - 20]];
+  const pr = d3.geoNaturalEarth1().precision(0.3);
+  if (cfg.regions.length) {
+    // centre on the area and fit to the countries' centres (whole outlines would let Russia stretch it round the world)
+    const pts = { type: 'MultiPoint', coordinates: asked.map(id => F[id].centroid) };
+    pr.rotate([-d3.geoCentroid(pts)[0], 0]).fitExtent([[ext[0][0] + 110, ext[0][1] + 110], [ext[1][0] - 110, ext[1][1] - 110]], pts);
+  } else pr.fitExtent(ext, SPHERE);
+  const gp = d3.geoPath(pr, g);
+  g.lineJoin = 'round';
+  g.beginPath(); gp(SPHERE); g.fillStyle = WATER; g.fill();
+  g.beginPath(); gp(LAND); g.fillStyle = '#fff'; g.fill();
+  for (const id of asked) { g.beginPath(); gp(F[id].f); g.fillStyle = missed.has(id) ? '#f4a6a9' : Y; g.fill(); }
+  g.beginPath(); gp(MESH); g.strokeStyle = '#a2a2a6'; g.lineWidth = 0.8; g.stroke();
+  // small countries get a dot so they can be seen
+  for (const id of asked) {
+    const b = gp.bounds(F[id].main);
+    if (!isFinite(b[0][0]) || Math.max(b[1][0] - b[0][0], b[1][1] - b[0][1]) > 9) continue;
+    const p = pr(F[id].centroid); if (!p) continue;
+    g.beginPath(); g.arc(p[0], p[1], 8, 0, 2 * Math.PI); g.fillStyle = missed.has(id) ? '#f4a6a9' : Y; g.fill();
+    g.strokeStyle = '#6e6e72'; g.lineWidth = 1.5; g.stroke();
+  }
+  g.beginPath(); gp(SPHERE); g.strokeStyle = '#c2c2c6'; g.lineWidth = 1.5; g.stroke();
+  g.restore();
+  g.strokeStyle = '#e5e5e8'; g.lineWidth = 2; roundRect(g, box.x, box.y, box.w, box.h, 28); g.stroke();
+  // legend + link
+  const dot = (cx, col) => { g.beginPath(); g.arc(cx, 1226, 13, 0, 2 * Math.PI); g.fillStyle = col; g.fill(); g.strokeStyle = '#8e8e92'; g.lineWidth = 2; g.stroke(); };
+  g.font = font(500, 32);
+  dot(78, Y); g.fillStyle = '#1d1d1f'; g.fillText(`Correct ${score}`, 102, 1237);
+  const w1 = g.measureText(`Correct ${score}`).width;
+  dot(150 + w1, '#f4a6a9'); g.fillStyle = '#1d1d1f'; g.fillText(`Missed ${n - score}`, 174 + w1, 1237);
+  g.fillStyle = '#8a8a8e'; g.font = font(600, 32);
+  g.fillText(GAME_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''), 64, 1300);
+  return new Promise(ok => c.toBlob(b => ok(b), 'image/png'));
+}
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+async function shareResult(shot, score, n) {
+  blip();
+  const area = cfg.regions.length ? ` (${regionLabel()})` : '';
+  const text = `I got ${score}/${n} on the Wire Atlas world quiz${area}. Can you beat me? ${GAME_URL}`;
+  const blob = await shot;
+  const file = blob && new File([blob], `wire-atlas-${score}-of-${n}.png`, { type: 'image/png' });
+  try {
+    if (file && navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], title: 'Wire Atlas', text });
+    if (navigator.share) return await navigator.share({ title: 'Wire Atlas', text, url: GAME_URL });
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // no share sheet (e.g. desktop browser): save the picture and copy the text + link
+  if (file) { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+  try { await navigator.clipboard.writeText(text); toast('Picture saved, text and link copied'); }
+  catch { toast(file ? 'Picture saved' : GAME_URL); }
 }
 
 function setQuizLook(on) { document.body.classList.toggle('quizzing', on); }

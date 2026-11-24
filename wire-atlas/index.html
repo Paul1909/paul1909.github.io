@@ -41,6 +41,10 @@
     background: #fff; }
   .btn.primary { background: var(--y); border-color: var(--y2); }
   .btn:disabled { opacity: .4; cursor: default; }
+  .sharebtn { display: flex; width: 100%; flex: none; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 4px; background: #fff; color: var(--ink); }
+  .sharebtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: translateX(-50%); z-index: 30;
+    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; max-width: 86vw; text-align: center; }
   .hint { color: var(--mut); font-size: 15px; line-height: 1.45; margin: 6px 0; }
   .hint b { color: var(--ink); font-weight: 600; }
   /* country card: name, capital, flag, shape, location */
