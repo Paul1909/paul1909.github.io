@@ -363,6 +363,9 @@ function roundView(revealed) {
 const GAME_URL = new URL('./', location.href).href.replace(/[?#].*$/, '');
 let recap = null; // Promise<Blob|null>, built when the results screen opens so Share responds instantly
 
+const BOX_NAME = { crayola: 'Crayola', neopastel: 'Neopastel', both: 'Neopastel + Crayola' };
+const setupLabel = () => `${BOX_NAME[S.deck]} · ${MODES.find(m => m.id === S.mode).label}`;
+
 async function buildRecap() {
   try {
     const her = S.audience === 'her';
@@ -377,7 +380,7 @@ async function buildRecap() {
     g.fillStyle = '#1f1d1a'; g.textAlign = 'left'; g.font = 'bold 46px Arial, Arimo, sans-serif'; g.fillText('Swatch', 72, 110);
     g.fillStyle = '#8b867c'; g.textAlign = 'right'; g.font = `${bold} ${her ? 50 : 38}px ${fam}`; g.fillText(her ? 'for her' : 'for him', W - 72, 110);
     g.textAlign = 'center'; g.fillStyle = '#1f1d1a'; g.font = `${bold} 160px ${fam}`; g.fillText(String(S.score), W / 2, 265);
-    g.fillStyle = '#8b867c'; g.font = `400 44px ${fam}`; g.fillText(`${S.correct} / ${rows.length} · ${MODES.find(m => m.id === S.mode).label}`, W / 2, 322);
+    g.fillStyle = '#8b867c'; g.font = `400 ${her ? 44 : 38}px ${fam}`; g.fillText(`${S.correct} / ${rows.length} · ${setupLabel()}`, W / 2, 322, W - 120);
     rows.forEach((r, i) => {
       const y = top + i * rowH;
       box(60, y, W - 120, rowH - 12, 18); g.fillStyle = '#fbfaf7'; g.fill(); g.strokeStyle = '#dcd8cf'; g.lineWidth = 2; g.stroke();
@@ -399,7 +402,7 @@ async function buildRecap() {
 }
 
 async function share() {
-  const text = `I named ${S.correct}/${S.queue.length} colours in Swatch (${S.audience === 'her' ? 'for her' : 'for him'}, ${MODES.find(m => m.id === S.mode).label}) and scored ${S.score}. Your turn: ${GAME_URL}`;
+  const text = `I named ${S.correct}/${S.queue.length} colours in Swatch (${S.audience === 'her' ? 'for her' : 'for him'}, ${BOX_NAME[S.deck]}, ${MODES.find(m => m.id === S.mode).label}) and scored ${S.score}. Your turn: ${GAME_URL}`;
   const blob = recap ? await recap : null;
   const file = blob && new File([blob], 'swatch-score.png', { type: 'image/png' });
   try {
