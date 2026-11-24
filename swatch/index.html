@@ -129,6 +129,9 @@
   .res em { font: 700 18px var(--arial); flex: none; }
   .res.ok em { color: var(--ok); } .res.bad em { color: var(--bad); }
   .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .actions .share { grid-column: 1 / -1; }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--panel);
+    font: 15px var(--arial); padding: 10px 16px; border-radius: 12px; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ghost { min-height: 58px; border: 1.5px solid var(--line); background: var(--panel); border-radius: 16px; font-size: 1.2rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>

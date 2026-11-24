@@ -231,6 +231,7 @@ function show(screen) {
     setTimeout(() => input && input.focus({ preventScroll: true }), 60);
   }
   if (fresh) window.scrollTo(0, 0);
+  if (screen === 'done' && fresh) recap = buildRecap();
 }
 
 // Menu choices only move the highlight; nothing is redrawn.
@@ -306,6 +307,7 @@ const VIEWS = {
       <div class="actions">
         <button class="primary" type="button" data-act="start">Again</button>
         <button class="ghost" type="button" data-act="back">Menu</button>
+        <button class="ghost share" type="button" data-act="share">Share ↗</button>
       </div>
     </section>`;
   },
@@ -340,6 +342,64 @@ function roundView(revealed) {
   </section>`;
 }
 
+/* ---------- share: recap picture + link to the game ---------- */
+
+const GAME_URL = new URL('./', location.href).href.replace(/[?#].*$/, '');
+let recap = null; // Promise<Blob|null>, built when the results screen opens so Share responds instantly
+
+async function buildRecap() {
+  try {
+    const her = S.audience === 'her';
+    const fam = her ? '"Dancing Script", cursive' : 'Arial, Arimo, sans-serif';
+    const bold = her ? '500' : '700';
+    await Promise.all([`500 40px "Dancing Script"`, '400 40px Arimo', '700 40px Arimo'].map(f => document.fonts.load(f).catch(() => {})));
+    const rows = S.results, W = 1080, rowH = 96, top = 350, H = top + rows.length * rowH + 130;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const box = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.fillStyle = '#f1efea'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#1f1d1a'; g.textAlign = 'left'; g.font = 'bold 46px Arial, Arimo, sans-serif'; g.fillText('Swatch', 72, 110);
+    g.fillStyle = '#8b867c'; g.textAlign = 'right'; g.font = `${bold} ${her ? 50 : 38}px ${fam}`; g.fillText(her ? 'for her' : 'for him', W - 72, 110);
+    g.textAlign = 'center'; g.fillStyle = '#1f1d1a'; g.font = `${bold} 160px ${fam}`; g.fillText(String(S.score), W / 2, 265);
+    g.fillStyle = '#8b867c'; g.font = `400 44px ${fam}`; g.fillText(`${S.correct} / ${rows.length}`, W / 2, 322);
+    rows.forEach((r, i) => {
+      const y = top + i * rowH;
+      box(60, y, W - 120, rowH - 12, 18); g.fillStyle = '#fbfaf7'; g.fill(); g.strokeStyle = '#dcd8cf'; g.lineWidth = 2; g.stroke();
+      box(72, y + 10, 64, 64, 14); g.fillStyle = r.swatch.hex; g.fill(); g.strokeStyle = 'rgba(0,0,0,.1)'; g.stroke();
+      g.textAlign = 'left'; g.fillStyle = '#1f1d1a'; g.font = `${bold} ${her ? 42 : 36}px ${fam}`;
+      g.fillText(r.swatch.name, 166, r.ok ? y + 55 : y + 44);
+      if (!r.ok) {
+        g.fillStyle = '#c2433a'; g.font = `400 ${her ? 32 : 28}px ${fam}`; g.fillText(r.picked, 166, y + 76);
+        const tw = g.measureText(r.picked).width; g.fillRect(166, y + 66, tw, 2.5);
+      }
+      g.textAlign = 'right'; g.fillStyle = r.ok ? '#2f8a57' : '#c2433a'; g.font = 'bold 40px Arial, Arimo, sans-serif';
+      g.fillText(r.ok ? '✓' : '✕', W - 90, y + 56);
+    });
+    g.textAlign = 'center'; g.fillStyle = '#8b867c'; g.font = '400 34px Arial, Arimo, sans-serif';
+    g.fillText(GAME_URL.replace(/^https?:\/\//, ''), W / 2, H - 56);
+    return await new Promise(res => c.toBlob(res, 'image/png'));
+  } catch { return null; }
+}
+
+async function share() {
+  const text = `I named ${S.correct}/${S.queue.length} colours in Swatch (${S.audience === 'her' ? 'for her' : 'for him'}) and scored ${S.score}. Your turn: ${GAME_URL}`;
+  const blob = recap ? await recap : null;
+  const file = blob && new File([blob], 'swatch-score.png', { type: 'image/png' });
+  try {
+    // The link goes in the text too: some apps (e.g. WhatsApp) drop the url field when a picture is attached.
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
+    if (navigator.share) { await navigator.share({ title: 'Swatch', text, url: GAME_URL }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // No share sheet (desktop): save the picture and copy the text with the link.
+  if (blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'swatch-score.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+  try { await navigator.clipboard.writeText(text); toast('Link copied'); } catch { toast(GAME_URL); }
+}
+
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
 /* ---------- input ---------- */
 
 app.addEventListener('click', e => {
@@ -354,6 +414,7 @@ app.addEventListener('click', e => {
   else if (act === 'back') backward();
   else if (act === 'choose') choose(+v);
   else if (act === 'next') next();
+  else if (act === 'share') share();
 });
 
 backBtn.addEventListener('click', () => { sfx.tap(); backward(); });
