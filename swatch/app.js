@@ -245,6 +245,7 @@ function show(screen) {
     setTimeout(() => input && input.focus({ preventScroll: true }), 60);
   }
   if (fresh) window.scrollTo(0, 0);
+  if (screen === 'intro') paintHerStrip();
   if (screen === 'play') startClock();
   if (screen === 'done' && fresh) recap = buildRecap();
 }
@@ -256,6 +257,28 @@ function paintMenu() {
   const best = readBest();
   app.querySelector('.best').textContent = best ? `Best ${best}` : '';
 }
+
+// "For her" strip: all 216 pencils, painted edge to edge at full colour on a canvas.
+// As CSS bars they are under 1.5 px wide on a phone, and the gaps between them washed the colours out.
+function paintHerStrip() {
+  const c = app.querySelector('canvas.strip');
+  if (!c || !c.clientWidth) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  c.width = Math.round(c.clientWidth * dpr); c.height = Math.round(c.clientHeight * dpr);
+  const g = c.getContext('2d');
+  const list = CRAYOLA.concat(NEOPASTEL).sort((a, b) => hue(a.hex) - hue(b.hex));
+  const step = c.width / list.length;
+  const tip = Math.min(12 * dpr, Math.max(5 * dpr, step * 3.5));
+  const shade = (hex, f) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
+  list.forEach((s, i) => {
+    const x0 = Math.round(i * step), w = Math.max(1, Math.round((i + 1) * step) - x0);
+    const top = Math.round(c.height * (1 - (0.62 + ((i * 37) % 17) / 100)));
+    g.fillStyle = s.hex; g.fillRect(x0, top, w, c.height - top);
+    g.fillStyle = shade(s.hex, 0.92);
+    g.beginPath(); g.moveTo(x0, top); g.lineTo(x0 + w, top); g.lineTo(x0 + w / 2, top - tip); g.closePath(); g.fill();
+  });
+}
+window.addEventListener('resize', () => { if (S.screen === 'intro') paintHerStrip(); });
 
 function crayonStrip(list, fat) {
   return `<div class="crayons${fat ? ' fat' : ''}" aria-hidden="true">${list
@@ -280,7 +303,7 @@ const VIEWS = {
     return `<section class="screen center">
       <div class="boxes">
         <button class="box her" type="button" data-act="aud" data-v="her">
-          ${crayonStrip(CRAYOLA.concat(NEOPASTEL), false)}
+          <canvas class="strip" aria-hidden="true"></canvas>
           <span class="who">For her</span>
         </button>
         <button class="box him" type="button" data-act="aud" data-v="him">
