@@ -22,14 +22,14 @@ const BASIC = new Set(['black', 'blue', 'brown', 'gray', 'grey', 'green', 'orang
 const isBasic = s => BASIC.has(normalize(s.name));
 
 const DECKS = [
-  { id: 'crayola', label: 'Crayola' },
-  { id: 'neopastel', label: 'Neopastel' },
-  { id: 'both', label: 'Both' },
+  { id: 'crayola', label: 'Crayola', detail: '120 crayons' },
+  { id: 'neopastel', label: 'Neopastel', detail: '96 pastels' },
+  { id: 'both', label: 'Both', detail: 'Either box' },
 ];
 const MODES = [
-  { id: 'close', label: 'Close calls' },
-  { id: 'open', label: 'Open box' },
-  { id: 'write', label: 'Write it' },
+  { id: 'close', label: 'Close calls', detail: 'Pick from four similar shades' },
+  { id: 'open', label: 'Open box', detail: 'Pick from four random names' },
+  { id: 'write', label: 'Write it', detail: 'Type the name yourself' },
 ];
 
 function poolFor(deck, audience) {
@@ -266,10 +266,10 @@ const VIEWS = {
     const best = readBest();
     return `<section class="screen center">
       <div class="seg three">${DECKS.map(d => `
-        <button class="opt" type="button" data-act="deck" data-v="${d.id}" aria-pressed="${S.deck === d.id}">${d.label}</button>`).join('')}
+        <button class="opt" type="button" data-act="deck" data-v="${d.id}" aria-pressed="${S.deck === d.id}"><b>${d.label}</b><small>${S.audience === 'him' ? `${poolFor(d.id, 'him').length} basics` : d.detail}</small></button>`).join('')}
       </div>
       <div class="seg">${MODES.map(m => `
-        <button class="opt" type="button" data-act="mode" data-v="${m.id}" aria-pressed="${S.mode === m.id}">${m.label}</button>`).join('')}
+        <button class="opt" type="button" data-act="mode" data-v="${m.id}" aria-pressed="${S.mode === m.id}"><b>${m.label}</b><small>${m.detail}</small></button>`).join('')}
       </div>
       <button class="primary" type="button" data-act="start">Play</button>
       <p class="best">${best ? `Best ${best}` : ''}</p>

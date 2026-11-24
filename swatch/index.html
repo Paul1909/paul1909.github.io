@@ -70,7 +70,10 @@
   /* Menu */
   .seg { display: grid; gap: 8px; margin-bottom: 18px; }
   .seg.three { grid-template-columns: repeat(3, 1fr); }
-  .opt { border: 1.5px solid var(--line); background: var(--panel); border-radius: 14px; padding: 8px 10px; min-height: 58px; font-size: 1.05rem; }
+  .opt { border: 1.5px solid var(--line); background: var(--panel); border-radius: 14px; padding: 8px 10px; min-height: 64px; font-size: 1.05rem; }
+  .opt b { display: block; font-weight: inherit; }
+  .opt small { display: block; color: var(--muted); font-size: .72rem; margin-top: 3px; font-weight: 400; }
+  body[data-aud="her"] .opt small { font-size: .82rem; }
   .opt[aria-pressed="true"] { border-color: var(--ink); background: #fff; box-shadow: 0 0 0 1px var(--ink); }
   .primary { min-height: 58px; border: 0; border-radius: 16px; background: var(--ink); color: var(--panel); font-size: 1.2rem; }
   body[data-aud="him"] .primary, body[data-aud="him"] .opt[aria-pressed="true"] { font-weight: 700; }
