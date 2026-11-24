@@ -27,8 +27,8 @@ const DECKS = [
   { id: 'both', label: 'Both', detail: 'Either box' },
 ];
 const MODES = [
-  { id: 'close', label: 'Close calls', detail: 'Pick from four similar shades' },
   { id: 'open', label: 'Open box', detail: 'Pick from four random names' },
+  { id: 'close', label: 'Close calls', detail: 'Pick from four similar shades' },
   { id: 'write', label: 'Write it', detail: 'Type the name yourself' },
 ];
 
@@ -121,7 +121,7 @@ const S = {
   screen: 'intro',
   audience: store.get('audience', 'her'),
   deck: store.get('deck', 'crayola'),
-  mode: store.get('mode', 'close'),
+  mode: store.get('mode', 'open'),
   queue: [], index: 0, choices: [], picked: null, typed: '',
   score: 0, correct: 0, streak: 0, results: [], verdict: null,
 };
@@ -157,11 +157,25 @@ function setRound() {
   Object.assign(S, { choices: choicesFor(answer, pool, S.mode), picked: null, typed: '', verdict: null });
 }
 
+/* Hidden answer clock: never shown while playing; fast right answers earn a bonus,
+   and each answer's time appears on the results page. Time with the app in the background doesn't count. */
+const clock = { start: 0, hiddenAt: 0, paused: 0 };
+function startClock() { clock.start = performance.now(); clock.paused = 0; clock.hiddenAt = document.hidden ? clock.start : 0; }
+function readClock() { const now = performance.now(); return now - clock.start - clock.paused - (clock.hiddenAt ? now - clock.hiddenAt : 0); }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clock.hiddenAt = performance.now();
+  else if (clock.hiddenAt) { clock.paused += performance.now() - clock.hiddenAt; clock.hiddenAt = 0; }
+});
+// Up to +10 for an instant answer, falling to 0 at 8 s (15 s when typing).
+const speedBonus = ms => Math.round(10 * Math.max(0, 1 - ms / (S.mode === 'write' ? 15000 : 8000)));
+const fmtTime = ms => (ms < 10000 ? (ms / 1000).toFixed(1) : Math.round(ms / 1000)) + ' s';
+
 function award(hit, guess) {
+  const ms = readClock();
   S.picked = guess;
   if (hit) {
     S.streak++;
-    S.score += (S.mode === 'write' ? 15 : 10) + Math.min(S.streak - 1, 4) * 2;
+    S.score += (S.mode === 'write' ? 15 : 10) + Math.min(S.streak - 1, 4) * 2 + speedBonus(ms);
     S.correct++;
     S.verdict = 'ok';
     sfx.ok();
@@ -170,7 +184,7 @@ function award(hit, guess) {
     S.verdict = 'bad';
     sfx.bad();
   }
-  S.results.push({ swatch: S.queue[S.index], ok: hit, picked: guess });
+  S.results.push({ swatch: S.queue[S.index], ok: hit, picked: guess, ms });
   show('reveal');
 }
 
@@ -231,6 +245,7 @@ function show(screen) {
     setTimeout(() => input && input.focus({ preventScroll: true }), 60);
   }
   if (fresh) window.scrollTo(0, 0);
+  if (screen === 'play') startClock();
   if (screen === 'done' && fresh) recap = buildRecap();
 }
 
@@ -301,6 +316,7 @@ const VIEWS = {
         <div class="res ${r.ok ? 'ok' : 'bad'}">
           <i style="background:${r.swatch.hex}"></i>
           <div><b>${esc(r.swatch.name)}</b>${r.ok ? '' : `<s>${esc(r.picked)}</s>`}</div>
+          <span class="t">${fmtTime(r.ms)}</span>
           <em>${r.ok ? '✓' : '✕'}</em>
         </div>`).join('')}
       </div>
@@ -374,6 +390,7 @@ async function buildRecap() {
       }
       g.textAlign = 'right'; g.fillStyle = r.ok ? '#2f8a57' : '#c2433a'; g.font = 'bold 40px Arial, Arimo, sans-serif';
       g.fillText(r.ok ? '✓' : '✕', W - 90, y + 56);
+      g.fillStyle = '#8b867c'; g.font = '400 30px Arial, Arimo, sans-serif'; g.fillText(fmtTime(r.ms), W - 150, y + 54);
     });
     g.textAlign = 'center'; g.fillStyle = '#8b867c'; g.font = '400 34px Arial, Arimo, sans-serif';
     g.fillText(GAME_URL.replace(/^https?:\/\//, ''), W / 2, H - 56);

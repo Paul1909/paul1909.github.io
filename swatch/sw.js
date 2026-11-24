@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'swatch';
-const VERSION = APP + '-v7';
+const VERSION = APP + '-v8';
 const FILES = [
   './',
   './index.html',
