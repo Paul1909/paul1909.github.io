@@ -80,8 +80,14 @@
   .fact { margin: 0; line-height: 1.5; }
   .fact a { color: var(--gold); }
   .fact b { color: var(--gold); font-weight: 600; }
-  .skymap { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-  .skymap canvas { touch-action: manipulation; }
+  html, body { overflow-x: hidden; }
+  .skymap { display: flex; flex-direction: column; gap: 10px; align-items: center;
+    width: min(100vw, 720px); position: relative; left: 50%; transform: translateX(-50%); }
+  .skymap > :not(canvas) { width: 100%; padding: 0 16px; box-sizing: border-box; margin: 0; }
+  .skymap canvas { touch-action: none; cursor: grab; display: block; }
+  .skymap.full { position: fixed; inset: 0; left: 0; transform: none; width: 100%; z-index: 50; background: var(--bg);
+    justify-content: center; overflow: auto; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .skybtns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .skyrow { display: flex; align-items: center; gap: 10px; width: 100%; }
   .skyrow span { color: var(--fg); font-size: 14px; min-width: 88px; font-variant-numeric: tabular-nums; }
   .skyrow input[type=range] { flex: 1; padding: 0; border: 0; accent-color: var(--gold); }
