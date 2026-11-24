@@ -688,6 +688,7 @@ function results() {
     <div class="lbl">${list(cfg.show).map(esc).join(' + ')} → ${list(cfg.ask).map(esc).join(' / ')} · ${esc(groupsOn().length ? groupLabel() : M.name)}</div>
     <p class="big">${quiz.score} / ${n}</p>
     <div class="hint">${pct}% correct · best ${best}%</div>
+    <button class="btn sharebtn" id="share"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>Share result</button>
     ${quiz.missed.length ? `<div class="lbl" style="margin-top:12px">To review (tap to see on the map)</div>
     <ul class="missed">${quiz.missed.map(id => `<li data-id="${id}"><img src="${flagSrc(id)}" alt=""><div><b>${esc(C[id].n)}</b><small>${esc(C[id].cap)}</small></div></li>`).join('')}</ul>`
     : '<div class="hint">Perfect round. Nothing to review.</div>'}`;
@@ -696,7 +697,79 @@ function results() {
     pane.querySelectorAll('.missed li').forEach(y => y.classList.toggle('on', y === li));
     selected = li.dataset.id; dirty = true; animateTo(selected, zoomFor(selected, 0.3, 6));
   });
+  // the picture is made straight away, so tapping Share opens the share sheet at once
+  const shot = shareImage(quiz.score, n, pct);
+  document.getElementById('share').onclick = () => shareResult(shot, quiz.score, n);
   footer([{ label: 'Map', on: () => history.back() }, { label: 'Play again', primary: true, on: startQuiz }]);
+}
+
+/* ---------------- share the result ---------------- */
+const GAME_URL = new URL('./', location.href).href;
+const loadImg = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+// A 1080x1350 picture of the round: score, settings and the map with right (yellow) and missed (red) regions.
+async function shareImage(score, n, pct) {
+  const Wc = 1080, Hc = 1350, c = document.createElement('canvas'); c.width = Wc; c.height = Hc;
+  const g = c.getContext('2d'), Pc = P, Mc = M;
+  const missed = new Set(quiz.missed), asked = quiz.items.map(x => x.id);
+  const flag = await loadImg(nationalFlag(Pc.code));
+  const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, Wc, Hc);
+  g.textBaseline = 'alphabetic'; g.fillStyle = '#1d1d1f';
+  g.font = font(800, 54); g.fillText('Wire Regions', 64, 112);
+  // country
+  let x = 64;
+  if (flag) { const fh = 46, fw = fh * (flag.naturalWidth / flag.naturalHeight || 4 / 3); g.drawImage(flag, x, 150, fw, fh); g.strokeStyle = '#e5e5e8'; g.lineWidth = 2; g.strokeRect(x, 150, fw, fh); x += fw + 18; }
+  g.font = font(700, 40); g.fillText(Mc.name + (groupsOn().length ? ' · ' + groupLabel() : ''), x, 188);
+  // score
+  g.font = font(800, 150); g.fillText(`${score} / ${n}`, 60, 360);
+  g.fillStyle = '#8a8a8e'; g.font = font(500, 36);
+  g.fillText(`${pct}% · ${list(cfg.show).join(' + ')} → ${list(cfg.ask).join(' / ')}`, 64, 418, Wc - 128);
+  // map
+  const box = { x: 64, y: 460, w: Wc - 128, h: 720 };
+  roundRect(g, box.x, box.y, box.w, box.h, 28); g.save(); g.clip();
+  g.fillStyle = '#f7f7f8'; g.fillRect(box.x, box.y, box.w, box.h);
+  const k = Math.min((box.w - 40) / Pc.MW, (box.h - 40) / Pc.MH);
+  const ox = box.x + (box.w - Pc.MW * k) / 2, oy = box.y + (box.h - Pc.MH * k) / 2;
+  g.setTransform(k, 0, 0, k, ox, oy); g.lineJoin = 'round';
+  g.fillStyle = WATER; g.fillRect(0, 0, Pc.MW, Pc.MH);
+  g.fillStyle = NEIGH; g.fill(Pc.neigh, 'evenodd'); g.strokeStyle = '#c8c8cc'; g.lineWidth = 1 / k; g.stroke(Pc.neigh);
+  for (const [fx, fy, fw, fh] of Pc.frames) { g.fillStyle = WATER; g.fillRect(fx, fy, fw, fh); g.strokeStyle = '#c2c2c6'; g.lineWidth = 1.5 / k; g.strokeRect(fx, fy, fw, fh); }
+  g.fillStyle = '#fff'; g.fill(Pc.land, 'evenodd');
+  for (const id of asked) { g.fillStyle = missed.has(id) ? '#f4a6a9' : Y; g.fill(Pc.F[id].path, 'evenodd'); }
+  g.strokeStyle = '#8e8e92'; g.lineWidth = 1.3 / k; g.stroke(Pc.land);
+  g.restore(); g.setTransform(1, 0, 0, 1, 0, 0);
+  g.strokeStyle = '#e5e5e8'; g.lineWidth = 2; roundRect(g, box.x, box.y, box.w, box.h, 28); g.stroke();
+  // legend + link
+  const dot = (cx, col) => { g.beginPath(); g.arc(cx, 1226, 13, 0, 2 * Math.PI); g.fillStyle = col; g.fill(); g.strokeStyle = '#8e8e92'; g.lineWidth = 2; g.stroke(); };
+  g.font = font(500, 32); g.fillStyle = '#1d1d1f';
+  dot(78, Y); g.fillStyle = '#1d1d1f'; g.fillText(`${Mc.ok} ${score}`, 102, 1237);
+  const w1 = g.measureText(`${Mc.ok} ${score}`).width;
+  dot(150 + w1, '#f4a6a9'); g.fillStyle = '#1d1d1f'; g.fillText(`${Mc.bad} ${n - score}`, 174 + w1, 1237);
+  g.fillStyle = '#8a8a8e'; g.font = font(600, 32);
+  g.fillText(GAME_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''), 64, 1300);
+  return new Promise(ok => c.toBlob(b => ok(b), 'image/png'));
+}
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+async function shareResult(shot, score, n) {
+  blip();
+  const text = `I got ${score}/${n} on ${M.list} (${M.name}) in Wire Regions. Can you beat me? ${GAME_URL}`;
+  const blob = await shot;
+  const file = blob && new File([blob], `wire-regions-${P.code.toLowerCase()}-${score}-of-${n}.png`, { type: 'image/png' });
+  try {
+    if (file && navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], title: 'Wire Regions', text });
+    if (navigator.share) return await navigator.share({ title: 'Wire Regions', text, url: GAME_URL });
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // no share sheet (e.g. desktop browser): save the picture and copy the text + link
+  if (file) { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+  try { await navigator.clipboard.writeText(text); toast('Picture saved, text and link copied'); }
+  catch { toast(file ? 'Picture saved' : GAME_URL); }
 }
 
 function setQuizLook(on) { document.body.classList.toggle('quizzing', on); }
