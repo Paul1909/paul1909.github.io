@@ -170,7 +170,7 @@ function award(hit, guess) {
     S.verdict = 'bad';
     sfx.bad();
   }
-  S.results.push({ swatch: S.queue[S.index], ok: hit });
+  S.results.push({ swatch: S.queue[S.index], ok: hit, picked: guess });
   show('reveal');
 }
 
@@ -280,10 +280,16 @@ const VIEWS = {
   reveal() { return roundView(true); },
 
   done() {
-    return `<section class="screen center">
+    return `<section class="screen">
       <p class="big">${S.score}</p>
       <p class="of">${S.correct} / ${S.queue.length}${S.best > 0 ? ` · Best ${S.best}` : ''}</p>
-      <div class="recap">${S.results.map(r => `<i class="${r.ok ? 'ok' : 'bad'}" style="background:${r.swatch.hex}"></i>`).join('')}</div>
+      <div class="results">${S.results.map(r => `
+        <div class="res ${r.ok ? 'ok' : 'bad'}">
+          <i style="background:${r.swatch.hex}"></i>
+          <div><b>${esc(r.swatch.name)}</b>${r.ok ? '' : `<s>${esc(r.picked)}</s>`}</div>
+          <em>${r.ok ? '✓' : '✕'}</em>
+        </div>`).join('')}
+      </div>
       <div class="actions">
         <button class="primary" type="button" data-act="start">Again</button>
         <button class="ghost" type="button" data-act="back">Menu</button>
