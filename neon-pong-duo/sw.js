@@ -1,6 +1,6 @@
 // Neon Pong Duo — offline cache (lives in its own folder on the shared arcade site).
 // Bump VERSION whenever you change any file, so phones pick up the update.
-const VERSION = 'neon-pong-duo-v4';
+const VERSION = 'neon-pong-duo-v5';
 const FILES = [
   './',
   './index.html',

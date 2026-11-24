@@ -1,6 +1,6 @@
 // Neon Ice Hockey — offline cache (lives in its own folder on the shared arcade site).
 // Bump VERSION whenever you change any file, so phones pick up the update.
-const VERSION = 'neon-ice-hockey-v2';
+const VERSION = 'neon-ice-hockey-v3';
 const FILES = [
   './',
   './index.html',
