@@ -85,7 +85,11 @@ new ResizeObserver(resize).observe(cv);
 const s0 = () => P ? Math.min(W / P.MW, H / P.MH) * 0.96 : 1;
 const scale = () => s0() * view.z;
 function clampView(v = view) {
-  if (!P || !W) return v;
+  if (!P) return v;
+  if (!isFinite(v.z)) v.z = 1;
+  if (!isFinite(v.cx)) v.cx = P.MW / 2;
+  if (!isFinite(v.cy)) v.cy = P.MH / 2;
+  if (!W || !H) return v;
   v.z = Math.max(1, Math.min(ZMAX, v.z));
   const s = s0() * v.z;
   // the map may slide a little past its edge, so a region at the border can still be centred
@@ -148,6 +152,8 @@ function animateView(target, dur = 900) {
   } };
 }
 function zoomFor(id, frac = 0.3, cap = 6) {
+  if (!W || !H) resize();
+  if (!W || !H) return 1;
   const b = F[id].bb, w = Math.max(1, b[2] - b[0]), h = Math.max(1, b[3] - b[1]);
   return Math.max(1, Math.min(cap, Math.min(W * frac / (w * s0()), H * frac / (h * s0()))));
 }
@@ -173,15 +179,16 @@ let lastT = 0;
 function frame(t) {
   const dt = Math.min(0.05, lastT ? (t - lastT) / 1000 : 0); lastT = t;
   if (anim) {
-    const p = Math.min(1, (t - anim.t0) / anim.dur); anim.step(ease(p)); clampView(); dirty = true;
+    const p = Math.min(1, (t - anim.t0) / anim.dur);
+    anim.step(ease(p)); clampView(); dirty = true;
     if (p >= 1) anim = null;
   } else if (inertia && !pointers.size) {
     view.cx += inertia.vx * dt; view.cy += inertia.vy * dt; clampView();
     const k = Math.exp(-dt * 4); inertia.vx *= k; inertia.vy *= k; dirty = true;
     if (Math.hypot(inertia.vx, inertia.vy) * scale() < 8) inertia = null;
   }
-  if (dirty) { draw(); dirty = false; }
   requestAnimationFrame(frame);
+  if (dirty) { dirty = false; try { draw(); } catch (e) { console.error(e); } }
 }
 requestAnimationFrame(frame);
 
@@ -549,6 +556,7 @@ function startQuiz() {
   quiz.items = len === 'All' ? pool : pool.slice(0, len);
   quiz.i = 0; quiz.score = 0; quiz.missed = [];
   mode = 'quiz'; setQuizLook(true); document.body.classList.remove('menuing');
+  resize();                        // the map was hidden by the menu: measure it before zooming anywhere
   ask();
 }
 
@@ -695,6 +703,7 @@ function setQuizLook(on) { document.body.classList.toggle('quizzing', on); }
 function toBrowse() {
   setQuizLook(false); document.body.classList.remove('menuing'); wrongSel = null;
   mode = 'browse'; selected = null; dirty = true;
+  resize();
   resetView();
   renderBrowse();
 }
