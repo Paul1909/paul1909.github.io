@@ -773,14 +773,39 @@ function openDb() {
   if (mode !== 'browse' || !dbEl.hidden) return;
   closeSearch(true);
   if (!dbList.firstChild) {
-    document.getElementById('dbcount').textContent = QUIZ.length;
-    dbList.innerHTML = QUIZ.map(c => `<div class="dbrow" data-id="${c.id}"><b>${esc(c.n)}</b>
+    dbList.innerHTML = QUIZ.map(c => `<div class="dbrow" data-id="${c.id}" data-r="${c.r}"><b>${esc(c.n)}</b>
       <img src="${flagSrc(c.id)}" alt="" loading="lazy"><span>${capText(c)}</span></div>`).join('');
   }
+  renderDbFilter();
   dbEl.hidden = false;
   history.pushState({ s: 'db' }, '');
 }
 dbBtn.onclick = openDb;
+// Region filter, same rules as the quiz: none selected = World; selecting all five = World
+let dbRegions = store.get('dbRegions', []);
+const dbFilter = document.getElementById('dbfilter');
+function renderDbFilter() {
+  dbFilter.innerHTML = REGIONS.map(r => {
+    const on = r === 'World' ? !dbRegions.length : dbRegions.includes(r);
+    return `<button class="choice${on ? ' on' : ''}" data-r="${r}">${r}</button>`;
+  }).join('');
+  let n = 0;
+  dbList.querySelectorAll('.dbrow').forEach(row => {
+    const show = !dbRegions.length || dbRegions.includes(row.dataset.r);
+    row.hidden = !show; if (show) n++;
+  });
+  document.getElementById('dbcount').textContent = n;
+}
+dbFilter.addEventListener('click', e => {
+  const b = e.target.closest('[data-r]'); if (!b) return;
+  const r = b.dataset.r;
+  if (r === 'World') dbRegions = [];
+  else dbRegions = dbRegions.includes(r) ? dbRegions.filter(x => x !== r) : [...dbRegions, r];
+  if (dbRegions.length === AREAS.length) dbRegions = [];
+  store.set('dbRegions', dbRegions);
+  renderDbFilter();
+  dbList.scrollTop = 0;
+});
 document.getElementById('dbclose').onclick = () => history.back();
 dbList.addEventListener('click', e => {
   const row = e.target.closest('.dbrow[data-id]'); if (!row) return;

@@ -108,13 +108,17 @@
   #dbclose { font-size: 26px; }
   .dbrow { display: grid; grid-template-columns: 1fr 52px 1fr; gap: 10px; align-items: center; padding: 0 16px; }
   .dbcols { color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding-bottom: 6px; border-bottom: 1px solid var(--bd); }
+  .dbfilter { padding: 0 16px 12px; }
+  .dbfilter .choice { padding: 7px 12px; min-height: 36px; font-size: 14px; }
+  #dblist .dbrow[hidden] { display: none; }
   #dblist { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   #dblist .dbrow { min-height: 48px; border-bottom: 1px solid #f0f0f2; cursor: pointer; font-size: 15px; }
   #dblist .dbrow:active { background: #fff8d6; }
   #dblist b { font-weight: 600; }
   #dblist img { width: 36px; height: 27px; object-fit: cover; border: 1px solid var(--bd); border-radius: 2px; display: block; }
   #dblist span:last-child { color: #444; }
-  @media (min-width: 760px) { .dbrow { max-width: 760px; margin: 0 auto; width: 100%; box-sizing: border-box; } }
+  @media (min-width: 760px) { .dbfilter { max-width: 760px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+    .dbrow { max-width: 760px; margin: 0 auto; width: 100%; box-sizing: border-box; } }
   /* compact look during a quiz, so nothing needs scrolling */
   body.quizzing .btn { min-height: 46px; font-size: 16px; }
   body.quizzing footer { padding: 6px 16px 10px; }
@@ -197,6 +201,7 @@
     <div class="dbtitle">Countries <small id="dbcount"></small></div>
     <button class="round" id="mute" aria-label="Sound on/off"></button>
   </div>
+  <div class="choices dbfilter" id="dbfilter"></div>
   <div class="dbrow dbcols"><span>Name</span><span>Flag</span><span>Capital</span></div>
   <div id="dblist"></div>
 </div>
