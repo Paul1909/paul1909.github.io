@@ -209,7 +209,10 @@ const muteBtn = document.getElementById('mute');
 const backBtn = document.getElementById('back');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Play and reveal are one screen: answering must not redraw it as a new page.
+const groupOf = screen => (screen === 'play' || screen === 'reveal' ? 'round' : screen);
 function show(screen) {
+  const fresh = groupOf(screen) !== groupOf(S.screen) || !app.firstElementChild;
   S.screen = screen;
   // Her: calligraphy. Him: Arial. The intro stays neutral.
   const aud = screen === 'intro' ? '' : S.audience;
@@ -221,11 +224,21 @@ function show(screen) {
     ? `${S.streak > 1 ? `🔥${S.streak} · ` : ''}${S.index + 1}/${S.queue.length} · <b>${S.score}</b>`
     : '';
   app.innerHTML = VIEWS[screen]();
+  // Fade in only when arriving on a different screen, never on taps within it.
+  if (fresh) app.firstElementChild.classList.add('enter');
   if (screen === 'play' && S.mode === 'write') {
     const input = app.querySelector('input');
     setTimeout(() => input && input.focus({ preventScroll: true }), 60);
   }
-  window.scrollTo(0, 0);
+  if (fresh) window.scrollTo(0, 0);
+}
+
+// Menu choices only move the highlight; nothing is redrawn.
+function paintMenu() {
+  app.querySelectorAll('[data-act=deck]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.deck));
+  app.querySelectorAll('[data-act=mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.mode));
+  const best = readBest();
+  app.querySelector('.best').textContent = best ? `Best ${best}` : '';
 }
 
 function crayonStrip(list, fat) {
@@ -335,8 +348,8 @@ app.addEventListener('click', e => {
   const act = b.dataset.act, v = b.dataset.v;
   if (act !== 'choose' && act !== 'next') sfx.tap();
   if (act === 'aud') { S.audience = v; store.set('audience', v); forward('menu'); }
-  else if (act === 'deck') { S.deck = v; store.set('deck', v); show('menu'); }
-  else if (act === 'mode') { S.mode = v; store.set('mode', v); show('menu'); }
+  else if (act === 'deck') { S.deck = v; store.set('deck', v); paintMenu(); }
+  else if (act === 'mode') { S.mode = v; store.set('mode', v); paintMenu(); }
   else if (act === 'start') { start(); if (S.screen === 'menu') forward('play'); else show('play'); }
   else if (act === 'back') backward();
   else if (act === 'choose') choose(+v);

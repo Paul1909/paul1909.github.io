@@ -48,10 +48,11 @@
   .hud b { color: var(--text); }
 
   #app { flex: 1; display: flex; flex-direction: column; }
-  .screen { flex: 1; display: flex; flex-direction: column; animation: rise .25s ease-out; }
+  .screen { flex: 1; display: flex; flex-direction: column; }
+  .screen.enter { animation: rise .2s ease-out; }
   .center { justify-content: center; padding-bottom: 48px; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: reduce) { .screen, .pop { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { .screen.enter, .pop { animation: none !important; } }
 
   /* Intro */
   .boxes { display: grid; gap: 16px; }
@@ -106,7 +107,8 @@
   form.guess button { min-height: 58px; min-width: 58px; border: 0; border-radius: 14px; background: var(--ink); color: var(--panel); font: 22px var(--arial); }
 
   .card { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
-  .pop { animation: rise .22s ease-out; }
+  .pop { animation: slide .18s ease-out; }
+  @keyframes slide { from { transform: translateY(6px); } to { transform: none; } }
   .name { flex: 1; font-size: 1.6rem; line-height: 1.1; display: flex; align-items: center; gap: 10px; }
   body[data-aud="him"] .name { font-weight: 700; font-size: 1.5rem; }
   .mark { font: 700 22px var(--arial); flex: none; }
