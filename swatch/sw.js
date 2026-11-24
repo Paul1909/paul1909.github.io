@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'swatch';
-const VERSION = APP + '-v2';
+const VERSION = APP + '-v3';
 const FILES = [
   './',
   './index.html',
@@ -12,7 +12,7 @@ const FILES = [
   './icon-512.png',
   './icon-maskable-512.png',
   './apple-touch-icon.png',
-  './fonts/pinyon-script.woff2',
+  './fonts/dancing-script.woff2',
   './fonts/arimo-400.woff2',
   './fonts/arimo-700.woff2',
 ];

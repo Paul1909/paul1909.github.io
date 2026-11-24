@@ -12,10 +12,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="preload" href="fonts/pinyon-script.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/dancing-script.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-  /* Fonts are bundled so they work offline. Pinyon Script for her; Arial for him (Arimo, an Arial clone, where Arial is missing). */
-  @font-face { font-family: "Pinyon Script"; src: url("fonts/pinyon-script.woff2") format("woff2"); font-display: block; }
+  /* Fonts are bundled so they work offline. Dancing Script for her; Arial for him (Arimo, an Arial clone, where Arial is missing). */
+  @font-face { font-family: "Dancing Script"; src: url("fonts/dancing-script.woff2") format("woff2"); font-weight: 500; font-display: block; }
   @font-face { font-family: "Arimo"; src: url("fonts/arimo-400.woff2") format("woff2"); font-weight: 400; }
   @font-face { font-family: "Arimo"; src: url("fonts/arimo-700.woff2") format("woff2"); font-weight: 700; }
 
@@ -23,13 +23,13 @@
   :root {
     --bg: #f1efea; --panel: #fbfaf7; --line: #dcd8cf; --text: #1f1d1a; --muted: #8b867c;
     --ink: #1f1d1a; --ok: #2f8a57; --bad: #c2433a;
-    --script: "Pinyon Script", "Snell Roundhand", cursive;
+    --script: "Dancing Script", "Snell Roundhand", cursive;
     --arial: Arial, Arimo, "Helvetica Neue", Helvetica, sans-serif;
     font-size: 16px;
   }
   body[data-aud="her"] { font-family: var(--script); }
   body[data-aud="him"] { font-family: var(--arial); }
-  html[data-aud="her"] { font-size: 22px; }
+  html[data-aud="her"] { font-size: 20px; }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
@@ -58,7 +58,7 @@
   .box { text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 22px; padding: 18px;
     display: flex; flex-direction: column; gap: 14px; }
   .box .who { line-height: 1; }
-  .box.her .who { font-family: var(--script); font-size: 46px; }
+  .box.her .who { font-family: var(--script); font-size: 40px; }
   .box.him .who { font-family: var(--arial); font-weight: 700; font-size: 32px; }
   .crayons { display: flex; height: 80px; align-items: flex-end; gap: 1px; }
   .crayons i { flex: 1; border-radius: 3px 3px 1px 1px; min-width: 0; }
