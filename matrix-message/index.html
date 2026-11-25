@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Matrix Msg">
+<meta name="description" content="Type a message, watch it decode out of Matrix rain, send it to a friend.">
+<title>Matrix Message</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --g: #00ff41;
+    --g-dim: rgba(0, 255, 65, .35);
+    --g-faint: rgba(0, 255, 65, .12);
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", "Noto Sans Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--g); font-family: var(--mono); }
+  body { overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  .hidden { display: none !important; }
+
+  #screen { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+
+  button {
+    font: inherit; color: var(--g); background: rgba(0, 0, 0, .55);
+    border: 1px solid var(--g-dim); border-radius: 10px;
+    min-height: 44px; padding: 0 14px; cursor: pointer; user-select: none; -webkit-user-select: none;
+  }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--g); color: #000; border-color: var(--g); font-weight: 700; }
+  button.ghost { background: transparent; border-color: transparent; }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--g); outline-offset: 2px; }
+
+  /* ---------- Composer ---------- */
+  #composer {
+    position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; align-items: center;
+    padding: calc(env(safe-area-inset-top) + 16px) calc(env(safe-area-inset-right) + 14px)
+             calc(env(safe-area-inset-bottom) + 20px) calc(env(safe-area-inset-left) + 14px);
+  }
+  .card {
+    width: 100%; max-width: 520px; margin: auto 0;
+    background: rgba(0, 6, 2, .8); border: 1px solid var(--g-dim); border-radius: 14px;
+    padding: 18px 16px 14px; box-shadow: 0 0 32px var(--g-faint);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  }
+  h1 {
+    margin: 0 0 14px; font-size: clamp(22px, 7vw, 30px); letter-spacing: .14em; color: #d9ffe1;
+    text-shadow: 0 0 6px var(--g), 0 0 18px rgba(0, 255, 65, .5);
+  }
+  h1 .cur { animation: blink 1s steps(1) infinite; color: var(--g); }
+
+  textarea {
+    width: 100%; min-height: 108px; resize: vertical; display: block;
+    font: 16px/1.4 var(--mono); color: #eaffef; background: #000;
+    border: 1px solid var(--g-dim); border-radius: 10px; padding: 12px;
+    caret-color: var(--g);
+  }
+  textarea::placeholder { color: rgba(0, 255, 65, .38); }
+  .meta { display: flex; justify-content: flex-end; margin-top: 6px; font-size: 12px; }
+  .meta .count.warn { color: #ffb000; }
+
+  .actions { display: flex; gap: 10px; margin-top: 12px; }
+  .actions button { flex: 1; font-size: 16px; }
+
+  details { margin-top: 14px; border-top: 1px solid var(--g-faint); padding-top: 6px; }
+  summary { cursor: pointer; padding: 10px 2px; font-weight: 700; letter-spacing: .06em; list-style: none; user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  .set { margin: 10px 0 16px; }
+  .lbl { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; opacity: .9; }
+  .lbl output { color: #d9ffe1; }
+  .chips, .seg, .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button, .seg button { min-height: 38px; padding: 0 11px; font-size: 13px; border-radius: 999px; }
+  .chips button.on, .seg button.on { background: var(--g); color: #000; border-color: var(--g); font-weight: 700; }
+  .swatches button, .swatches label {
+    width: 38px; height: 38px; min-height: 38px; padding: 0; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .15); position: relative; overflow: hidden; cursor: pointer;
+  }
+  .swatches .on { border-color: #fff; box-shadow: 0 0 0 2px #000 inset; }
+  .swatches label { display: grid; place-items: center; font-size: 16px; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .swatches input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: 0; padding: 0; }
+  #customChars {
+    margin-top: 8px; width: 100%; font: 16px var(--mono); color: #eaffef; background: #000;
+    border: 1px solid var(--g-dim); border-radius: 10px; padding: 10px 12px;
+  }
+  input[type=range] { width: 100%; accent-color: var(--g); height: 28px; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 14px; margin: 12px 0; cursor: pointer; user-select: none; }
+  .check input { width: 22px; height: 22px; accent-color: var(--g); }
+  #resetSettings { font-size: 13px; opacity: .7; padding: 0 4px; }
+
+  /* ---------- Playback chrome ---------- */
+  #closeBtn {
+    position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: calc(env(safe-area-inset-left) + 10px);
+    width: 44px; padding: 0; opacity: .45; background: rgba(0, 0, 0, .4); z-index: 5;
+  }
+  #bar {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 5;
+    bottom: calc(env(safe-area-inset-bottom) + 18px);
+    display: flex; gap: 8px; padding: 8px; border-radius: 14px;
+    background: rgba(0, 0, 0, .75); border: 1px solid var(--g-dim);
+    animation: rise .35s ease-out; max-width: calc(100vw - 20px);
+  }
+  #bar button { white-space: nowrap; }
+  #rec {
+    position: fixed; top: calc(env(safe-area-inset-top) + 18px); right: calc(env(safe-area-inset-right) + 16px);
+    color: #ff4040; font-weight: 700; font-size: 14px; z-index: 5; animation: blink 1s steps(1) infinite;
+  }
+
+  /* ---------- Sheets ---------- */
+  .sheet { position: fixed; inset: 0; z-index: 10; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, .55); }
+  .sheet-card {
+    width: 100%; max-width: 480px; margin: 0 10px calc(env(safe-area-inset-bottom) + 12px);
+    background: #020a04; border: 1px solid var(--g-dim); border-radius: 16px; padding: 16px;
+    display: flex; flex-direction: column; gap: 8px; animation: rise .25s ease-out;
+  }
+  .sheet-card h2 { margin: 0 0 4px; font-size: 16px; letter-spacing: .1em; }
+  .sheet-card button { text-align: left; padding: 10px 14px; font-size: 15px; display: flex; flex-direction: column; gap: 2px; }
+  .sheet-card button small { opacity: .65; font-size: 12px; }
+  .sheet-card button.primary small { opacity: .75; }
+  .sheet-card button.ghost { align-items: center; }
+
+  /* ---------- Incoming message intro ---------- */
+  #intro {
+    position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center;
+    padding: 24px; cursor: pointer; user-select: none;
+  }
+  .term {
+    background: rgba(0, 0, 0, .78); border: 1px solid var(--g-dim); border-radius: 12px;
+    padding: 20px 22px; min-width: min(320px, 88vw); max-width: 92vw; box-shadow: 0 0 28px var(--g-faint);
+  }
+  #introText { white-space: pre-line; margin: 0; font-size: 15px; line-height: 1.7; min-height: 5em; text-shadow: 0 0 6px rgba(0, 255, 65, .6); }
+  #tapHint { margin: 14px 0 0; font-weight: 700; color: #eaffef; letter-spacing: .12em; }
+  #tapHint::after { content: "_"; animation: blink 1s steps(1) infinite; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: translateX(-50%);
+    background: rgba(0, 0, 0, .9); border: 1px solid var(--g-dim); border-radius: 10px; padding: 10px 14px;
+    font-size: 14px; z-index: 20; opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; text-align: center;
+  }
+  #toast.show { opacity: 1; }
+
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes rise { from { opacity: 0; transform: translate(var(--tx, 0), 14px); } }
+  #bar { --tx: -50%; }
+</style>
+<script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body>
+  <canvas id="screen" aria-label="Matrix rain animation"></canvas>
+
+  <main id="composer">
+    <div class="card">
+      <h1>MATRIX MESSAGE<span class="cur">_</span></h1>
+
+      <textarea id="msg" maxlength="280" spellcheck="true" autocomplete="off"
+        placeholder="can you pick up the milk on the way home?" aria-label="Your message"></textarea>
+      <div class="meta">
+        <span class="count" id="count">0 / 280</span>
+      </div>
+
+      <div class="actions">
+        <button id="play" class="primary" type="button">▶ Play</button>
+        <button id="composeShare" type="button">Send ↗</button>
+      </div>
+
+      <details id="settings">
+        <summary>SETTINGS</summary>
+
+        <div class="set">
+          <div class="lbl">Rain characters</div>
+          <div class="chips" id="chips"></div>
+          <input id="customChars" class="hidden" type="text" maxlength="120" autocomplete="off"
+            placeholder="Your own characters, e.g. MILK🥛 or $€¥" aria-label="Custom rain characters">
+        </div>
+
+        <div class="set">
+          <label class="lbl" for="len">Animation length <output id="lenOut"></output></label>
+          <input type="range" id="len" min="4" max="30" step="1">
+        </div>
+
+        <div class="set">
+          <label class="lbl" for="speed">Rain speed <output id="speedOut"></output></label>
+          <input type="range" id="speed" min="6" max="45" step="1">
+        </div>
+
+        <div class="set">
+          <label class="lbl" for="trail">Trail length <output id="trailOut"></output></label>
+          <input type="range" id="trail" min="1" max="5" step="1">
+        </div>
+
+        <div class="set">
+          <div class="lbl">Rain colour</div>
+          <div class="swatches" id="swatches"></div>
+        </div>
+
+        <div class="set">
+          <div class="lbl">Message colour</div>
+          <div class="seg" data-key="msgColor">
+            <button type="button" data-v="white">White</button>
+            <button type="button" data-v="rain">Same as rain</button>
+          </div>
+        </div>
+
+        <div class="set">
+          <div class="lbl">Ending</div>
+          <div class="seg" data-key="end">
+            <button type="button" data-v="fade">Fade to message</button>
+            <button type="button" data-v="keep">Keep raining</button>
+            <button type="button" data-v="loop">Loop</button>
+          </div>
+        </div>
+
+        <label class="check"><input type="checkbox" id="upper"> UPPERCASE message</label>
+        <label class="check"><input type="checkbox" id="crt"> CRT scanlines</label>
+
+        <button id="resetSettings" class="ghost" type="button">↺ Reset settings</button>
+      </details>
+    </div>
+  </main>
+
+  <div id="intro" class="hidden" role="button" tabindex="0" aria-label="Tap to decode the message">
+    <div class="term">
+      <p id="introText"></p>
+      <p id="tapHint" class="hidden">TAP TO DECODE</p>
+    </div>
+  </div>
+
+  <button id="closeBtn" class="hidden" type="button" aria-label="Back">✕</button>
+  <div id="rec" class="hidden">● REC <span id="recTime"></span></div>
+
+  <div id="bar" class="hidden">
+    <button id="replay" type="button">↻ Replay</button>
+    <button id="edit" type="button">✎ Edit</button>
+    <button id="barShare" class="primary" type="button">Send ↗</button>
+  </div>
+
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-card" role="dialog" aria-label="Send it">
+      <h2>SEND IT</h2>
+      <button type="button" class="primary" data-share="link">🔗 Secret link<small>They watch the rain decode it. No spoilers.</small></button>
+      <button type="button" data-share="image">🖼 Picture + link<small>Shows the message straight away</small></button>
+      <button type="button" data-share="video" id="videoOpt">🎬 Video<small id="videoNote">Records the animation</small></button>
+      <button type="button" class="ghost" data-share="cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div id="videoReady" class="sheet hidden">
+    <div class="sheet-card" role="dialog" aria-label="Video ready">
+      <h2>VIDEO READY</h2>
+      <button type="button" class="primary" id="shareVideo">Share video ↗<small>WhatsApp, Messages, …</small></button>
+      <button type="button" id="saveVideo">⬇ Save to device</button>
+      <button type="button" class="ghost" id="closeVideo">Close</button>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
