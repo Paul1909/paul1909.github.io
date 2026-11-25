@@ -52,8 +52,8 @@
   :root[data-theme="light"] .badge { box-shadow: none; }
   :root[data-theme="light"] .log li::before { box-shadow: none; }
 
+  .toggles { position: absolute; top: -38px; right: 0; display: flex; gap: 8px; }
   .theme-toggle {
-    position: absolute; top: -38px; right: 0;
     display: inline-flex; align-items: center; gap: 6px;
     font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
     background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
@@ -62,6 +62,9 @@
     transition: border-color .15s ease;
   }
   .theme-toggle:hover, .theme-toggle:focus-visible { border-color: var(--cyan); outline: none; }
+
+  /* Sharp mode: every corner square — buttons, tiles, icons, cards, tags, badges, dots */
+  :root[data-shape="sharp"] *, :root[data-shape="sharp"] *::before, :root[data-shape="sharp"] *::after { border-radius: 0 !important; }
   * { box-sizing: border-box; margin: 0; }
   html { -webkit-text-size-adjust: 100%; }
   body {
@@ -158,13 +161,17 @@
 </style>
 <script>
   try { if (localStorage.getItem("arcade:theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
+  try { if (localStorage.getItem("arcade:shape") === "sharp") document.documentElement.dataset.shape = "sharp"; } catch (e) {}
 </script>
 <script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <button class="theme-toggle" id="themeToggle" type="button"></button>
+    <div class="toggles">
+      <button class="theme-toggle" id="shapeToggle" type="button"></button>
+      <button class="theme-toggle" id="themeToggle" type="button"></button>
+    </div>
     <h1>Paolo's Arcade</h1>
     <p class="tagline">Little games and tools I build for fun</p>
   </header>
@@ -427,6 +434,20 @@ themeBtn.addEventListener("click", () => {
   const t = document.documentElement.dataset.theme === "light" ? "dark" : "light";
   applyTheme(t);
   try { localStorage.setItem("arcade:theme", t); } catch (e) {}
+});
+
+const shapeBtn = document.getElementById("shapeToggle");
+function applyShape(s) {
+  if (s === "sharp") document.documentElement.dataset.shape = "sharp";
+  else delete document.documentElement.dataset.shape;
+  shapeBtn.textContent = s === "sharp" ? "● Round" : "■ Sharp";
+  shapeBtn.setAttribute("aria-label", s === "sharp" ? "Switch to rounded corners" : "Switch to sharp corners");
+}
+applyShape(document.documentElement.dataset.shape === "sharp" ? "sharp" : "round");
+shapeBtn.addEventListener("click", () => {
+  const s = document.documentElement.dataset.shape === "sharp" ? "round" : "sharp";
+  applyShape(s);
+  try { localStorage.setItem("arcade:shape", s); } catch (e) {}
 });
 
 const splitCard = g => `
