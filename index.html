@@ -138,6 +138,11 @@
   .half { display: flex; flex-direction: column; padding: 14px; background: color-mix(in srgb, var(--half) 7%, transparent); }
   .half + .half { border-left: 1px solid var(--line); }
   .half .icon { --accent: var(--half); width: 46px; height: 46px; font-size: 25px; margin-bottom: 10px; }
+  /* App icons (icons/<slug>.svg, Candy Tile style). Emoji stays as the fallback if a tile is missing. */
+  .icon.tile { background: none; border: 0; border-radius: 22%; overflow: hidden;
+    box-shadow: 0 8px 18px -8px var(--accent, var(--cyan)); }
+  .icon.tile img { width: 100%; height: 100%; display: block; }
+  .mini { width: 20px; height: 20px; border-radius: 22%; vertical-align: -4px; margin-right: 2px; }
   .half h4 { font-size: 17px; margin-bottom: 4px; }
   .half p { color: var(--muted); font-size: 14px; flex: 1; margin-bottom: 12px; }
   .btn {
@@ -194,7 +199,10 @@
    of the list, change the details, and commit. That's it.
    - url:   the game folder, e.g. "./my-new-game/"
    - added: date it joined the arcade (YYYY-MM-DD)
-   - color: card glow colour (any CSS colour)
+   - color: card glow colour (any CSS colour); also the icon's tile colour
+   - icon:  shown automatically from icons/<folder>.svg, made with
+            icons/make_icons.py (see icons/STYLE-GUIDE.md). The emoji
+            is only a fallback if that file is missing.
    - soon:  true = shows as "coming soon", not clickable
    - split: [gameA, gameB] = two games in one card, each half
             with its own title, emoji, desc, url, colour + button
@@ -431,6 +439,11 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
 
 const games = [...GAMES].sort((a, b) => b.added.localeCompare(a.added));
 const live = games.filter(g => !g.soon);
+const slugOf = g => (String(g.url || "").match(/^\.?\/?([\w-]+)\/?$/) || [])[1];
+const iconImg = (g, cls) => { const s = slugOf(g); return s
+  ? `<img src="./icons/${esc(s)}.svg" alt="" ${cls ? `class="${cls}" ` : ""}onerror="this.parentNode.classList.remove('tile');this.replaceWith(document.createTextNode(this.dataset.e))" data-e="${esc(g.emoji || "🎮")}">`
+  : esc(g.emoji || "🎮"); };
+const iconBox = g => `<div class="icon${slugOf(g) ? " tile" : ""}">${iconImg(g)}</div>`;
 const isNew = g => (Date.now() - new Date(g.added + "T12:00:00")) / 864e5 <= NEW_DAYS;
 
 const themeBtn = document.getElementById("themeToggle");
@@ -470,7 +483,7 @@ const splitCard = g => `
     ${g.desc ? `<p>${esc(g.desc)}</p>` : ""}
     <div class="halves">${g.split.map(h => `
       <div class="half" style="--half:${esc(h.color || g.color || "#3ef2ff")}">
-        <div class="icon">${esc(h.emoji || "🎮")}</div>
+        ${iconBox(h)}
         <h4>${esc(h.title)}</h4>
         <p>${esc(h.desc)}</p>
         <a class="btn" href="${esc(h.url)}">Play ▶</a>
@@ -482,7 +495,7 @@ const splitCard = g => `
 document.getElementById("grid").innerHTML = games.map(g => g.split ? splitCard(g) : `
   <a class="card${g.soon ? " soon" : ""}" href="${esc(g.url)}" ${g.soon ? 'aria-disabled="true"' : ""} style="--accent:${esc(g.color || "#3ef2ff")}">
     ${g.soon ? '<span class="badge" style="background:#9a92c4">SOON</span>' : isNew(g) ? '<span class="badge">NEW</span>' : ""}
-    <div class="icon">${esc(g.emoji || "🎮")}</div>
+    ${iconBox(g)}
     <h3>${esc(g.title)}</h3>
     <p>${esc(g.desc)}</p>
     <div class="meta">
@@ -492,7 +505,7 @@ document.getElementById("grid").innerHTML = games.map(g => g.split ? splitCard(g
   </a>`).join("");
 
 document.getElementById("log").innerHTML = live.map(g => `
-  <li><time datetime="${esc(g.added)}">${fmt(g.added)}</time><span>${g.split ? g.split.map(h => `${esc(h.emoji || "🎮")} <b>${esc(h.title)}</b>`).join(" and ") + " joined" : `${esc(g.emoji || "🎮")} <b>${esc(g.title)}</b> joined`} the arcade</span></li>`).join("");
+  <li><time datetime="${esc(g.added)}">${fmt(g.added)}</time><span>${g.split ? g.split.map(h => `${iconImg(h, "mini")} <b>${esc(h.title)}</b>`).join(" and ") + " joined" : `${iconImg(g, "mini")} <b>${esc(g.title)}</b> joined`} the arcade</span></li>`).join("");
 </script>
 </body>
 </html>

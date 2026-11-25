@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'dots-and-lines';
-const VERSION = APP + '-v6';
+const VERSION = APP + '-v7';
 const FILES = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const FILES = [
   './bot.js',
   './manifest.webmanifest',
   './favicon.svg',
+  './icon.svg',
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',

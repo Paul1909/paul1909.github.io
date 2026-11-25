@@ -1,7 +1,7 @@
 // Offline cache for the app shell. The song clips stream from Apple and are not cached.
 // Change VERSION whenever any file changes, so installed copies update.
 const APP = 'backstreet-boys-name-that-tune';
-const VERSION = APP + '-v2';
+const VERSION = APP + '-v3';
 const FILES = [
   './',
   './index.html',

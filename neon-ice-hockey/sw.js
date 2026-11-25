@@ -1,6 +1,6 @@
 // Neon Ice Hockey — offline cache (lives in its own folder on the shared arcade site).
 // Bump VERSION whenever you change any file, so phones pick up the update.
-const VERSION = 'neon-ice-hockey-v3';
+const VERSION = 'neon-ice-hockey-v4';
 const FILES = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const FILES = [
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
+  './icon.svg',
+  './apple-touch-icon.png',
 ];
 
 self.addEventListener('install', event => {

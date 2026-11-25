@@ -1,6 +1,6 @@
 // Neon Pong Duo — offline cache (lives in its own folder on the shared arcade site).
 // Bump VERSION whenever you change any file, so phones pick up the update.
-const VERSION = 'neon-pong-duo-v5';
+const VERSION = 'neon-pong-duo-v6';
 const FILES = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const FILES = [
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
+  './icon.svg',
+  './apple-touch-icon.png',
 ];
 
 self.addEventListener('install', event => {

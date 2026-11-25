@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'matrix-message';
-const VERSION = APP + '-v3';
+const VERSION = APP + '-v4';
 const FILES = [
   './',
   './index.html',
