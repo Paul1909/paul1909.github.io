@@ -175,7 +175,7 @@
   .side { display: flex; align-items: center; gap: 10px; margin-left: auto; }
   .meta { gap: 10px; }
 
-  /* Like / dislike: no numbers shown, only your own vote lights up */
+  /* Like button: no numbers shown, only your own like lights up */
   .votes { position: relative; z-index: 1; display: inline-flex; gap: 4px; }
   .vote {
     display: grid; place-items: center; width: 34px; height: 34px; padding: 0; cursor: pointer;
@@ -183,7 +183,6 @@
     -webkit-tap-highlight-color: transparent; transition: color .15s, border-color .15s, background .15s, transform .15s;
   }
   .vote svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
-  .vote.down svg { transform: rotate(180deg); }
   .vote:hover, .vote:focus-visible { color: var(--text); border-color: var(--accent, var(--cyan)); outline: none; }
   .vote[aria-pressed="true"] {
     color: var(--accent, var(--cyan)); border-color: var(--accent, var(--cyan));
@@ -540,11 +539,11 @@ shapeBtn.addEventListener("click", () => {
   try { localStorage.setItem("arcade:shape", s); } catch (e) {}
 });
 
-/* ---------- likes, dislikes and stats (GoatCounter) ----------
-   A vote is sent to GoatCounter as an event: like-<id>, dislike-<id>, and
-   unlike-<id> / undislike-<id> when a vote is taken back. Counts are read from
+/* ---------- likes and stats (GoatCounter) ----------
+   A like is sent to GoatCounter as an event: like-<id>, and unlike-<id> when
+   it's taken back. Counts are read from
    GoatCounter's public counter (needs "Allow adding visitor counts on your
-   website" on in the GoatCounter settings). Like/dislike numbers are only used
+   website" on in the GoatCounter settings). Like numbers are only used
    for sorting, never shown. Each card shows its app's views (visits to the
    app's folder). GoatCounter refreshes the numbers every few hours. */
 const GC_COUNTER = "https://paolosarcade.goatcounter.com/counter/";
@@ -561,6 +560,7 @@ const THUMB = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10h4v11H2
 
 let votes = {};
 try { votes = JSON.parse(localStorage.getItem("arcade:votes")) || {}; } catch (e) {}
+for (const k in votes) if (votes[k] !== 1) delete votes[k];  // old dislikes from before the dislike button was removed
 const saveVotes = () => { try { localStorage.setItem("arcade:votes", JSON.stringify(votes)); } catch (e) {} };
 
 function gcEvent(name, title) {
@@ -572,7 +572,6 @@ const voteBox = g => {
   const v = votes[id] || 0;
   return `<div class="votes" data-id="${esc(id)}" data-title="${esc(g.title)}">
     <button type="button" class="vote up" data-v="1" aria-pressed="${v === 1}" aria-label="Like ${esc(g.title)}">${THUMB}</button>
-    <button type="button" class="vote down" data-v="-1" aria-pressed="${v === -1}" aria-label="Dislike ${esc(g.title)}">${THUMB}</button>
   </div>`;
 };
 
@@ -613,9 +612,7 @@ grid.addEventListener("click", e => {
   const box = btn.parentNode, id = box.dataset.id, title = box.dataset.title;
   const old = votes[id] || 0, pick = +btn.dataset.v, now = old === pick ? 0 : pick;
   if (old === 1) gcEvent(`unlike-${id}`, `↩︎ Unlike: ${title}`);
-  if (old === -1) gcEvent(`undislike-${id}`, `↩︎ Undislike: ${title}`);
   if (now === 1) gcEvent(`like-${id}`, `👍 Like: ${title}`);
-  if (now === -1) gcEvent(`dislike-${id}`, `👎 Dislike: ${title}`);
   if (now) votes[id] = now; else delete votes[id];
   saveVotes();
   box.querySelectorAll(".vote").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === now)));
@@ -638,7 +635,7 @@ async function pool(items, fn, n = 6) {
   if (!ok && fail) throw new Error("counter unavailable");
   return out;
 }
-const STATS_KEY = "arcade:stats", STATS_TTL = 15 * 60e3;
+const STATS_KEY = "arcade:stats2", STATS_TTL = 15 * 60e3;
 let stats = {};
 try { const s = JSON.parse(sessionStorage.getItem(STATS_KEY)); if (s && Date.now() - s.t < STATS_TTL) stats = s; } catch (e) {}
 const saveStats = () => { try { sessionStorage.setItem(STATS_KEY, JSON.stringify({ ...stats, t: Date.now() })); } catch (e) {} };
@@ -656,16 +653,10 @@ async function loadStats(kind) {
   const res = {};
   {
     const ids = live.map(idOf);
-    const [ups, downs] = await Promise.all([pool(ids, id => gcCount("like-" + id)), pool(ids, id => gcCount("dislike-" + id))]);
-    const back = (arr, pre) => pool(ids.filter((_, k) => arr[k] > 0), id => gcCount(pre + id));  // only ask for take-backs where there were votes
-    const upIds = ids.filter((_, k) => ups[k] > 0), downIds = ids.filter((_, k) => downs[k] > 0);
-    const [unUp, unDown] = await Promise.all([back(ups, "unlike-"), back(downs, "undislike-")]);
-    const take = (list, n) => Object.fromEntries(list.map((id, k) => [id, n[k]]));
-    const uu = take(upIds, unUp), ud = take(downIds, unDown);
-    ids.forEach((id, k) => {
-      const likes = Math.max(0, ups[k] - (uu[id] || 0)), dislikes = Math.max(0, downs[k] - (ud[id] || 0));
-      res[id] = { score: likes - dislikes, likes };
-    });
+    const ups = await pool(ids, id => gcCount("like-" + id));
+    const upIds = ids.filter((_, k) => ups[k] > 0);  // only ask for take-backs where there were likes
+    const un = Object.fromEntries((await pool(upIds, id => gcCount("unlike-" + id))).map((n, k) => [upIds[k], n]));
+    ids.forEach((id, k) => res[id] = Math.max(0, ups[k] - (un[id] || 0)));
   }
   stats[kind] = res; saveStats();
   return res;
@@ -680,7 +671,7 @@ function ordered(kind) {
   const val = g => kind === "clicked" ? pagesOf(g).reduce((t, p) => t + (s[p] || 0), 0) : s[idOf(g)];
   return [...games].sort((a, b) => soonLast(a, b) || (kind === "clicked"
     ? (val(b) || 0) - (val(a) || 0)
-    : ((val(b) || {}).score || 0) - ((val(a) || {}).score || 0) || ((val(b) || {}).likes || 0) - ((val(a) || {}).likes || 0)
+    : (val(b) || 0) - (val(a) || 0)
   ) || byLatest(a, b));
 }
 const render = kind => { grid.innerHTML = ordered(kind).map(card).join(""); };
