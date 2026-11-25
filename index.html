@@ -18,7 +18,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0a0716">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+<link rel="preload" href="./fonts/orbitron-900.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  @font-face { font-family: "Orbitron"; src: url("./fonts/orbitron-900.woff2") format("woff2"); font-weight: 900; font-display: swap; }
   :root {
     --bg: #0a0716;
     --panel: #140f2a;
@@ -78,20 +80,21 @@
     line-height: 1.5;
     padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 20px 64px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 64px; }
 
-  header { position: relative; margin-bottom: 40px; padding-top: 12px; }
+  header { position: relative; margin-bottom: 36px; text-align: center; }
   .eyebrow {
     font-size: 13px; letter-spacing: .18em; text-transform: uppercase;
     color: var(--cyan); text-shadow: 0 0 12px rgba(62,242,255,.6);
   }
   h1 {
+    font-family: "Orbitron", ui-rounded, system-ui, sans-serif; font-weight: 900;
     font-size: clamp(40px, 8vw, 72px); line-height: 1; margin: 10px 0 14px;
     background: linear-gradient(90deg, var(--cyan), var(--pink));
     -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 0 18px rgba(255,79,216,.35));
   }
-  .tagline { color: var(--muted); font-size: 17px; max-width: 560px; }
+  .tagline { color: var(--muted); font-size: 17px; max-width: 560px; margin: 0 auto; }
 
   h2 { font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
 
