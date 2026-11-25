@@ -436,6 +436,35 @@ function buildRecap(raw, s) {
 }
 
 // ---------- Links: the message + look travel in the URL hash ----------
+// The message is scrambled so it can't be read in the chat preview.
+// Not real encryption: it just hides the text from a glance. All done on the phone, no server.
+function keystream(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) & 255;
+  };
+}
+function scramble(str) {
+  const bytes = new TextEncoder().encode(str);
+  const salt = (Math.random() * 256) | 0;            // same message, different-looking link each time
+  const k = keystream(0x4d4d5347 ^ (salt * 2654435761));
+  const out = new Uint8Array(bytes.length + 1);
+  out[0] = salt;
+  bytes.forEach((b, i) => { out[i + 1] = b ^ k(); });
+  let bin = '';
+  out.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function unscramble(code) {
+  const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/'));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const k = keystream(0x4d4d5347 ^ (bytes[0] * 2654435761));
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes.slice(1).map(b => b ^ k()));
+}
 function buildLink(raw, s) {
   const p = new URLSearchParams();
   p.set('m', raw);
@@ -449,11 +478,14 @@ function buildLink(raw, s) {
   if (s.end !== DEFAULTS.end) p.set('e', s.end[0]);
   if (!s.upper) p.set('u', '0');
   if (!s.crt) p.set('s', '0');
-  return GAME_URL + '#' + p.toString();
+  return GAME_URL + '#t=' + scramble(p.toString());
 }
 function parseLink() {
   if (location.hash.length < 3) return null;
-  const p = new URLSearchParams(location.hash.slice(1));
+  let p = new URLSearchParams(location.hash.slice(1));
+  if (p.get('t')) {                                   // scrambled link (old readable #m= links still work)
+    try { p = new URLSearchParams(unscramble(p.get('t'))); } catch { return null; }
+  }
   const m = p.get('m');
   if (!m || !m.trim()) return null;
   const ends = { f: 'fade', k: 'keep', l: 'loop' };
