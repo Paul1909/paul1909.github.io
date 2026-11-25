@@ -52,7 +52,7 @@
   :root[data-theme="light"] .badge { box-shadow: none; }
   :root[data-theme="light"] .log li::before { box-shadow: none; }
 
-  .toggles { position: absolute; top: -38px; right: 0; display: flex; gap: 8px; }
+  .toggles { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 48px 0 0; }
   .theme-toggle {
     display: inline-flex; align-items: center; gap: 6px;
     font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
@@ -154,7 +154,7 @@
   .log time { font-size: 13px; color: var(--muted); display: block; }
   .log span { font-size: 15px; }
 
-  footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
+  footer { margin-top: 20px; color: var(--muted); font-size: 13px; text-align: center; }
   footer a { color: var(--cyan); }
 
   @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
@@ -168,10 +168,6 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="toggles">
-      <button class="theme-toggle" id="shapeToggle" type="button"></button>
-      <button class="theme-toggle" id="themeToggle" type="button"></button>
-    </div>
     <h1>Paolo's Arcade</h1>
     <p class="tagline">Little games and tools I build for fun</p>
   </header>
@@ -180,6 +176,11 @@
 
   <h2>Growth log</h2>
   <ul class="log" id="log"></ul>
+
+  <div class="toggles">
+    <button class="theme-toggle" id="shapeToggle" type="button"></button>
+    <button class="theme-toggle" id="themeToggle" type="button"></button>
+  </div>
 
   <footer>Built by Paolo · hosted on GitHub Pages</footer>
 </div>
