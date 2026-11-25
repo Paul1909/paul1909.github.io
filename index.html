@@ -165,7 +165,62 @@
   footer { margin-top: 20px; color: var(--muted); font-size: 13px; text-align: center; }
   footer a { color: var(--cyan); }
 
-  @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
+  /* Whole card is a link via a stretched ::after, so the vote buttons can sit inside it */
+  .stretch { color: inherit; text-decoration: none; outline: none; }
+  .stretch::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 0; }
+  .card:has(.stretch:focus-visible) {
+    border-color: var(--accent, var(--cyan));
+    box-shadow: 0 0 0 1px var(--accent, var(--cyan)), 0 10px 40px -10px var(--accent, var(--cyan));
+  }
+  .side { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .meta { gap: 10px; }
+
+  /* Like / dislike: no numbers shown, only your own vote lights up */
+  .votes { position: relative; z-index: 1; display: inline-flex; gap: 4px; }
+  .vote {
+    display: grid; place-items: center; width: 34px; height: 34px; padding: 0; cursor: pointer;
+    background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 10px;
+    -webkit-tap-highlight-color: transparent; transition: color .15s, border-color .15s, background .15s, transform .15s;
+  }
+  .vote svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+  .vote.down svg { transform: rotate(180deg); }
+  .vote:hover, .vote:focus-visible { color: var(--text); border-color: var(--accent, var(--cyan)); outline: none; }
+  .vote[aria-pressed="true"] {
+    color: var(--accent, var(--cyan)); border-color: var(--accent, var(--cyan));
+    background: color-mix(in srgb, var(--accent, var(--cyan)) 14%, transparent);
+  }
+  .vote[aria-pressed="true"] svg { fill: currentColor; }
+  .vote.pop { animation: pop .3s ease; }
+  @keyframes pop { 50% { transform: scale(1.25); } }
+
+  /* Sort bar */
+  .bar {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin: 0 -20px 20px; padding: calc(10px + env(safe-area-inset-top)) 20px 10px;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; }
+  .seg button {
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap;
+    background: none; border: 0; border-radius: 999px; padding: 6px 11px; min-height: 32px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; transition: color .15s, background .15s;
+  }
+  .seg button:hover, .seg button:focus-visible { color: var(--text); outline: none; }
+  .seg button[aria-pressed="true"] { color: #0a0716; background: var(--cyan); }
+  .seg button.loading { opacity: .6; }
+  /* Per-app view count: little play icon + number */
+  .plays { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .plays svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .card-head h3 { margin-bottom: 0; }
+  .half-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 8px; margin-bottom: 4px; }
+  .half-head h4 { margin-bottom: 0; }
+  .note { font-size: 13px; color: var(--muted); text-align: center; margin: -8px 0 16px; }
+  .note[hidden] { display: none; }
+  @media (max-width: 380px) { .seg button { padding: 6px 8px; font-size: 12px; } }
+
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } .vote.pop { animation: none; } }
 </style>
 <script>
   try { if (localStorage.getItem("arcade:theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
@@ -179,6 +234,15 @@
     <h1>Paolo's Arcade</h1>
     <p class="tagline">Little games and tools I build for fun</p>
   </header>
+
+  <div class="bar">
+    <div class="seg" id="sort" role="group" aria-label="Sort apps">
+      <button type="button" data-sort="latest" aria-pressed="true">Latest</button>
+      <button type="button" data-sort="liked" aria-pressed="false">Most liked</button>
+      <button type="button" data-sort="clicked" aria-pressed="false">Most clicked</button>
+    </div>
+  </div>
+  <p class="note" id="note" hidden></p>
 
   <div class="grid" id="grid"></div>
 
@@ -476,6 +540,44 @@ shapeBtn.addEventListener("click", () => {
   try { localStorage.setItem("arcade:shape", s); } catch (e) {}
 });
 
+/* ---------- likes, dislikes and stats (GoatCounter) ----------
+   A vote is sent to GoatCounter as an event: like-<id>, dislike-<id>, and
+   unlike-<id> / undislike-<id> when a vote is taken back. Counts are read from
+   GoatCounter's public counter (needs "Allow adding visitor counts on your
+   website" on in the GoatCounter settings). Like/dislike numbers are only used
+   for sorting, never shown. Each card shows its app's views (visits to the
+   app's folder). GoatCounter refreshes the numbers every few hours. */
+const GC_COUNTER = "https://paolosarcade.goatcounter.com/counter/";
+const idOf = g => g.split ? g.split.map(slugOf).join("_") : slugOf(g);
+const pagesOf = g => (g.split || [g]).map(slugOf).filter(Boolean).map(s => `/${s}/`);
+const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8v14.4L19 12z"/></svg>';
+const plays = gs => {
+  if (!stats.views) return "";
+  const n = gs.reduce((t, g) => t + (stats.views[`/${slugOf(g)}/`] || 0), 0);
+  // The "k" is a joke: every count shows as thousands (40 → "40k").
+  return `<span class="plays" title="${n.toLocaleString("en-US")}k views">${PLAY}${n.toLocaleString("en-US")}k<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> views</span></span>`;
+};
+const THUMB = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10h4v11H2zM6 20.5V10.5l5.6-7.3c.9-1.1 2.7-.5 2.7 1v4.3h5.2c1.4 0 2.5 1.3 2.2 2.7l-1.6 7.6c-.2 1-1.1 1.7-2.2 1.7z"/></svg>';
+
+let votes = {};
+try { votes = JSON.parse(localStorage.getItem("arcade:votes")) || {}; } catch (e) {}
+const saveVotes = () => { try { localStorage.setItem("arcade:votes", JSON.stringify(votes)); } catch (e) {} };
+
+function gcEvent(name, title) {
+  try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: name, title, event: true }); } catch (e) {}
+}
+
+const voteBox = g => {
+  const id = idOf(g); if (!id || g.soon) return "";
+  const v = votes[id] || 0;
+  return `<div class="votes" data-id="${esc(id)}" data-title="${esc(g.title)}">
+    <button type="button" class="vote up" data-v="1" aria-pressed="${v === 1}" aria-label="Like ${esc(g.title)}">${THUMB}</button>
+    <button type="button" class="vote down" data-v="-1" aria-pressed="${v === -1}" aria-label="Dislike ${esc(g.title)}">${THUMB}</button>
+  </div>`;
+};
+
+const tagsHtml = g => `<div class="tags">${(g.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
+
 const splitCard = g => `
   <div class="card split" style="--accent:${esc(g.color || "#3ef2ff")}">
     ${isNew(g) ? '<span class="badge">NEW</span>' : ""}
@@ -484,25 +586,126 @@ const splitCard = g => `
     <div class="halves">${g.split.map(h => `
       <div class="half" style="--half:${esc(h.color || g.color || "#3ef2ff")}">
         ${iconBox(h)}
-        <h4>${esc(h.title)}</h4>
+        <div class="half-head"><h4>${esc(h.title)}</h4>${plays([h])}</div>
         <p>${esc(h.desc)}</p>
         <a class="btn" href="${esc(h.url)}">Play ▶</a>
       </div>`).join("")}
     </div>
-    <div class="meta"><div class="tags">${(g.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div></div>
+    <div class="meta">${tagsHtml(g)}<div class="side">${voteBox(g)}</div></div>
   </div>`;
 
-document.getElementById("grid").innerHTML = games.map(g => g.split ? splitCard(g) : `
-  <a class="card${g.soon ? " soon" : ""}" href="${esc(g.url)}" ${g.soon ? 'aria-disabled="true"' : ""} style="--accent:${esc(g.color || "#3ef2ff")}">
+const card = g => g.split ? splitCard(g) : `
+  <div class="card${g.soon ? " soon" : ""}" style="--accent:${esc(g.color || "#3ef2ff")}">
     ${g.soon ? '<span class="badge" style="background:#9a92c4">SOON</span>' : isNew(g) ? '<span class="badge">NEW</span>' : ""}
     ${iconBox(g)}
-    <h3>${esc(g.title)}</h3>
+    <div class="card-head"><h3>${g.soon ? esc(g.title) : `<a class="stretch" href="${esc(g.url)}">${esc(g.title)}</a>`}</h3>${g.soon ? "" : plays([g])}</div>
     <p>${esc(g.desc)}</p>
     <div class="meta">
-      <div class="tags">${(g.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>
-      <span class="play">${g.soon ? "Coming soon" : "Play ▶"}</span>
+      ${tagsHtml(g)}
+      <div class="side">${voteBox(g)}<span class="play">${g.soon ? "Coming soon" : "Play ▶"}</span></div>
     </div>
-  </a>`).join("");
+  </div>`;
+
+const grid = document.getElementById("grid");
+grid.addEventListener("click", e => {
+  const btn = e.target.closest(".vote"); if (!btn) return;
+  e.preventDefault();
+  const box = btn.parentNode, id = box.dataset.id, title = box.dataset.title;
+  const old = votes[id] || 0, pick = +btn.dataset.v, now = old === pick ? 0 : pick;
+  if (old === 1) gcEvent(`unlike-${id}`, `↩︎ Unlike: ${title}`);
+  if (old === -1) gcEvent(`undislike-${id}`, `↩︎ Undislike: ${title}`);
+  if (now === 1) gcEvent(`like-${id}`, `👍 Like: ${title}`);
+  if (now === -1) gcEvent(`dislike-${id}`, `👎 Dislike: ${title}`);
+  if (now) votes[id] = now; else delete votes[id];
+  saveVotes();
+  box.querySelectorAll(".vote").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === now)));
+  if (now) { btn.classList.remove("pop"); void btn.offsetWidth; btn.classList.add("pop"); try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
+});
+
+/* Reading counts: one small request per path, a few at a time, cached for the visit. */
+async function gcCount(path) {
+  const r = await fetch(GC_COUNTER + encodeURIComponent(path) + ".json");
+  if (r.status === 404) return 0;               // nothing counted yet
+  if (!r.ok) throw new Error("goatcounter " + r.status);
+  const j = await r.json();
+  return parseInt(String(j.count).replace(/\D/g, ""), 10) || 0;  // "1,234" / "1 234" / "1'234"
+}
+async function pool(items, fn, n = 6) {
+  const out = new Array(items.length); let i = 0, ok = 0, fail = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const k = i++; try { out[k] = await fn(items[k]); ok++; } catch (e) { out[k] = 0; fail++; } }
+  }));
+  if (!ok && fail) throw new Error("counter unavailable");
+  return out;
+}
+const STATS_KEY = "arcade:stats", STATS_TTL = 15 * 60e3;
+let stats = {};
+try { const s = JSON.parse(sessionStorage.getItem(STATS_KEY)); if (s && Date.now() - s.t < STATS_TTL) stats = s; } catch (e) {}
+const saveStats = () => { try { sessionStorage.setItem(STATS_KEY, JSON.stringify({ ...stats, t: Date.now() })); } catch (e) {} };
+
+async function loadViews() {
+  if (stats.views) return stats.views;
+  const paths = live.flatMap(pagesOf), n = await pool(paths, gcCount), res = {};
+  paths.forEach((p, k) => res[p] = n[k]);
+  stats.views = res; saveStats();
+  return res;
+}
+async function loadStats(kind) {
+  if (kind === "clicked") return loadViews();
+  if (stats[kind]) return stats[kind];
+  const res = {};
+  {
+    const ids = live.map(idOf);
+    const [ups, downs] = await Promise.all([pool(ids, id => gcCount("like-" + id)), pool(ids, id => gcCount("dislike-" + id))]);
+    const back = (arr, pre) => pool(ids.filter((_, k) => arr[k] > 0), id => gcCount(pre + id));  // only ask for take-backs where there were votes
+    const upIds = ids.filter((_, k) => ups[k] > 0), downIds = ids.filter((_, k) => downs[k] > 0);
+    const [unUp, unDown] = await Promise.all([back(ups, "unlike-"), back(downs, "undislike-")]);
+    const take = (list, n) => Object.fromEntries(list.map((id, k) => [id, n[k]]));
+    const uu = take(upIds, unUp), ud = take(downIds, unDown);
+    ids.forEach((id, k) => {
+      const likes = Math.max(0, ups[k] - (uu[id] || 0)), dislikes = Math.max(0, downs[k] - (ud[id] || 0));
+      res[id] = { score: likes - dislikes, likes };
+    });
+  }
+  stats[kind] = res; saveStats();
+  return res;
+}
+
+/* Sorting */
+const byLatest = (a, b) => b.added.localeCompare(a.added);
+const soonLast = (a, b) => (a.soon ? 1 : 0) - (b.soon ? 1 : 0);
+function ordered(kind) {
+  const s = kind === "clicked" ? stats.views : stats[kind];
+  if (kind === "latest" || !s) return games;
+  const val = g => kind === "clicked" ? pagesOf(g).reduce((t, p) => t + (s[p] || 0), 0) : s[idOf(g)];
+  return [...games].sort((a, b) => soonLast(a, b) || (kind === "clicked"
+    ? (val(b) || 0) - (val(a) || 0)
+    : ((val(b) || {}).score || 0) - ((val(a) || {}).score || 0) || ((val(b) || {}).likes || 0) - ((val(a) || {}).likes || 0)
+  ) || byLatest(a, b));
+}
+const render = kind => { grid.innerHTML = ordered(kind).map(card).join(""); };
+
+const sortBox = document.getElementById("sort"), note = document.getElementById("note");
+let sortKind = "latest", sortReq = 0;
+sortBox.addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-sort]"); if (!btn) return;
+  const kind = btn.dataset.sort, req = ++sortReq;
+  sortKind = kind; note.hidden = true;
+  sortBox.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+  if (kind !== "latest" && !stats[kind === "clicked" ? "views" : kind]) {
+    btn.classList.add("loading");
+    try { await loadStats(kind); }
+    catch (err) { note.textContent = "Counts aren't available right now, so this is still the latest first."; note.hidden = false; }
+    btn.classList.remove("loading");
+  }
+  if (req === sortReq) render(sortKind);
+});
+
+render("latest");
+
+/* Views on every card: load once, then redraw the grid in the current order */
+if (stats.views) render(sortKind);
+else loadViews().then(() => render(sortKind)).catch(() => {});
 
 document.getElementById("log").innerHTML = live.map(g => `
   <li><time datetime="${esc(g.added)}">${fmt(g.added)}</time><span>${g.split ? g.split.map(h => `${iconImg(h, "mini")} <b>${esc(h.title)}</b>`).join(" and ") + " joined" : `${iconImg(g, "mini")} <b>${esc(g.title)}</b> joined`} the arcade</span></li>`).join("");
