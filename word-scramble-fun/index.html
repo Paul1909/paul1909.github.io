@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#e7f5ff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scramble">
+<meta name="description" content="Unscramble the same word in up to six languages at once.">
+<title>Word Scramble Fun</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #e7f5ff;
+    --ink: #333;
+    --muted: #5b6b7a;
+    --blue: #2a6daa;
+    --blue-deep: #0d47a1;
+    --header: #b3d9ff;
+    --header-line: #8cbce6;
+    --chip: #cce4ff;
+    --green: #81c784;
+    --green-deep: #2e7d32;
+    --sky: #03a9f4;
+    --orange: #ff9800;
+    --orange-deep: #f57c00;
+    --red: #f44336;
+    --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Helvetica Rounded", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font); }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button { font: inherit; font-weight: 700; cursor: pointer; border: none; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  button:active { transform: scale(.97); }
+
+  .app { max-width: 480px; height: 100%; margin: 0 auto; display: flex; flex-direction: column; position: relative; }
+  .screen { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .screen.on { display: flex; }
+
+  /* ---------- Setup ---------- */
+  #setup { overflow-y: auto; padding: 28px 18px 40px; align-items: center; justify-content: center; text-align: center; }
+  .title { color: var(--blue); font-size: 2em; line-height: 1.1; margin-bottom: 6px; }
+  .title-tiles { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; }
+  .title-tiles span { width: 38px; height: 38px; border-radius: 8px; background: #fff; border: 2px solid var(--header-line); display: grid; place-items: center; font-size: 1.3em; font-weight: 800; color: var(--blue-deep); box-shadow: 0 2px 4px rgba(0,0,0,.08); }
+  .title-tiles span:nth-child(odd) { transform: rotate(-6deg); }
+  .title-tiles span:nth-child(even) { transform: rotate(5deg); }
+  .section { width: 100%; max-width: 400px; margin-top: 22px; }
+  .section p { color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+  .group { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .chip { min-height: 46px; padding: 10px 16px; border-radius: 10px; background: var(--chip); color: var(--ink); border: 2px solid transparent; transition: background-color .15s, border-color .15s; }
+  .lang.on { background: var(--green); border-color: #5a9a68; color: #fff; }
+  .len { background: #b3e5fc; }
+  .len.on { background: var(--sky); border-color: #0277bd; color: #fff; }
+  .best { margin-top: 18px; min-height: 1.3em; color: var(--muted); font-size: .95em; }
+  .best b { color: var(--blue-deep); }
+  .big { margin-top: 18px; width: 80%; max-width: 280px; padding: 15px 20px; border-radius: 12px; background: var(--orange); color: #fff; font-size: 1.25em; box-shadow: 0 4px 0 var(--orange-deep); }
+  .big:active { box-shadow: 0 1px 0 var(--orange-deep); transform: translateY(3px); }
+  .big:disabled { opacity: .5; }
+  .note { margin-top: 10px; min-height: 1.2em; color: var(--red); font-size: .9em; font-weight: 700; }
+  .sound { margin-top: 18px; padding: 8px 14px; border-radius: 999px; background: transparent; border: 2px solid var(--chip); color: var(--muted); font-size: .9em; }
+
+  /* ---------- Game ---------- */
+  .bar { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 15px; background: var(--header); border-bottom: 2px solid var(--header-line); font-weight: 700; }
+  .bar span { color: var(--blue-deep); }
+  .bar .count { font-size: .9em; color: var(--muted); }
+  .quit { background: var(--red); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: .9em; }
+  .play { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 15px 40px; display: flex; flex-direction: column; align-items: center; }
+  .clue { font-size: 4em; line-height: 1.2; margin: 4px 0 14px; transition: transform .25s; }
+  .clue.pop { animation: pop .45s ease; }
+  @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .rows { width: 100%; display: flex; flex-direction: column; gap: 18px; }
+  .row { container-type: inline-size; background: #fff; border-radius: 12px; padding: 14px 12px; box-shadow: 0 2px 5px rgba(0,0,0,.1); display: flex; flex-direction: column; align-items: center; gap: 12px; transition: background-color .3s; }
+  .row.done { background: #f1faf2; }
+  .row.shake { animation: shake .5s ease-in-out; background: #ffeeee; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 10%,30%,50%,70%,90% { transform: translateX(-5px); } 20%,40%,60%,80% { transform: translateX(5px); } }
+  .flag { font-size: 1.4em; font-weight: 700; color: #1976d2; display: flex; align-items: center; gap: 6px; }
+  .flag small { font-size: .55em; color: var(--muted); letter-spacing: .08em; }
+  /* Tiles shrink to fit long words (SCHLUESSEL, KIAUSINIS) on one line */
+  .tiles { --t: min(44px, calc((100cqw - (var(--n) - 1) * 5px) / var(--n))); display: flex; gap: 5px; justify-content: center; min-height: var(--t); }
+  .tile { width: var(--t); height: var(--t); flex: none; display: grid; place-items: center; border-radius: 6px; font-weight: 800; font-size: calc(var(--t) * .58); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .slot { border: 2px dashed #a0cfff; background: #f0f8ff; color: var(--blue-deep); cursor: pointer; }
+  .slot.filled { border-style: solid; border-color: #88aabb; background: #e3f2fd; }
+  .letter { border: 1px solid #b0b0b0; background: #fff; color: #555; cursor: pointer; box-shadow: 0 2px 0 #d5d5d5; transition: opacity .15s; }
+  .letter.used { opacity: .25; pointer-events: none; box-shadow: none; }
+  .done .slot { border: 2px solid #66bb6a; background: #e8f5e9; color: var(--green-deep); cursor: default; }
+  .done .letter { opacity: .35; pointer-events: none; }
+
+  /* ---------- Overlays ---------- */
+  .veil { position: absolute; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(13,71,161,.25); }
+  .veil.on { display: flex; }
+  .card { width: 100%; max-width: 360px; background: #fff; border-radius: 18px; padding: 24px 20px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.2); }
+  .card h2 { color: var(--blue); font-size: 1.5em; margin-bottom: 6px; }
+  .card .score { font-size: 3.2em; font-weight: 800; color: var(--blue-deep); line-height: 1.1; margin: 8px 0 2px; }
+  .card .sub { color: var(--muted); margin-bottom: 6px; }
+  .card .record { color: var(--orange-deep); font-weight: 800; min-height: 1.3em; }
+  .card .emojis { font-size: 1.6em; line-height: 1.4; margin: 10px 0 4px; word-break: break-all; }
+  .card .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .card .actions button { padding: 13px; border-radius: 10px; font-size: 1.05em; }
+  .primary { background: var(--orange); color: #fff; }
+  .secondary { background: var(--chip); color: var(--ink); }
+  .share { background: var(--sky); color: #fff; }
+  .danger { background: var(--red); color: #fff; }
+  .toast { position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20; background: #333; color: #fff; padding: 9px 16px; border-radius: 999px; font-size: .9em; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.on { opacity: 1; }
+</style>
+<script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body>
+<div class="app">
+  <!-- Setup -->
+  <section id="setup" class="screen on">
+    <div class="title-tiles" aria-hidden="true"><span>W</span><span>O</span><span>R</span><span>D</span></div>
+    <h1 class="title">Word Scramble Fun!</h1>
+
+    <div class="section">
+      <p>Choose languages</p>
+      <div class="group" id="langs"></div>
+    </div>
+
+    <div class="section">
+      <p>Game length</p>
+      <div class="group" id="lengths">
+        <button class="chip len" data-len="10">10 words</button>
+        <button class="chip len" data-len="20">20 words</button>
+        <button class="chip len" data-len="all">All words</button>
+      </div>
+    </div>
+
+    <div class="best" id="best"></div>
+    <button class="big" id="start">Let's Play!</button>
+    <div class="note" id="note"></div>
+    <button class="sound" id="sound"></button>
+  </section>
+
+  <!-- Game -->
+  <section id="game" class="screen">
+    <header class="bar">
+      <div>Score: <span id="score">0</span></div>
+      <div>Time: <span id="time">0.0</span>s</div>
+      <div class="count" id="counter">1 / 10</div>
+      <button class="quit" id="quit">Quit</button>
+    </header>
+    <div class="play">
+      <div class="clue" id="clue">❓</div>
+      <div class="rows" id="rows"></div>
+    </div>
+  </section>
+
+  <!-- Quit? -->
+  <div class="veil" id="quitVeil">
+    <div class="card">
+      <h2>Quit this game?</h2>
+      <p class="sub">Your score so far won't be saved.</p>
+      <div class="actions">
+        <button class="secondary" id="keep">Keep playing</button>
+        <button class="danger" id="confirmQuit">Quit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="veil" id="endVeil">
+    <div class="card">
+      <h2>Great job!</h2>
+      <div class="score" id="endScore">0</div>
+      <div class="sub" id="endSub"></div>
+      <div class="record" id="endRecord"></div>
+      <div class="emojis" id="endEmojis"></div>
+      <div class="actions">
+        <button class="share" id="shareBtn">Share ↗</button>
+        <button class="primary" id="again">Play again</button>
+        <button class="secondary" id="menu">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+<script src="words.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
