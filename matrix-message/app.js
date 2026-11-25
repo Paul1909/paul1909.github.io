@@ -662,7 +662,7 @@ function startPlay(c, { push = true } = {}) {
   clearInterval(introTimer);
   hide(ui.composer, ui.intro, ui.bar, ui.sheet, ui.videoReady);
   show(ui.close);
-  ui.edit.textContent = c.fromLink ? '✎ Make your own' : '✎ Edit';
+  $('#editLabel').textContent = c.fromLink ? 'Create' : 'Edit';
   if (push && !(history.state && history.state.mm === 'play')) history.pushState({ mm: 'play' }, '');
   E = newScene({ raw: c.raw, s: c.s });
   keepAwake(true);
