@@ -220,6 +220,7 @@ function drawJulia(fine) {
   const off = document.createElement('canvas'); off.width = W; off.height = H; off.getContext('2d').putImageData(img, 0, 0);
   const g = c.g; g.imageSmoothingEnabled = !fine; g.drawImage(off, 0, 0, c.w, c.h);
   const inside = O.r && O.r.kind !== 'esc';
+  $('julC').textContent = fmtC(O.cr, O.ci);
   $('julText').innerHTML = inside
     ? `Julia set for this <i>c</i>: <b style="color:var(--accent)">one connected piece</b>, because <i>c</i> is in the Mandelbrot set.`
     : `Julia set for this <i>c</i>: <b style="color:var(--pink)">scattered dust</b>, because <i>c</i> is outside the Mandelbrot set.`;
@@ -234,9 +235,11 @@ function setC(x, y, fine = true) {
   drawOrbit(); queueJulia(fine);
 }
 dragOn($('orbCv'), (x, y) => { O.dragging = true; setC(O.m.re(x), O.m.im(y), false); }, () => { O.dragging = false; drawOrbit(); queueJulia(true); });
-for (const [id, k] of [['orbSet', 'set'], ['orbCircle', 'circle'], ['orbJulia', 'julia']]) $(id).addEventListener('change', e => {
-  O[k] = e.target.checked; $('juliaBox').style.display = O.julia ? '' : 'none'; drawOrbit(); if (k === 'julia' && O.julia) queueJulia(true);
-});
+for (const [id, k] of [['orbSet', 'set'], ['orbCircle', 'circle']]) $(id).addEventListener('change', e => { O[k] = e.target.checked; drawOrbit(); });
+chips($('julChips'), [
+  ['Circle', 0, 0], ['Wobbly circle', -0.2, 0.15], ['Basilica (period 2)', -1, 0], ['Rabbit (period 3)', -0.1226, 0.7449],
+  ['Dendrite (c = i)', 0, 1], ['Seahorse edge', -0.7453, 0.1127], ['Dust', 0.3, 0.6],
+], (x, y) => setC(x, y));
 chips($('orbChips'), [
   ['c = 0', 0, 0], ['Cardioid', 0.2, 0.35], ['Period 2', -1, 0.08], ['Period 3', -0.1226, 0.7449], ['Period 4', 0.282, 0.53],
   ['Period 5', 0.3795, 0.3349], ['Baby set', -1.7549, 0], ['c = i', 0, 1], ['c = −2', -2, 0], ['Seahorse edge', -0.7453, 0.1127], ['Just outside', -0.3, 0.65], ['Slow escape', 0.255, 0], ['c = 1', 1, 0],

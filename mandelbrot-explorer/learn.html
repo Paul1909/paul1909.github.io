@@ -116,13 +116,8 @@
     <div class="toggles">
       <label><input type="checkbox" id="orbSet" checked> Show the set</label>
       <label><input type="checkbox" id="orbCircle" checked> Circle of radius 2</label>
-      <label><input type="checkbox" id="orbJulia" checked> Its Julia set</label>
     </div>
     <div class="chips" id="orbChips"></div>
-    <div class="julia" id="juliaBox">
-      <canvas id="julCv" aria-label="Julia set for the chosen c"></canvas>
-      <p id="julText"></p>
-    </div>
     <div class="row"><a class="btn" id="orbOpen" href="./">Zoom into this spot in the explorer →</a></div>
   </div>
   <p>Things to try:</p>
@@ -133,12 +128,30 @@
     <li>Near the edge, the orbit takes hundreds of steps to make up its mind. That indecision is where all the detail lives.</li>
   </ul>
 
-  <h2><small>4 · Why the circle?</small>Once past 2, there's no way back</h2>
+  <h2><small>4 · Julia sets</small>The same rule, flipped</h2>
+  <p>A Julia set uses the same rule, <span class="m">z → z² + c</span>, but flips which number you vary. For the Mandelbrot set you always start at <span class="m">z <b>=</b> 0</span> and try every possible <span class="m">c</span>. For a Julia set you fix one <span class="m">c</span> and try every possible <em>starting point</em> <span class="m">z</span>. The starting points whose sequence stays bounded form the (filled) Julia set for that <span class="m">c</span>. So there's one Mandelbrot set, but a different Julia set for every value of <span class="m">c</span>.</p>
+  <p>They're tied together by a classic theorem: the Mandelbrot set is exactly the set of values of <span class="m">c</span> whose Julia set is <em>connected</em>, meaning it's all in one piece.</p>
+  <ul>
+    <li>If <span class="m">c</span> is <strong>inside</strong> the Mandelbrot set, its Julia set is one connected shape.</li>
+    <li>If <span class="m">c</span> is <strong>outside</strong>, the Julia set shatters into infinitely many separate specks, called "Fatou dust".</li>
+  </ul>
+  <p>The reason is that the starting point 0 is special for <span class="m">z² + c</span>: the shape of the whole Julia set depends on whether the orbit of 0 escapes. That orbit is exactly what the Mandelbrot set tests. In that sense the Mandelbrot set is a map, or catalogue, of all the Julia sets.</p>
+  <p>The shape also carries over. A <span class="m">c</span> deep inside the main cardioid gives a slightly wobbly circle, and a <span class="m">c</span> in the period-3 bulb gives a "rabbit" with three ears meeting at each joint. A <span class="m">c</span> on the edge gives the most intricate Julia sets, and if you zoom into the Mandelbrot set near that <span class="m">c</span>, you often find patterns that look like that <span class="m">c</span>'s Julia set.</p>
+  <div class="lab">
+    <h3>The Julia set of your c</h3>
+    <canvas id="julCv" aria-label="Julia set for the chosen c"></canvas>
+    <div class="readout"><span>c = <b id="julC"></b></span></div>
+    <p class="verdict" id="julText"></p>
+    <div class="chips" id="julChips"></div>
+  </div>
+  <p>This pane follows the orbit tool above: drag <span class="m">c</span> in and out of the set there and watch its Julia set break into dust the moment <span class="m">c</span> crosses the edge. In the explorer, put the cross on a spot and tap <strong>Julia</strong> to see the Julia set for that point full screen.</p>
+
+  <h2><small>5 · Why the circle?</small>Once past 2, there's no way back</h2>
   <p>If a point of the orbit ever gets further than 2 from the centre, it will escape for sure. In the Mandelbrot sequence, <span class="m">|z|</span> is at least <span class="m">|c|</span> by the time it passes 2, and then</p>
   <div class="eq" style="font-size:22px">|z² + c| ≥ |z|² − |c| ≥ |z|² − |z| = |z| (|z| − 1)</div>
   <p>With <span class="m">|z| &gt; 2</span>, the factor <span class="m">|z| − 1</span> is bigger than 1, so every step pushes it further out, faster and faster. That's why the computer can stop as soon as it crosses the circle: it already knows the answer. It also means the whole set fits inside that circle.</p>
 
-  <h2><small>5 · Colours</small>How fast it escapes</h2>
+  <h2><small>6 · Colours</small>How fast it escapes</h2>
   <p>Strictly, a point is either in the set (black) or not. The colours in the explorer show <strong>how many steps</strong> each outside point took to cross the circle. Below, only <span class="m">N</span> steps are checked. Black is "hasn't escaped yet". Raise <span class="m">N</span> and watch the black shape shrink towards the real set.</p>
   <div class="lab">
     <h3>Survivors after N steps</h3>
@@ -147,7 +160,7 @@
   </div>
   <p>After 1 step, the survivors are just the disc of radius 2. After 2 steps it's an oval, after 3 a pear, and every extra step carves in more detail. The real set is what's left after infinitely many steps. The explorer raises <span class="m">N</span> automatically as you zoom: thousands of steps at ×10¹⁰, tens of thousands deeper down. The smooth colour bands come from also measuring <em>how far</em> past the circle the last step landed.</p>
 
-  <h2><small>6 · Bulbs and periods</small>The set counts for you</h2>
+  <h2><small>7 · Bulbs and periods</small>The set counts for you</h2>
   <p>Every bulb has a number: the length of the cycle its orbits fall into (you saw this in the orbit tool). And you can read that number off the picture: count the spokes on the antenna sticking out of a bulb. The top bulb has 3 spokes and a 3-cycle. Its neighbour has 4 spokes and a 4-cycle.</p>
   <p>Between two bulbs, the biggest bulb in the gap has the sum of their numbers. Between the 2-bulb and the 3-bulb sits a 5-bulb, between 3 and 5 an 8, then 13, 21, 34… That's the Fibonacci sequence, appearing in the bulbs. (Mathematicians call this Farey addition.)</p>
   <table>
@@ -158,7 +171,7 @@
     <tr><td>Baby Mandelbrot at −1.75</td><td>3-cycle</td><td>a whole small copy of the set</td></tr>
   </table>
 
-  <h2><small>7 · The fig tree</small>The real line, unfolded</h2>
+  <h2><small>8 · The fig tree</small>The real line, unfolded</h2>
   <p>Back to the number line. For each <span class="m">c</span>, run the rule for a long time and plot every value the sequence keeps visiting. Line that up under the set and something remarkable shows: each time the set pinches to a new bulb, the line splits in two (1 → 2 → 4 → 8 …). Then chaos sets in, broken by calm windows that sit exactly where the baby Mandelbrots are.</p>
   <div class="lab">
     <h3>The set (top) and where the orbit settles (bottom)</h3>
@@ -166,14 +179,6 @@
     <div class="readout" id="bifOut"></div>
   </div>
   <p>This picture is famous in its own right: it's the "bifurcation diagram" of the logistic map <span class="m">x → r·x(1 − x)</span>, used in population models. It's the same rule in disguise: substitute <span class="m">z = r(½ − x)</span> and you get <span class="m">z² + c</span> with <span class="m">c = r/2 − r²/4</span>. The splits come closer and closer, each gap about 4.669 times shorter than the one before. That's Feigenbaum's constant, and it turns up in dripping taps, fluid flow and electronic circuits too.</p>
-
-  <h2><small>8 · Julia sets</small>The set is a map of shapes</h2>
-  <p>Flip the question around. Keep <span class="m">c</span> fixed and ask which <em>starting</em> points <span class="m">z</span> stay bounded. The answer is a Julia set, and every <span class="m">c</span> has its own (you saw them under the orbit tool). The Mandelbrot set is a catalogue of them:</p>
-  <ul>
-    <li>If <span class="m">c</span> is <strong>inside</strong> the Mandelbrot set, its Julia set is all one piece.</li>
-    <li>If <span class="m">c</span> is <strong>outside</strong>, its Julia set shatters into infinitely many separate specks ("Fatou dust").</li>
-  </ul>
-  <p>Zoom into the Mandelbrot set near a point <span class="m">c</span> and you often find shapes that look like that point's Julia set. In the explorer, put the cross on a spot and tap <strong>Julia</strong>.</p>
 
   <h2><small>9 · Going deep</small>How the explorer reaches ×10²⁵⁰</h2>
   <p>Phones do arithmetic with about 16 significant digits. Past a zoom of about 10¹³, neighbouring pixels become the same number and the picture breaks into blocks. The explorer gets round that in three steps:</p>
