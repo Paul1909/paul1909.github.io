@@ -163,7 +163,7 @@ function orbSetup() {
   O.cv = fit($('orbCv'), 0.8);
   O.m = mapper(O.cv, -0.5, 0, 3.7);
   O.bg = setImage(O.cv, O.m, { it: 300 });
-  O.jcv = fit($('julCv'), 0.6);
+  O.jcv = fit($('julCv'), matchMedia('(min-width: 1024px)').matches ? 0.8 : 0.6); // square up with the orbit tool on desktop
   O.jm = mapper(O.jcv, 0, 0, 3.8);
 }
 function drawOrbit() {
