@@ -1,0 +1,18 @@
+{
+  "name": "Grid Spinner",
+  "short_name": "Grid Spinner",
+  "description": "The power grid is a giant spinning wheel. Keep it at 50 Hz with plants, wind, sun, batteries and flywheels.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#e9edf2",
+  "theme_color": "#1f2a37",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

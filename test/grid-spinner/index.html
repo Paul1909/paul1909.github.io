@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1f2a37">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grid Spinner">
+<meta name="description" content="The power grid is a giant spinning wheel. Keep it at 50 Hz with power plants, wind, sun, batteries and flywheels.">
+<title>Grid Spinner</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  /* Engineering dashboard look: system fonts only, nothing loaded from the internet. */
+  :root {
+    --bg: #e9edf2; --panel: #ffffff; --panel2: #f5f7fa; --line: #cfd6df; --line2: #e3e8ee;
+    --text: #17202b; --muted: #5d6978; --head: #1f2a37; --head2: #2b3949;
+    --accent: #1c5fd1; --ok: #2b8a3e; --warn: #d97706; --bad: #c92a2a; --cyan: #1971c2;
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --st: env(safe-area-inset-top); --sb: env(safe-area-inset-bottom);
+    --sl: env(safe-area-inset-left); --sr: env(safe-area-inset-right);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; -webkit-tap-highlight-color: transparent; }
+  .hidden { display: none !important; }
+  button { font: inherit; color: var(--text); background: none; border: 0; cursor: pointer;
+    user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn { min-height: 44px; padding: 0 16px; border-radius: 4px; font-weight: 700; font-size: 14px; letter-spacing: .02em;
+    background: var(--panel); border: 1px solid var(--line); }
+  .btn:active { background: var(--panel2); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:active { background: #174fb0; }
+  .btn.small { min-height: 40px; font-size: 13px; padding: 0 12px; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 18px 0 6px; font-weight: 700; }
+  .code { font-style: normal; font: 700 11px var(--mono); color: #fff; background: var(--c); border-radius: 3px; padding: 1px 5px; vertical-align: 1px; white-space: nowrap; }
+  .screen { position: fixed; inset: 0; padding: calc(var(--st) + 16px) calc(var(--sr) + 16px) calc(var(--sb) + 16px) calc(var(--sl) + 16px);
+    overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .col { max-width: 560px; margin: 0 auto; }
+
+  /* switches */
+  .settings { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+  .setting { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line2); font-size: 14px; font-weight: 600; }
+  .setting:first-child { border-top: 0; }
+  .setting span { flex: 1; } .setting small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .switch { width: 48px; height: 28px; border-radius: 14px; background: #b8c1cc; position: relative; flex: none; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+  .switch.on { background: var(--ok); } .switch.on::after { left: 23px; }
+
+  /* ---------- menu ---------- */
+  #menu { background: var(--bg); }
+  #menuWheel { display: block; margin: 12px auto 0; width: 150px; height: 150px; }
+  #menu h1 { font-size: 26px; margin: 10px 0 0; text-align: center; letter-spacing: .14em; font-weight: 800; }
+  #menu .sub { text-align: center; font: 600 12px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  #menu .tag { text-align: center; color: var(--muted); margin: 10px 0 4px; font-size: 14px; line-height: 1.45; }
+  .countries { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .country { text-align: left; padding: 9px 12px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); min-height: 58px; }
+  .country b { display: block; font-size: 15px; }
+  .country small { color: var(--muted); font-size: 11.5px; }
+  .country.on, .seg button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: #eef3fd; }
+  .country .hz { float: right; font: 700 11px var(--mono); color: var(--muted); }
+  #countryFact { font-size: 13px; color: var(--muted); margin: 8px 2px 0; line-height: 1.45; min-height: 38px; }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; min-height: 50px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; }
+  .seg button small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
+  .menuBtns { display: flex; gap: 6px; margin-top: 18px; }
+  .menuBtns .primary { flex: 1.4; font-size: 17px; min-height: 52px; }
+  .menuBtns .btn:not(.primary) { flex: 1; min-height: 52px; }
+  #best { text-align: center; color: var(--muted); font: 12px var(--mono); margin-top: 12px; }
+  .foot { text-align: center; margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .foot a { color: var(--muted); }
+
+  /* ---------- game: phone, one column that always fits the screen ---------- */
+  #game { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--bg); }
+  #hud { flex: none; display: flex; align-items: stretch; gap: 6px; background: var(--head); color: #fff;
+    padding: calc(var(--st) + 6px) calc(var(--sr) + 8px) 6px calc(var(--sl) + 8px); }
+  #hud .iconBtn { width: 42px; border-radius: 4px; background: var(--head2); color: #fff; font-size: 18px; flex: none; border: 1px solid #3c4b5d; }
+  #clock { flex: 1; min-width: 0; line-height: 1.2; display: flex; flex-direction: column; justify-content: center; }
+  #clock b { font: 700 14px var(--mono); }
+  #clock small { color: #a9b6c5; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #money { text-align: right; line-height: 1.15; padding: 2px 8px; border-radius: 4px; color: #fff; border: 1px solid #3c4b5d; background: var(--head2); }
+  #money .lbl { display: block; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #a9b6c5; }
+  #money b { font: 700 15px var(--mono); display: block; }
+  #money small#net { display: block; font: 11px var(--mono); }
+  #money .pos { color: #69db7c; } #money .neg { color: #ff8787; }
+  #runBtn { width: 62px; flex: none; border-radius: 4px; background: var(--ok); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+  #runBtn #runI { font-size: 17px; } #runBtn small { font: 700 9.5px var(--mono); letter-spacing: .06em; margin-top: 2px; }
+  #runBtn.running { background: #475569; }
+  #runBtn.attn { animation: attn 1s infinite; }
+  @keyframes attn { 50% { box-shadow: 0 0 0 3px rgba(105, 219, 124, .8); } }
+  #main { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 700px; margin: 0 auto;
+    padding: 0 calc(var(--sr) + 6px) calc(var(--sb) + 6px) calc(var(--sl) + 6px); gap: 5px; }
+  #side { display: contents; }
+  #ticker { order: 0; flex: none; height: 44px; margin-top: 5px; pointer-events: none; }
+  #tut { order: 0; flex: none; margin-top: 5px; }
+  #wx { order: 1; flex: none; display: flex; gap: 4px; }
+  #wheelWrap { order: 2; position: relative; flex: 1 1 0; min-height: 110px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+  #chartWrap { order: 3; flex: none; height: clamp(58px, 11svh, 110px); }
+  #mix { order: 4; flex: none; }
+  #dock { order: 5; flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  #wheel { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .plabel { position: absolute; top: 5px; left: 8px; font: 700 9.5px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
+  #holdTag { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); background: var(--head); color: #fff; font: 700 12px var(--mono);
+    padding: 5px 10px; border-radius: 3px; pointer-events: none; white-space: nowrap; letter-spacing: .03em; }
+
+  /* event log */
+  .tick { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: 4px; padding: 4px 9px; font-size: 13px; line-height: 1.3;
+    animation: tin .2s ease-out; transition: opacity .4s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 100%; }
+  .tick .ts { font: 700 11px var(--mono); color: var(--muted); margin-right: 6px; }
+  .tick .tg { font: 700 9.5px var(--mono); letter-spacing: .06em; color: #fff; background: var(--muted); border-radius: 2px; padding: 1px 4px; margin-right: 6px; vertical-align: 1px; }
+  .tick.gone { opacity: 0; }
+  .tick.bad { border-left-color: var(--bad); } .tick.bad .tg { background: var(--bad); }
+  .tick.good { border-left-color: var(--ok); } .tick.good .tg { background: var(--ok); }
+  .tick.info { border-left-color: var(--cyan); } .tick.info .tg { background: var(--cyan); }
+  .tick i { font-style: normal; color: var(--muted); display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+  @keyframes tin { from { opacity: 0; } }
+  #alarm { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); background: var(--bad); color: #fff; font: 700 12.5px var(--mono);
+    border-radius: 3px; padding: 5px 10px; pointer-events: none; white-space: nowrap; animation: pulse .5s infinite alternate; }
+  @keyframes pulse { to { background: #8f1d1d; } }
+
+  /* weather */
+  #wx .now { display: flex; flex-direction: column; justify-content: center; background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+    padding: 2px 8px; font: 12px var(--mono); white-space: nowrap; }
+  #wx .now b { font-weight: 700; }
+  #wx .fc { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+  #wx .c { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; text-align: center; line-height: 1.1; padding: 2px 0; min-width: 0; }
+  #wx .c small { display: block; color: var(--muted); font: 9.5px var(--mono); }
+  #wx .c span { display: block; font-size: 13px; }
+  #wx .c b { font: 700 10.5px var(--mono); white-space: nowrap; }
+
+  #chart { width: 100%; height: 100%; display: block; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); }
+  #mixBar { display: flex; height: 8px; border-radius: 2px; overflow: hidden; background: var(--line2); }
+  #mixBar span { display: block; height: 100%; transition: width .3s; }
+  #mixTxt { display: flex; justify-content: space-between; font: 11px var(--mono); color: var(--muted); margin-top: 3px; gap: 6px; white-space: nowrap; }
+  #mixTxt b { color: var(--text); }
+
+  /* build cards: + builds, − removes */
+  .card { min-width: 0; border-radius: 4px; padding: 4px 5px 4px 7px; position: relative; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c); }
+  .card .nm { font-weight: 700; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .sb { font: 10px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .x { display: none; }
+  .card .p { font: 700 10.5px var(--mono); white-space: nowrap; }
+  .card .pm { display: flex; align-items: center; gap: 3px; margin-top: 3px; }
+  .card .pm button { flex: 1; height: 28px; border-radius: 3px; font: 800 17px/1 var(--mono); border: 1px solid var(--line); background: var(--panel2); padding: 0; }
+  .card .pm .plus { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .card .pm button:disabled { opacity: .35; cursor: default; }
+  .card .pm .n { min-width: 14px; text-align: center; font: 700 11.5px var(--mono); }
+  .card.na { opacity: .45; }
+  @media (max-height: 700px) {
+    #ticker { height: 38px; } .tick i { display: none; } .tick { line-height: 28px; padding-top: 0; padding-bottom: 0; }
+    .card .sb { display: none; } .card .pm button { height: 26px; }
+  }
+
+  /* ---------- game: desktop, big wheel + side panel ---------- */
+  @media (min-width: 900px) and (min-height: 560px) {
+    #hud { padding: 10px 20px; gap: 10px; }
+    #clock b { font-size: 18px; } #clock small { font-size: 13px; }
+    #money b { font-size: 22px; } #money small#net { font-size: 13px; } #money { padding: 4px 14px; }
+    #hud .iconBtn { width: 52px; font-size: 22px; } #runBtn { width: 92px; } #runBtn #runI { font-size: 22px; } #runBtn small { font-size: 11px; }
+    #main { flex-direction: row; max-width: 1700px; gap: 12px; padding: 12px 20px 16px; }
+    #wheelWrap { flex: 1; min-width: 0; }
+    .plabel { font-size: 11px; top: 8px; left: 12px; }
+    #side { order: 2; display: flex; flex-direction: column; width: clamp(400px, 34vw, 560px); flex: none; gap: 8px; min-height: 0; }
+    #ticker, #tut { margin-top: 0; } #ticker { height: 58px; }
+    .tick { font-size: 14px; padding: 7px 12px; } .tick i { font-size: 13px; margin-top: 2px; }
+    .card .x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #wx { gap: 6px; } #wx .now { font-size: 14px; padding: 4px 12px; } #wx .c small { font-size: 11px; } #wx .c span { font-size: 18px; } #wx .c b { font-size: 13px; } #wx .fc { gap: 5px; }
+    #chartWrap { height: clamp(150px, 24vh, 260px); }
+    #mixBar { height: 12px; } #mixTxt { font-size: 12.5px; }
+    #dock { grid-template-columns: repeat(2, 1fr); gap: 6px; overflow-y: auto; min-height: 0; align-content: start; }
+    .card { padding: 6px 8px 6px 10px; display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: center; }
+    .card .nm { font-size: 14px; } .card .sb, .card .x { font-size: 11.5px; display: block; } .card .p { font-size: 12.5px; }
+    .card .pm { grid-column: 2; grid-row: 1 / span 4; margin: 0; flex-direction: row; }
+    .card .pm button { width: 38px; height: 38px; flex: none; }
+    #alarm { font-size: 16px; padding: 7px 16px; bottom: 14px; }
+    #holdTag { font-size: 14px; top: 34px; }
+    #sheet .box { max-width: 460px; margin: 0 20px 0 auto; }
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(23, 32, 43, .45);
+    display: flex; align-items: center; justify-content: center; padding: calc(var(--st) + 16px) 16px calc(var(--sb) + 16px); z-index: 20; }
+  .box { width: 100%; max-width: 440px; max-height: 100%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px;
+    box-shadow: 0 16px 50px rgba(23, 32, 43, .3); }
+  .box h2 { margin: 0 0 8px; font-size: 18px; text-transform: uppercase; letter-spacing: .08em; }
+  .box p { color: var(--muted); line-height: 1.5; margin: 8px 0; font-size: 14px; }
+  .box p b { color: var(--text); }
+  .box .row { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .box .row .btn { flex: 1; }
+  table.econ { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  table.econ td { padding: 5px 0; border-bottom: 1px solid var(--line2); }
+  table.econ td:last-child { text-align: right; white-space: nowrap; padding-left: 8px; font-family: var(--mono); }
+  .pos { color: var(--ok); } .neg { color: var(--bad); }
+
+  #sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; padding: 0 8px calc(var(--sb) + 8px); pointer-events: none; }
+  #sheet .box { pointer-events: auto; margin: 0 auto; max-width: 540px; padding: 12px 14px; }
+  #sheet h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  #sheet h3 .x { margin-left: auto; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 4px; }
+  #sheetBody { font-size: 13px; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+  #sheetBody b { color: var(--text); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin: 8px 0; font-size: 13px; }
+  .stats span { color: var(--muted); } .stats b { color: var(--text); text-align: right; font-family: var(--mono); font-weight: 600; }
+
+  #coach .box { text-align: center; }
+  #coach .big { font: 700 13px var(--mono); color: var(--muted); letter-spacing: .1em; }
+  .dots { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+  .dots i { width: 8px; height: 8px; border-radius: 1px; background: var(--line); }
+  .dots i.on { background: var(--accent); }
+
+  #over h2 { font-size: 24px; text-align: center; color: var(--bad); letter-spacing: .14em; }
+  #overReason { text-align: center; }
+  #overTime { text-align: center; font: 700 30px var(--mono); margin: 6px 0 2px; }
+  #overBest { text-align: center; font-size: 12.5px; color: var(--muted); }
+  #overChart { width: 100%; height: 110px; display: block; margin-top: 12px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--line); }
+
+  #toast { position: fixed; left: 50%; top: calc(var(--st) + 118px); transform: translateX(-50%); background: var(--head); color: #fff; font: 600 13px var(--mono);
+    padding: 7px 12px; border-radius: 3px; z-index: 40; pointer-events: none; white-space: nowrap; transition: opacity .25s; max-width: 94vw; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- tutorial ---------- */
+  body.tut #ticker { display: none; }
+  .tbox { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 4px; padding: 7px 10px 9px; }
+  .th { display: flex; align-items: center; gap: 8px; }
+  .th .e { font: 700 11px var(--mono); color: #fff; background: var(--accent); border-radius: 3px; padding: 2px 6px; }
+  .th b { font-size: 14.5px; flex: 1; min-width: 0; }
+  .th .skip { font-size: 12px; color: var(--muted); text-decoration: underline; min-height: 30px; padding: 0 4px; }
+  .tp { font-size: 13px; line-height: 1.42; color: #2f3b49; margin: 3px 0 7px; max-height: 19svh; overflow-y: auto; }
+  .tp .cl { display: grid; grid-template-columns: 1fr; gap: 3px; margin: 4px 0; font-size: 12.5px; }
+  .tb { display: flex; gap: 5px; flex-wrap: wrap; }
+  .tb .btn { min-height: 38px; font-size: 13px; padding: 0 10px; flex: 1 1 auto; }
+  .tb .btn:disabled { opacity: .4; cursor: default; }
+  .tb .btn.go { animation: hlp 1.1s infinite; }
+  .hl { animation: hlp 1.1s infinite; position: relative; z-index: 1; }
+  @keyframes hlp { 0%, 100% { box-shadow: 0 0 0 0 rgba(28, 95, 209, 0); } 50% { box-shadow: 0 0 0 3px rgba(28, 95, 209, .75); } }
+  @media (min-width: 900px) and (min-height: 560px) {
+    .tp { font-size: 14.5px; max-height: 32vh; } .th b { font-size: 17px; }
+    .tp .cl { grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
+  }
+
+  /* ---------- learn ---------- */
+  #learn { background: var(--bg); z-index: 30; }
+  #learn .col { max-width: 720px; }
+  #learn h2 { font-size: 20px; margin: 4px 0; text-transform: uppercase; letter-spacing: .1em; }
+  #learn h3 { font-size: 13px; margin: 22px 0 6px; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; }
+  #learn p, #learn li { color: #2f3b49; line-height: 1.55; font-size: 15px; }
+  #learn ul { padding-left: 20px; margin: 6px 0; }
+  #learn .back { position: sticky; top: calc(-16px - var(--st)); z-index: 2; margin: calc(-16px - var(--st)) -16px 8px; padding: calc(var(--st) + 10px) 16px 10px; background: rgba(233, 237, 242, .95); border-bottom: 1px solid var(--line); }
+  #learn .typeGrid { display: grid; gap: 6px; }
+  #learn .t { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c); }
+  #learn .t b { display: block; }
+  #learn .t small { color: var(--muted); font-size: 13px; line-height: 1.45; display: block; }
+  #learnDemo { width: 100%; height: 190px; display: block; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); margin-top: 8px; touch-action: manipulation; }
+  .demoBtns { display: flex; gap: 6px; margin-top: 6px; }
+  .demoBtns .btn { flex: 1; font-size: 13px; padding: 0 6px; }
+</style>
+<script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body>
+
+<!-- ================= MENU ================= -->
+<section id="menu" class="screen">
+  <div class="col">
+    <canvas id="menuWheel" width="340" height="340" aria-hidden="true"></canvas>
+    <h1>GRID SPINNER</h1>
+    <div class="sub">Frequency control simulator</div>
+    <p class="tag">The power grid is one giant spinning wheel. Every plant pushes it, every kettle drags it. Keep it at exactly the right speed for as long as you can.</p>
+
+    <div class="label">Pick a grid</div>
+    <div class="countries" id="countries"></div>
+    <p id="countryFact"></p>
+
+    <div class="label">Difficulty</div>
+    <div class="seg" id="diffs">
+      <button data-d="easy">Calm<small>steady loads</small></button>
+      <button data-d="normal">Busy<small>some chaos</small></button>
+      <button data-d="hard">Wild<small>erratic loads</small></button>
+    </div>
+
+    <div class="label">Settings</div>
+    <div class="settings">
+      <div class="setting"><span>Auto-collect bills<small>Off: tap the money tags on consumers to cash in</small></span><button class="switch" data-set="auto" aria-label="Auto-collect bills"></button></div>
+      <div class="setting"><span>Sound</span><button class="switch" data-set="sound" aria-label="Sound"></button></div>
+      <div class="setting"><span>Vibration</span><button class="switch" data-set="vibe" aria-label="Vibration"></button></div>
+    </div>
+
+    <div class="menuBtns">
+      <button class="btn" id="tutBtn">Tutorial</button>
+      <button class="btn" id="learnBtn">Learn</button>
+      <button class="btn primary" id="playBtn">▶ Play</button>
+    </div>
+    <div id="best"></div>
+    <div class="foot"><a href="../">← Paolo's Arcade</a></div>
+  </div>
+</section>
+
+<!-- ================= GAME ================= -->
+<section id="game" class="hidden">
+  <div id="hud">
+    <button class="iconBtn" id="pauseBtn" aria-label="Menu and settings">☰</button>
+    <div id="clock"><b id="clockT">Day 1 · 06:00</b><small id="clockS">Switzerland · Busy</small></div>
+    <button id="money" aria-label="Money details"><small class="lbl">Cash</small><b id="cash">0</b><small id="net">0</small></button>
+    <button id="runBtn" aria-label="Start or pause"><span id="runI">▶</span><small id="runT">START</small></button>
+  </div>
+  <div id="main">
+    <div id="wheelWrap">
+      <canvas id="wheel"></canvas>
+      <div class="plabel">Synchronous area · rotor view</div>
+      <div id="holdTag" class="hidden">Clock stopped · press ▶ START</div>
+      <div id="alarm" class="hidden"></div>
+    </div>
+    <div id="side">
+      <div id="ticker"></div>
+      <div id="tut" class="hidden"></div>
+      <div id="wx" title="Weather now and forecast for the next 6 hours: sun for solar, wind speed for wind farms"></div>
+      <div id="chartWrap"><canvas id="chart"></canvas></div>
+      <div id="mix">
+        <div id="mixBar"></div>
+        <div id="mixTxt"><span>Supply <b id="supTxt">0</b> MW</span><span>Demand <b id="demTxt">0</b> MW</span><span>Inertia <b id="inTxt">0</b></span></div>
+      </div>
+      <div id="dock"></div>
+    </div>
+  </div>
+</section>
+
+<!-- unit details sheet -->
+<div id="sheet" class="hidden">
+  <div class="box">
+    <h3><span id="sheetTitle"></span><button class="iconBtn x" id="sheetX" aria-label="Close">✕</button></h3>
+    <div id="sheetBody"></div>
+    <div class="row" id="sheetBtns"></div>
+  </div>
+</div>
+
+<!-- pause -->
+<div id="pause" class="overlay hidden">
+  <div class="box">
+    <h2>Menu</h2>
+    <div class="settings">
+      <div class="setting"><span>Auto-collect bills<small>Off: tap the money tags on consumers to cash in</small></span><button class="switch" data-set="auto" aria-label="Auto-collect bills"></button></div>
+      <div class="setting"><span>Sound</span><button class="switch" data-set="sound" aria-label="Sound"></button></div>
+      <div class="setting"><span>Vibration</span><button class="switch" data-set="vibe" aria-label="Vibration"></button></div>
+    </div>
+    <div class="label">Cash flow</div>
+    <table class="econ" id="econ"></table>
+    <p style="font-size:13px">Consumers pay for every MWh you deliver. Fuel, CO₂, maintenance and out-of-band penalties come off the top. Money runs on a yearly clock: <b>one game day books a full year</b> of bills, fuel and upkeep, so plants cost real-world prices. Go below <b id="bankrupt">−150 MEUR</b> and the bank pulls the plug.</p>
+    <div class="row">
+      <button class="btn primary" id="resumeBtn">Close</button>
+    </div>
+    <div class="row">
+      <button class="btn small" id="pLearn">Learn</button>
+      <button class="btn small" id="pHelp">How to play</button>
+      <button class="btn small" id="pQuit">Quit</button>
+    </div>
+  </div>
+</div>
+
+<!-- coach (first-time tutorial) -->
+<div id="coach" class="overlay hidden">
+  <div class="box">
+    <div class="big" id="coachE"></div>
+    <h2 id="coachH"></h2>
+    <p id="coachP"></p>
+    <div class="dots" id="coachDots"></div>
+    <div class="row"><button class="btn primary" id="coachNext">Next</button></div>
+  </div>
+</div>
+
+<!-- game over -->
+<div id="over" class="overlay hidden">
+  <div class="box">
+    <h2 id="overH">BLACKOUT</h2>
+    <p id="overReason"></p>
+    <div id="overTime"></div>
+    <div id="overBest"></div>
+    <canvas id="overChart"></canvas>
+    <div class="stats" id="overStats"></div>
+    <div class="row">
+      <button class="btn primary" id="againBtn">↻ Play again</button>
+      <button class="btn" id="shareBtn">Share ↗</button>
+    </div>
+    <div class="row"><button class="btn small" id="menuBtn">Menu</button><button class="btn small" id="oLearn">Learn</button></div>
+  </div>
+</div>
+
+<!-- ================= LEARN ================= -->
+<section id="learn" class="screen hidden">
+  <div class="col">
+    <div class="back"><button class="btn small" id="learnBack">← Back</button></div>
+    <h2>How the grid spins</h2>
+
+    <h3>One giant wheel</h3>
+    <p>Every big power station on a grid spins in lockstep: the turbines and generators in a gas, nuclear or hydro plant all turn at exactly the same rhythm. Together they behave like one huge shared wheel. Its speed is the grid <b>frequency</b>: 50 turns per second (50 Hz) across Switzerland and continental Europe, 60 Hz in most of the Americas.</p>
+    <p>Generators push the rim forward. Every motor, heater and phone charger drags on it. If pushes and drags are equal, the wheel keeps its pace. If demand wins, it slows down; if supply wins, it speeds up. That's the whole game.</p>
+
+    <h3>Try it</h3>
+    <p>Push or drag the wheel and watch the frequency. Then make it heavier.</p>
+    <canvas id="learnDemo"></canvas>
+    <div class="demoBtns">
+      <button class="btn small" id="dPush">+ Push 30 MW</button>
+      <button class="btn small" id="dDrag">− Drag 30 MW</button>
+      <button class="btn small" id="dHeavy">Heavy wheel</button>
+    </div>
+
+    <h3>Inertia buys you seconds</h3>
+    <p>A heavy wheel is hard to slow down. The spinning steel in big generators stores a lot of energy, so when a power station suddenly trips, the frequency falls gently instead of crashing. That gives the automatic reserves time to react.</p>
+    <p>Solar panels, wind farms and batteries connect through power electronics (inverters), so they add <b>no</b> spinning mass by default. A grid running mostly on wind and sun is a lighter wheel: it wobbles faster. In the game, watch the <b>Inertia</b> number fall when you replace gas with solar.</p>
+
+    <h3>Automatic reserves</h3>
+    <p>Grids don't rely on humans for the first seconds. Many plants carry <b>primary control</b> (in Europe called FCR): when the frequency drops, they automatically push a bit harder, and when it rises they ease off. In continental Europe these reserves are fully deployed at a deviation of 0.2 Hz, which is why the game's green band is 49.8 to 50.2 Hz.</p>
+    <p>Primary control stops the fall but doesn't bring the wheel all the way back. Operators then dispatch more plants (that's you, tapping the spinners).</p>
+
+    <h3>Batteries and flywheels</h3>
+    <p>A <b>BESS</b> (battery energy storage system) can flip from charging to full discharge in a fraction of a second, so it's superb at frequency response. Its limit is energy: once empty it can't push any more. A <b>flywheel</b> is a literal spinning wheel you can bolt onto the grid: it soaks up spare energy by spinning faster and gives it back in milliseconds, and it adds real inertia, but it only holds a few seconds' worth.</p>
+
+    <h3>Not every plant is quick</h3>
+    <div class="typeGrid" id="learnTypes"></div>
+
+    <h3>When it goes wrong</h3>
+    <p>If the frequency keeps falling, grids protect themselves by switching off whole areas of customers on purpose (automatic load shedding), starting around 49 Hz in Europe. Too fast or too slow for too long, and generators disconnect to protect themselves, which makes things worse. That cascade is a blackout.</p>
+
+    <h3>The rules here</h3>
+    <ul>
+      <li>Keep the frequency in the green band (±0.2 Hz).</li>
+      <li>Outside the band an alarm counts down. Get back in time, or it's a blackout.</li>
+      <li>Hit ±1 Hz (49 Hz or 51 Hz) and it's an instant blackout.</li>
+      <li><b>Tap</b> a generator on the wheel to switch it on or off. <b>Long-press</b> for details or to scrap it.</li>
+      <li>Build more from the dock. Consumers pay for every MWh you deliver.</li>
+      <li>Prices are real-world ballparks (build cost, yearly upkeep, fuel and CO₂). To make that playable, money runs on a yearly clock: one game day books a full year of bills, fuel and upkeep.</li>
+      <li>Each new day brings more customers, wilder loads and more surprises.</li>
+    </ul>
+    <p style="font-size:13px;color:var(--muted)">Game numbers are scaled so the action fits on a phone: real grids are far heavier and react over seconds, not this dramatically.</p>
+    <div style="height:24px"></div>
+  </div>
+</section>
+
+<div id="toast" class="hidden"></div>
+
+<script src="game.js"></script>
+</body>
+</html>
