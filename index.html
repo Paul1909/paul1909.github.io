@@ -190,6 +190,17 @@
   }
   .vote[aria-pressed="true"] svg { fill: currentColor; }
   .vote.pop { animation: pop .3s ease; }
+  /* Share button: same look as the like button, opens the phone's share sheet */
+  .vote.share svg { stroke-linecap: round; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 20;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: var(--panel); color: var(--text); border: 1px solid var(--cyan); border-radius: 999px;
+    padding: 8px 16px; font-size: 14px; font-weight: 600; max-width: calc(100vw - 32px);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    box-shadow: 0 6px 24px -8px var(--cyan); transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
   @keyframes pop { 50% { transform: scale(1.25); } }
 
   /* Sort bar */
@@ -255,6 +266,7 @@
 
   <footer>Built by Paolo · hosted on GitHub Pages</footer>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 /* ===========================================================
@@ -576,13 +588,41 @@ function gcEvent(name, title) {
   try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: name, title, event: true }); } catch (e) {}
 }
 
+const SHARE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7.5c0 .8.7 1.5 1.5 1.5h11c.8 0 1.5-.7 1.5-1.5V12"/></svg>';
+
 const voteBox = g => {
   const id = idOf(g); if (!id || g.soon) return "";
   const v = votes[id] || 0;
   return `<div class="votes" data-id="${esc(id)}" data-title="${esc(g.title)}">
+    <button type="button" class="vote share" aria-label="Share ${esc(g.title)}" title="Share with a friend">${SHARE}</button>
     <button type="button" class="vote up" data-v="1" aria-pressed="${v === 1}" aria-label="Like ${esc(g.title)}">${THUMB}</button>
   </div>`;
 };
+
+/* Share: the phone's share sheet with the app's own link (its page shows the preview);
+   on desktop without a share sheet, the text + link go to the clipboard. */
+const toastEl = document.getElementById("toast");
+let toastT;
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 2200);
+}
+const abs = u => new URL(u, location.href).href.replace(/[?#].*$/, "");
+async function shareGame(g) {
+  const parts = (g.split || [g]).filter(h => h.url);
+  const url = abs(parts[0].url);
+  const text = g.split
+    ? `${g.title} on Paolo's Arcade 🕹️\n${parts.map(h => `${h.title}: ${abs(h.url)}`).join("\n")}`
+    : `Try ${g.title} on Paolo's Arcade 🕹️`;
+  const copyText = g.split ? text : `${text}\n${url}`;
+  gcEvent(`share-${idOf(g)}`, `↗ Share: ${g.title}`);
+  if (navigator.share) {
+    try { return await navigator.share(g.split ? { title: g.title, text } : { title: g.title, text, url }); }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  try { await navigator.clipboard.writeText(copyText); toast("Link copied, paste it to a friend"); }
+  catch (e) { toast(url); }
+}
 
 const tagsHtml = g => `<div class="tags">${(g.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
 
@@ -616,6 +656,13 @@ const card = g => g.split ? splitCard(g) : `
 
 const grid = document.getElementById("grid");
 grid.addEventListener("click", e => {
+  const sh = e.target.closest(".vote.share");
+  if (sh) {
+    e.preventDefault();
+    const g = live.find(x => idOf(x) === sh.parentNode.dataset.id);
+    if (g) shareGame(g);
+    return;
+  }
   const btn = e.target.closest(".vote"); if (!btn) return;
   e.preventDefault();
   const box = btn.parentNode, id = box.dataset.id, title = box.dataset.title;
