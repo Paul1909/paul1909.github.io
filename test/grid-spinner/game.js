@@ -515,7 +515,14 @@ function scrap(u) {
 // ---------------------------------------------------------------- rendering: wheel
 const wheel = $('wheel'), wctx = wheel.getContext('2d');
 const chart = $('chart'), cctx = chart.getContext('2d');
-let layoutDirty = true, hits = [], W = 0, H = 0, DPR = 1;
+let layoutDirty = true, hits = [], W = 0, H = 0, DPR = 1, UIK = 1;
+// Desktop scale: panels grow with the window (1 at 1440×880), so big screens are filled and stay readable.
+function setScale() {
+  const desk = innerWidth >= 900 && innerHeight >= 560;
+  UIK = desk ? clamp(Math.min(innerWidth / 1440, innerHeight / 880), 1, 2.6) : 1;
+  document.documentElement.style.setProperty('--kz', UIK.toFixed(3));
+}
+setScale(); window.addEventListener('resize', setScale);
 function fitCanvas(cv, ctx) {
   const r = cv.getBoundingClientRect(); DPR = Math.min(window.devicePixelRatio || 1, 2.5);
   const w = Math.max(1, Math.round(r.width * DPR)), h = Math.max(1, Math.round(r.height * DPR));
@@ -565,7 +572,7 @@ function drawWheel(dt) {
   const cx = W / 2, cy = H / 2;
   const gens = g.units.slice().sort((a, b) => unitOrder.indexOf(a.type) - unitOrder.indexOf(b.type) || a.id - b.id);
   const n = Math.max(10, gens.length);
-  const grMax = clamp(Mx * .15, 14, 58);
+  const grMax = clamp(Mx * .15, 14, 96);
   let gr = grMax;
   for (let k = 0; k < 4; k++) gr = Math.min(grMax, (Mx - gr * 1.3) * Math.sin(Math.PI / n) * .95);
   const ring = Mx - gr * 1.3, R = ring - gr;
@@ -641,9 +648,9 @@ function drawWheel(dt) {
     ctx.lineWidth = Math.max(2, lr * .08); ctx.strokeStyle = L.off > 0 ? '#aaa6bd' : TH.bad; ctx.stroke();
     ctx.globalAlpha = L.off > 0 ? .4 : 1;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.round(lr * (L.D.code.length > 3 ? .36 : .44))}px ${MONO}`; ctx.fillStyle = TH.bad;
+    ctx.font = `800 ${Math.round(lr * (L.D.code.length > 3 ? .38 : .46))}px ${MONO}`; ctx.fillStyle = TH.bad;
     ctx.fillText(L.D.code, x, y - (lr >= 17 ? lr * .16 : 0));
-    if (lr >= 17) label(ctx, Math.round(L.P), x, y + lr * .56, Math.round(lr * .36));
+    if (lr >= 17) label(ctx, Math.round(L.P), x, y + lr * .52, Math.round(lr * .4));
     ctx.globalAlpha = 1;
     L.hx = x; L.hy = y;
     hits.push({ x, y, r: lr + 6, L });
@@ -736,12 +743,12 @@ function drawFreqChart(ctx, w, h, data, f0, opts = {}) {
   ctx.beginPath(); ctx.arc(X(data.length - 1), Y(last), 3, 0, Math.PI * 2); ctx.fill();
 }
 function drawChart() {
-  const [w, h] = fitCanvas(chart, cctx), big = h > 150;
+  const [w, h] = fitCanvas(chart, cctx), big = h > 150, k = big ? UIK : 1;
   cctx.clearRect(0, 0, w, h);
-  drawFreqChart(cctx, w, h, G.hist, G.f0, { slots: 900, font: big ? 12 : 10, lw: big ? 2.5 : 2, pad: { l: big ? 44 : 38, r: 10, t: big ? 26 : 16, b: 10 } });
-  cctx.font = `700 ${big ? 11.5 : 9.5}px ${MONO}`; cctx.textAlign = 'left'; cctx.textBaseline = 'top'; cctx.fillStyle = TH.muted;
+  drawFreqChart(cctx, w, h, G.hist, G.f0, { slots: 900, font: (big ? 13 : 10) * k, lw: (big ? 2.5 : 2) * k, pad: { l: (big ? 50 : 38) * k, r: 10 * k, t: (big ? 28 : 16) * k, b: 10 * k } });
+  cctx.font = `700 ${(big ? 12.5 : 9.5) * k}px ${MONO}`; cctx.textAlign = 'left'; cctx.textBaseline = 'top'; cctx.fillStyle = TH.muted;
   const rocof = G.hist.length > 10 ? (G.hist[G.hist.length - 1] - G.hist[G.hist.length - 11]) : 0;
-  cctx.fillText(`FREQUENCY [Hz] · 90 s · ROCOF ${rocof >= 0 ? '+' : '−'}${Math.abs(rocof).toFixed(2)} Hz/s`, big ? 46 : 40, big ? 7 : 3);
+  cctx.fillText(`FREQUENCY [Hz] · 90 s · ROCOF ${rocof >= 0 ? '+' : '−'}${Math.abs(rocof).toFixed(2)} Hz/s`, (big ? 52 : 40) * k, (big ? 8 : 3) * k);
 }
 // ---------------------------------------------------------------- HUD, dock, mix
 function buildDock() {
@@ -1078,8 +1085,8 @@ function renderEcon() {
   const r = G.rate, net = r.rev - r.fuel - r.maint - r.pen;
   const row = (a, v, c) => `<tr><td>${a}</td><td class="${c}">${v}</td></tr>`;
   $('econ').innerHTML = row('Cash', fmtMoney(G.cash), G.cash < 0 ? 'neg' : '') +
-    row(`💶 Bills paid by consumers (${perMWh(TARIFF)})`, '+' + fmtMoney(r.rev * DAY_S) + '/yr', 'pos') + row('⛽ Fuel, CO₂ & imports', '−' + fmtMoney(r.fuel * DAY_S) + '/yr', 'neg') +
-    row('🔧 Maintenance', '−' + fmtMoney(r.maint * DAY_S) + '/yr', 'neg') + row('🚨 Out-of-band penalties', '−' + fmtMoney(r.pen * DAY_S) + '/yr', r.pen > 0 ? 'neg' : '') +
+    row(`Bills paid by consumers (${perMWh(TARIFF)})`, '+' + fmtMoney(r.rev * DAY_S) + '/yr', 'pos') + row('Fuel, CO₂ & imports', '−' + fmtMoney(r.fuel * DAY_S) + '/yr', 'neg') +
+    row('Maintenance', '−' + fmtMoney(r.maint * DAY_S) + '/yr', 'neg') + row('Out-of-band penalties', '−' + fmtMoney(r.pen * DAY_S) + '/yr', r.pen > 0 ? 'neg' : '') +
     row('<b>Net</b>', `<b>${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net) * DAY_S)}/yr</b>`, net >= 0 ? 'pos' : 'neg');
 }
 $('pauseBtn').addEventListener('click', () => pause(true));
