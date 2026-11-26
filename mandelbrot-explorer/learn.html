@@ -71,6 +71,34 @@
   th { color: var(--muted); font-weight: 600; font-size: 13px; }
   footer { margin-top: 50px; color: var(--muted); font-size: 14px; text-align: center; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .aside { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; margin: 18px -6px; }
+  .aside h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .aside .eq { margin: 10px 0; }
+  .aside p { font-size: 15px; color: var(--muted); margin: 8px 0 0; }
+  .aside table { margin: 0; }
+
+  /* Tablet: a little wider, still one column */
+  @media (min-width: 700px) and (max-width: 1023px) { main { max-width: 780px; } }
+
+  /* Desktop: text on the left, the tool beside it (stays in view while you read) */
+  @media (min-width: 1024px) {
+    body { font-size: 18px; }
+    main { max-width: 1260px; padding: 0 40px 100px; }
+    .top { margin: 0 -40px; padding: 12px 40px; }
+    h1 { font-size: 54px; margin: 60px 0 12px; }
+    .lede { font-size: 21px; max-width: 780px; }
+    .sec { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); grid-template-rows: auto 1fr;
+      column-gap: 60px; margin-top: 64px; border-top: 1px solid var(--line); }
+    .sec h2 { margin-top: 40px; font-size: 28px; }
+    .sec .a { grid-column: 1; grid-row: 1; }
+    .sec .b { grid-column: 1; grid-row: 2; }
+    .sec .side { grid-column: 2; grid-row: 1 / span 2; align-self: start; }
+    .sec .side > .lab, .sec .side > .aside { margin: 40px 0 0; }
+    .lab { padding: 18px; }
+    .eq { font-size: 34px; }
+    .aside .eq { font-size: 24px !important; }
+  }
+  @media (min-width: 1024px) and (min-height: 800px) { .sec .side { position: sticky; top: 76px; } }
 </style>
 <script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
@@ -81,12 +109,15 @@
   <h1>One rule, infinite detail</h1>
   <p class="lede">Everything in the explorer comes from one tiny formula, repeated over and over. Here is how it works, with tools you can poke at.</p>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>1 · The rule</small>Square it, add <span class="m">c</span>, repeat</h2>
   <p>Pick a number <span class="m">c</span>. Start with <span class="m">z <b>=</b> 0</span> and apply this rule again and again, feeding each answer back in:</p>
   <div class="eq">z &nbsp;→&nbsp; z² + c</div>
   <p>Try <span class="m">c <b>=</b> 1</span>: you get 0, 1, 2, 5, 26, 677, … and it races off to infinity. Try <span class="m">c <b>=</b> −1</span>: you get 0, −1, 0, −1, … and it bounces back and forth forever. That's the whole question the Mandelbrot set asks:</p>
   <p class="note">The Mandelbrot set is every <span class="m">c</span> for which the sequence stays bounded (does not run off to infinity).</p>
-
+    </div>
+    <div class="side">
   <div class="lab">
     <h3>Try it on the number line</h3>
     <canvas id="lineCv" aria-label="The sequence plotted step by step"></canvas>
@@ -95,19 +126,35 @@
     <div class="seq" id="lineSeq"></div>
     <div class="verdict" id="lineVerdict"></div>
   </div>
+    </div>
+    <div class="txt b">
   <p>Slide slowly from right to left. Above <span class="m">c <b>=</b> ¼</span> everything escapes. Between ¼ and −¾ the sequence settles on one value. Past −¾ it splits into a 2-cycle, then a 4-cycle, then 8, then chaos, with calm windows inside it (try −1.76 for a 3-cycle). At exactly −2 it lands on 2 and stays there. Below −2 it escapes again. So on the number line, the Mandelbrot set is just the stretch from −2 to ¼.</p>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>2 · Into the plane</small>Complex numbers turn a line into a picture</h2>
   <p>The magic starts when <span class="m">c</span> can be a <em>complex</em> number: a point <span class="m">a <b>+</b> bi</span> on a flat plane, where <span class="m">i² <b>=</b> −1</span>. Adding is just sliding the point. Squaring is a geometric move: <strong>the distance from 0 gets squared and the angle doubles</strong>.</p>
+    </div>
+    <div class="side">
   <div class="lab">
     <h3>What squaring does</h3>
     <canvas id="sqCv" aria-label="Drag z to see z squared"></canvas>
     <div class="readout" id="sqOut"></div>
   </div>
+    </div>
+    <div class="txt b">
   <p>Drag <span class="m" style="color:var(--accent)">z</span> around. Inside the circle of radius 1, squaring pulls points inwards. Outside it, squaring flings them further out. Every step of the rule is "double the angle, square the distance, then slide by <span class="m">c</span>". That spinning and stretching is what makes the shapes spiral.</p>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>3 · The orbit tool</small>Drag <span class="m">c</span> and watch it move</h2>
   <p>The dots below are the sequence 0, <span class="m">z₁</span>, <span class="m">z₂</span>, … for the point <span class="m">c</span> you pick, joined in order. That path is called the <em>orbit</em> of 0. Touch anywhere and drag.</p>
+    </div>
+    <div class="side">
   <div class="lab">
     <h3>Orbit of 0 under z² + c</h3>
     <canvas id="orbCv" aria-label="Mandelbrot set with the orbit of the chosen point"></canvas>
@@ -120,6 +167,8 @@
     <div class="chips" id="orbChips"></div>
     <div class="row"><a class="btn" id="orbOpen" href="./">Zoom into this spot in the explorer →</a></div>
   </div>
+    </div>
+    <div class="txt b">
   <p>Things to try:</p>
   <ul>
     <li>Inside the big heart shape (the <em>main cardioid</em>), the orbit spirals in to <strong>one</strong> point.</li>
@@ -127,7 +176,11 @@
     <li>Just outside the black area, the orbit wanders for a while, then crosses the circle and is gone.</li>
     <li>Near the edge, the orbit takes hundreds of steps to make up its mind. That indecision is where all the detail lives.</li>
   </ul>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>4 · Julia sets</small>The same rule, flipped</h2>
   <p>A Julia set uses the same rule, <span class="m">z → z² + c</span>, but flips which number you vary. For the Mandelbrot set you always start at <span class="m">z <b>=</b> 0</span> and try every possible <span class="m">c</span>. For a Julia set you fix one <span class="m">c</span> and try every possible <em>starting point</em> <span class="m">z</span>. The starting points whose sequence stays bounded form the (filled) Julia set for that <span class="m">c</span>. So there's one Mandelbrot set, but a different Julia set for every value of <span class="m">c</span>.</p>
   <p>They're tied together by a classic theorem: the Mandelbrot set is exactly the set of values of <span class="m">c</span> whose Julia set is <em>connected</em>, meaning it's all in one piece.</p>
@@ -137,6 +190,8 @@
   </ul>
   <p>The reason is that the starting point 0 is special for <span class="m">z² + c</span>: the shape of the whole Julia set depends on whether the orbit of 0 escapes. That orbit is exactly what the Mandelbrot set tests. In that sense the Mandelbrot set is a map, or catalogue, of all the Julia sets.</p>
   <p>The shape also carries over. A <span class="m">c</span> deep inside the main cardioid gives a slightly wobbly circle, and a <span class="m">c</span> in the period-3 bulb gives a "rabbit" with three ears meeting at each joint. A <span class="m">c</span> on the edge gives the most intricate Julia sets, and if you zoom into the Mandelbrot set near that <span class="m">c</span>, you often find patterns that look like that <span class="m">c</span>'s Julia set.</p>
+    </div>
+    <div class="side">
   <div class="lab">
     <h3>The Julia set of your c</h3>
     <canvas id="julCv" aria-label="Julia set for the chosen c"></canvas>
@@ -144,25 +199,53 @@
     <p class="verdict" id="julText"></p>
     <div class="chips" id="julChips"></div>
   </div>
+    </div>
+    <div class="txt b">
   <p>This pane follows the orbit tool above: drag <span class="m">c</span> in and out of the set there and watch its Julia set break into dust the moment <span class="m">c</span> crosses the edge. In the explorer, put the cross on a spot and tap <strong>Julia</strong> to see the Julia set for that point full screen.</p>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>5 · Why the circle?</small>Once past 2, there's no way back</h2>
   <p>If a point of the orbit ever gets further than 2 from the centre, it will escape for sure. In the Mandelbrot sequence, <span class="m">|z|</span> is at least <span class="m">|c|</span> by the time it passes 2, and then</p>
-  <div class="eq" style="font-size:22px">|z² + c| ≥ |z|² − |c| ≥ |z|² − |z| = |z| (|z| − 1)</div>
+    </div>
+    <div class="side">
+  <div class="aside">
+<div class="eq" style="font-size:22px">|z² + c| ≥ |z|² − |c| ≥ |z|² − |z| = |z| (|z| − 1)</div>
+    <p>Each step at least multiplies the distance by |z| − 1, which is more than 1 once you are past 2.</p>
+  </div>
+    </div>
+    <div class="txt b">
   <p>With <span class="m">|z| &gt; 2</span>, the factor <span class="m">|z| − 1</span> is bigger than 1, so every step pushes it further out, faster and faster. That's why the computer can stop as soon as it crosses the circle: it already knows the answer. It also means the whole set fits inside that circle.</p>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>6 · Colours</small>How fast it escapes</h2>
   <p>Strictly, a point is either in the set (black) or not. The colours in the explorer show <strong>how many steps</strong> each outside point took to cross the circle. Below, only <span class="m">N</span> steps are checked. Black is "hasn't escaped yet". Raise <span class="m">N</span> and watch the black shape shrink towards the real set.</p>
+    </div>
+    <div class="side">
   <div class="lab">
     <h3>Survivors after N steps</h3>
     <canvas id="lvCv" aria-label="Points that survive N steps"></canvas>
     <div class="row"><label for="lvN">N</label><input id="lvN" type="range" min="1" max="60" step="1" value="3"><output id="lvOut"></output></div>
   </div>
+    </div>
+    <div class="txt b">
   <p>After 1 step, the survivors are just the disc of radius 2. After 2 steps it's an oval, after 3 a pear, and every extra step carves in more detail. The real set is what's left after infinitely many steps. The explorer raises <span class="m">N</span> automatically as you zoom: thousands of steps at ×10¹⁰, tens of thousands deeper down. The smooth colour bands come from also measuring <em>how far</em> past the circle the last step landed.</p>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>7 · Bulbs and periods</small>The set counts for you</h2>
   <p>Every bulb has a number: the length of the cycle its orbits fall into (you saw this in the orbit tool). And you can read that number off the picture: count the spokes on the antenna sticking out of a bulb. The top bulb has 3 spokes and a 3-cycle. Its neighbour has 4 spokes and a 4-cycle.</p>
   <p>Between two bulbs, the biggest bulb in the gap has the sum of their numbers. Between the 2-bulb and the 3-bulb sits a 5-bulb, between 3 and 5 an 8, then 13, 21, 34… That's the Fibonacci sequence, appearing in the bulbs. (Mathematicians call this Farey addition.)</p>
+    </div>
+    <div class="side">
+  <div class="aside">
   <table>
     <tr><th>Region</th><th>Orbit ends up in</th><th>Exact shape</th></tr>
     <tr><td>Main cardioid</td><td>1 point</td><td class="m">c = μ/2 − μ²/4, |μ| &lt; 1</td></tr>
@@ -170,16 +253,29 @@
     <tr><td>Top / bottom bulb</td><td>3-cycle</td><td>almost a disc, centre ≈ −0.12 ± 0.74i</td></tr>
     <tr><td>Baby Mandelbrot at −1.75</td><td>3-cycle</td><td>a whole small copy of the set</td></tr>
   </table>
+  </div>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>8 · The fig tree</small>The real line, unfolded</h2>
   <p>Back to the number line. For each <span class="m">c</span>, run the rule for a long time and plot every value the sequence keeps visiting. Line that up under the set and something remarkable shows: each time the set pinches to a new bulb, the line splits in two (1 → 2 → 4 → 8 …). Then chaos sets in, broken by calm windows that sit exactly where the baby Mandelbrots are.</p>
+    </div>
+    <div class="side">
   <div class="lab">
     <h3>The set (top) and where the orbit settles (bottom)</h3>
     <canvas id="bifCv" aria-label="Mandelbrot set above its bifurcation diagram"></canvas>
     <div class="readout" id="bifOut"></div>
   </div>
+    </div>
+    <div class="txt b">
   <p>This picture is famous in its own right: it's the "bifurcation diagram" of the logistic map <span class="m">x → r·x(1 − x)</span>, used in population models. It's the same rule in disguise: substitute <span class="m">z = r(½ − x)</span> and you get <span class="m">z² + c</span> with <span class="m">c = r/2 − r²/4</span>. The splits come closer and closer, each gap about 4.669 times shorter than the one before. That's Feigenbaum's constant, and it turns up in dripping taps, fluid flow and electronic circuits too.</p>
+    </div>
+  </section>
 
+  <section class="sec">
+    <div class="txt a">
   <h2><small>9 · Going deep</small>How the explorer reaches ×10²⁵⁰</h2>
   <p>Phones do arithmetic with about 16 significant digits. Past a zoom of about 10¹³, neighbouring pixels become the same number and the picture breaks into blocks. The explorer gets round that in three steps:</p>
   <ul>
@@ -187,7 +283,15 @@
     <li><strong>Only the differences.</strong> Every other pixel is tracked as a tiny offset from that path (<em>perturbation</em>). Tiny numbers are no problem for ordinary arithmetic, even at 10⁻³⁰⁰.</li>
     <li><strong>Skip the boring part.</strong> For the first few thousand steps all those offsets grow almost in lockstep, so a short polynomial predicts them, and the app jumps straight past (<em>series approximation</em>).</li>
   </ul>
-  <p>A few facts to finish: the set is all one connected piece (Douady and Hubbard proved it in 1982), its area is about 1.506 though nobody knows the exact value, and its edge is so wrinkled that it counts as 2-dimensional (Shishikura, 1998).</p>
+    </div>
+    <div class="side">
+  <div class="aside">
+    <h3>Three facts</h3>
+    <p>The set is all one connected piece (Douady and Hubbard proved it in 1982), its area is about 1.506 though nobody knows the exact value, and its edge is so wrinkled that it counts as 2-dimensional (Shishikura, 1998).</p>
+
+  </div>
+    </div>
+  </section>
 
   <footer><a href="./">← Back to the explorer</a></footer>
 </main>
