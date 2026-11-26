@@ -208,6 +208,18 @@ def g_scramble(k, a):
             f'<g transform="translate(312 308) rotate(9)"><rect x="-62" y="-62" width="124" height="124" rx="22" {T(k,.25)} {S(k,18)}/>'
             f'<path d="{S_}" fill="none" {S(k,14)}/></g>')
 
+def g_mandel(k, a):
+    # The set's own silhouette: main cardioid, period-2 bulb, top/bottom bulbs and the antenna.
+    S_, ox = 150, 256 + 0.86 * 150
+    P = lambda x, y: f'{ox + x * S_:.1f},{256 - y * S_:.1f}'
+    card = 'M' + ' L'.join(P(math.cos(t) / 2 - math.cos(2 * t) / 4, math.sin(t) / 2 - math.sin(2 * t) / 4)
+                           for t in (i * 2 * math.pi / 120 for i in range(120))) + 'Z'
+    disc = lambda x, y, r, o='': f'<circle cx="{ox + x * S_:.1f}" cy="{256 - y * S_:.1f}" r="{r * S_:.1f}" fill="{k}"{o}/>'
+    halo = f'<circle cx="256" cy="256" r="176" {T(k,.12)}/>'
+    return (halo + f'<path d="{card}" fill="{k}"/>' + disc(-1, 0, .262) + disc(-1.3107, 0, .0597) +
+            disc(-0.1226, 0.7449, .104) + disc(-0.1226, -0.7449, .104) +
+            f'<path d="M{P(-1.37, 0)} L{P(-1.96, 0)}" {S(k,12)}/>' + disc(-1.7549, 0, .028))
+
 # slug, accent (same as the homepage card colour), glyph
 APPS = [
     ('matrix-message', '#00ff41', g_matrix), ('swatch', '#ff7a9c', g_swatch),
@@ -222,6 +234,7 @@ APPS = [
     ('atomic-chess', '#ffb347', g_atomic), ('finger-twist', '#ffe14a', g_twist),
     ('neon-ice-hockey', '#3ef2ff', g_hockey), ('neon-pong-duo', '#ff4fd8', g_pong),
     ('dots-and-lines', '#b6ff4a', g_dots), ('word-scramble-fun', '#03a9f4', g_scramble),
+    ('mandelbrot-explorer', '#1fd1b9', g_mandel),
 ]
 
 def build_svg(accent, glyph, rounded=True, coin=True):

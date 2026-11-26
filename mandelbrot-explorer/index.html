@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05030c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mandelbrot">
+<meta name="description" content="Pinch your way into the Mandelbrot set, from the whole set down to a zoom of 10^250.">
+<title>Mandelbrot Explorer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  /* System fonts only: a Google Fonts link would fail offline. */
+  :root {
+    --bg: #05030c; --panel: rgba(12, 9, 26, .78); --line: rgba(255, 255, 255, .14);
+    --text: #ece8ff; --muted: #9a92c4; --accent: #1fd1b9;
+    --st: env(safe-area-inset-top); --sb: env(safe-area-inset-bottom);
+    --sl: env(safe-area-inset-left); --sr: env(safe-area-inset-right);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  .hidden { display: none !important; }
+
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #view:active { cursor: grabbing; }
+
+  .ui { transition: opacity .2s ease; }
+  body.clean .ui { opacity: 0; pointer-events: none; }
+
+  button { font: inherit; color: var(--text); background: none; border: 0; cursor: pointer;
+    user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .glass { background: var(--panel); border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: var(--accent);
+    box-shadow: 0 0 10px var(--accent); z-index: 5; transition: width .12s linear, opacity .3s ease; }
+
+  #hud { position: fixed; top: calc(var(--st) + 10px); left: calc(var(--sl) + 10px); right: calc(var(--sr) + 10px);
+    display: flex; gap: 8px; align-items: flex-start; pointer-events: none; }
+  #hud .glass { border-radius: 14px; padding: 8px 12px; pointer-events: auto; max-width: 100%; min-width: 0; }
+  #learn { margin-left: auto; flex: none; color: var(--text); text-decoration: none; font-size: 14px; font-weight: 600;
+    min-height: 44px; display: inline-flex; align-items: center; }
+  #learn:active { background: rgba(31, 209, 185, .25); }
+  #zoom { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  #zoom sup { font-size: .62em; }
+  #where { font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+  #place { font-size: 13px; color: var(--accent); font-weight: 600; margin-top: 3px; }
+  #place:empty { display: none; }
+
+  #cross { position: fixed; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; opacity: .55; }
+  #cross::before, #cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+  #cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
+
+  #zoomBtns { position: fixed; right: calc(var(--sr) + 10px); bottom: calc(var(--sb) + 96px);
+    display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; }
+  #zoomBtns button { width: 48px; height: 48px; font-size: 26px; line-height: 1; }
+  #zoomBtns button + button { border-top: 1px solid var(--line); }
+
+  #tools { position: fixed; left: calc(var(--sl) + 8px); right: calc(var(--sr) + 8px); bottom: calc(var(--sb) + 10px);
+    display: grid; grid-template-columns: repeat(6, 1fr); border-radius: 18px; padding: 4px; max-width: 520px; margin: 0 auto; }
+  #tools button { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0 6px;
+    border-radius: 14px; font-size: 11px; color: var(--muted); min-height: 54px; }
+  #tools button svg { width: 24px; height: 24px; stroke: var(--text); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #tools button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+  #tools button[aria-pressed="true"] svg { stroke: var(--accent); }
+
+  .sheet { position: fixed; left: calc(var(--sl) + 8px); right: calc(var(--sr) + 8px); bottom: calc(var(--sb) + 84px);
+    max-width: 520px; margin: 0 auto; border-radius: 18px; padding: 14px 14px 16px; max-height: 52vh; overflow-y: auto;
+    overscroll-behavior: contain; }
+  .sheet h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .sheet p { margin: 8px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+  .places { display: grid; gap: 6px; }
+  .places button { text-align: left; display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px;
+    border: 1px solid var(--line); min-height: 52px; }
+  .places button:active { background: rgba(255, 255, 255, .06); }
+  .places b { display: block; font-size: 15px; }
+  .places span { font-size: 12px; color: var(--muted); }
+  .places i { margin-left: auto; font-style: normal; font-size: 12px; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .palettes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .palettes button { border-radius: 12px; height: 46px; border: 2px solid transparent; position: relative; overflow: hidden; }
+  .palettes button span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 11px; padding: 2px 0; background: rgba(0, 0, 0, .55); }
+  .palettes button[aria-pressed="true"] { border-color: #fff; }
+
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 14px; }
+  .row label { flex: 0 0 auto; min-width: 96px; }
+  .row input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; }
+  .row output { min-width: 74px; text-align: right; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { padding: 8px 14px; font-size: 14px; color: var(--muted); min-height: 40px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #05030c; font-weight: 600; }
+  .switch { margin-left: auto; width: 52px; height: 30px; border-radius: 15px; background: rgba(255, 255, 255, .18); position: relative; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch[aria-pressed="true"] { background: var(--accent); }
+  .switch[aria-pressed="true"]::after { transform: translateX(22px); }
+  .btn { border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; min-height: 42px; font-size: 14px; }
+
+  #toast { position: fixed; left: 50%; top: calc(var(--st) + 84px); transform: translate(-50%, -8px); opacity: 0;
+    padding: 10px 16px; border-radius: 12px; font-size: 14px; pointer-events: none; transition: opacity .2s, transform .2s;
+    max-width: calc(100% - 32px); text-align: center; z-index: 6; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+<script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body>
+  <canvas id="view" aria-label="Mandelbrot set"></canvas>
+  <div id="progress"></div>
+  <div id="cross" class="ui"></div>
+
+  <div id="hud" class="ui">
+    <div class="glass">
+      <div id="zoom">×1</div>
+      <div id="where"></div>
+      <div id="place"></div>
+    </div>
+    <a id="learn" class="glass" href="learn.html" aria-label="The maths behind the set">∑ Maths</a>
+  </div>
+
+  <div id="zoomBtns" class="ui glass">
+    <button id="zin" aria-label="Zoom in">+</button>
+    <button id="zout" aria-label="Zoom out">−</button>
+  </div>
+
+  <section class="sheet glass ui hidden" id="sheet-places">
+    <h2>Famous places</h2>
+    <div class="places" id="placeList"></div>
+  </section>
+
+  <section class="sheet glass ui hidden" id="sheet-colours">
+    <h2>Colours</h2>
+    <div class="palettes" id="paletteList"></div>
+    <div class="row"><label for="density">Colour bands</label><input id="density" type="range" min="-3" max="3" step="0.25"><output id="densityOut"></output></div>
+    <div class="row"><span>Colour cycling</span><button class="switch" id="cycle" aria-pressed="false" aria-label="Colour cycling"></button></div>
+  </section>
+
+  <section class="sheet glass ui hidden" id="sheet-settings">
+    <h2>Settings</h2>
+    <div class="row"><label for="iters">Detail</label><input id="iters" type="range" min="-2" max="2" step="0.25"><output id="itersOut"></output></div>
+    <div class="row"><span>Resolution</span><span class="seg" id="quality" style="margin-left:auto"><button data-q="fast">Fast</button><button data-q="sharp">Sharp</button></span></div>
+    <div class="row"><button class="btn" id="reset">Back to the whole set</button><a class="btn" href="learn.html" style="color:var(--accent);text-decoration:none;display:inline-flex;align-items:center">How does it work? ∑</a></div>
+    <p>Pinch or scroll to zoom, drag to move, double-tap to dive in. Tap once to hide the buttons.</p>
+    <p>Julia shows the Julia set of the point under the cross. Detail sets how many iterations each pixel gets: raise it if the edges look blobby deep down.</p>
+  </section>
+
+  <nav id="tools" class="ui glass">
+    <button data-sheet="places" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Places</button>
+    <button data-sheet="colours" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2 0-1.5-1.3-1.8-1.3-3 0-1 .8-1.8 1.9-1.8H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></svg>Colours</button>
+    <button id="julia" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 12c0-2 2-3 3.5-2s1 4-2 4.5S8 13 8.5 9.5 13 4 17 6s4.5 8 0 11-11 2-12.5-3S6 3.5 11 3"/></svg>Julia</button>
+    <button id="surprise"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg>Surprise</button>
+    <button data-sheet="settings" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+    <button id="share"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>Share ↗</button>
+  </nav>
+
+  <div id="toast" class="glass"></div>
+
+  <script src="fractal.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
