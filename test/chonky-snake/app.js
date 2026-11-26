@@ -25,6 +25,9 @@ const DIFFS = {
 const R0 = 0.5;        // starting body radius (diameter = 1 unit, like one classic Snake cell)
 const LEN = 7;         // body length, never changes
 const FOOD_R = 0.55, PU_R = 0.62, PU_LIFE = 8, GYM_TIME = 5;
+const FOOD_VIS = 0.62, PU_VIS = 0.95;   // drawn radius at scale 1
+// Burgers and power-ups grow with the snake, so they stay in proportion as it fattens.
+const itemScale = r => 1 + Math.max(0, r - R0) * 0.6;
 const U = { x: 0, y: -1 }, D = { x: 0, y: 1 }, L = { x: -1, y: 0 }, R = { x: 1, y: 0 };
 const RANKS = [[0, 'Noodle'], [2, 'Snacky Snek'], [4, 'Chubby'], [8, 'Chonker'], [15, "Heckin' Chonker"],
   [25, 'Mega Chonk'], [40, 'Absolute Unit'], [70, 'Oh Lawd He Comin’']];
@@ -34,6 +37,7 @@ const settings = {
   diff: store.get('diff', 'normal'),
   sound: store.get('sound', true),
   vib: store.get('vib', true),
+  arrows: store.get('arrows', true),
 };
 if (!DIFFS[settings.diff]) settings.diff = 'normal';
 
@@ -114,18 +118,20 @@ function newGame() {
     r: R0, rT: R0, ang: -Math.PI / 2, pulse: 0, dead: false, gym: 0,
   };
   bulges = []; parts = []; floats = []; puddles = []; score = 0; pu = null; puIn = 6; food = null; shake = 0; recap = null;
-  food = findSpot(FOOD_R);
+  food = findSpot(FOOD_R, FOOD_VIS);
   updateHud(false);
 }
 
-function findSpot(rad) {
-  const s = snake, rn = s.rT + diff().grow, m = Math.max(0.9, 0.75 * rn);
+function findSpot(rad, vis) {
+  const s = snake, rn = s.rT + diff().grow, sc = itemScale(rn);
+  rad *= sc;
+  const m = Math.max(0.9, 0.75 * rn, vis * sc + 0.15);
   for (let k = 0; k < 400; k++) {
     const p = { x: m + Math.random() * (AW - 2 * m), y: m + Math.random() * (AH - 2 * m) };
     const relax = k > 200;
     if (pathDist(p, s.path) < s.rT * 1.15 + rad + (relax ? 0.1 : 0.8)) continue;
     if (!relax && dist(p, s.path[0]) < 3 + s.rT) continue;
-    if (food && dist(p, food) < 2) continue;
+    if (food && dist(p, food) < 2 * sc + 0.5) continue;
     return p;
   }
   return { x: AW / 2, y: m };
@@ -204,8 +210,9 @@ function step(h) {
   const m = s.r * 0.95;
   if ((H.x < m && s.dir.x < 0) || (H.x > AW - m && s.dir.x > 0) || (H.y < m && s.dir.y < 0) || (H.y > AH - m && s.dir.y > 0)) return die('wall');
   if (hitsSelf()) return die('self');
-  if (food && dist(H, food) < s.r * 1.1 + FOOD_R) eat();
-  if (pu && dist(H, pu) < s.r * 1.1 + PU_R) eatPowerUp();
+  const isc = itemScale(s.r);
+  if (food && dist(H, food) < s.r * 1.1 + FOOD_R * isc) eat();
+  if (pu && dist(H, pu) < s.r * 1.1 + PU_R * isc) eatPowerUp();
 }
 
 function eat() {
@@ -215,8 +222,8 @@ function eat() {
   floats.push({ x: f.x, y: f.y, text: '+1', c: '#ffffff', t: 0 });
   sfx.munch(); if (score % 5 === 0) setTimeout(() => sfx.burp(), 260);
   buzz(15);
-  food = null; food = findSpot(FOOD_R);
-  if (!pu && --puIn <= 0) { pu = Object.assign(findSpot(PU_R), { t: 0, type: Math.random() < 0.55 ? 'salad' : 'gym' }); puIn = 6 + Math.floor(Math.random() * 4); }
+  food = null; food = findSpot(FOOD_R, FOOD_VIS);
+  if (!pu && --puIn <= 0) { pu = Object.assign(findSpot(PU_R, PU_VIS), { t: 0, type: Math.random() < 0.55 ? 'salad' : 'gym' }); puIn = 6 + Math.floor(Math.random() * 4); }
   updateHud(true);
 }
 
@@ -376,7 +383,7 @@ function drawWorld(g, k, ox, oy) {
   g.restore();
   for (const d of puddles) { g.fillStyle = d.c; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(d.x, d.y, d.r * 1.25, d.r, d.a, 0, 7); g.fill(); }
   g.globalAlpha = 1;
-  if (food) drawBurger(g, food.x, food.y, 1.3 * (1 + 0.06 * Math.sin(tAnim * 5)));
+  if (food) drawBurger(g, food.x, food.y, 1.3 * itemScale(snake.r) * (1 + 0.06 * Math.sin(tAnim * 5)));
   if (pu) drawPowerUp(g, pu);
   const dots = list => { for (const p of list) { g.globalAlpha = Math.min(1, p.life / 0.3); g.fillStyle = p.c; g.beginPath(); g.arc(p.x, p.y, p.s, 0, 7); g.fill(); } g.globalAlpha = 1; };
   dots(parts.filter(p => !p.puke));
@@ -407,7 +414,7 @@ function drawBurger(g, x, y, sc = 1) {
 function drawPowerUp(g, p) {
   const left = PU_LIFE - p.t;
   if (left < 2.5 && Math.floor(p.t * 6) % 2 === 0) return;
-  g.save(); g.translate(p.x, p.y);
+  g.save(); g.translate(p.x, p.y); const isc = itemScale(snake.r); g.scale(isc, isc);
   g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.arc(0, 0, 0.95, 0, 7); g.fill();
   g.strokeStyle = p.type === 'salad' ? 'rgba(184,240,90,.7)' : 'rgba(255,143,171,.75)'; g.lineWidth = 0.08; g.lineCap = 'round';
   g.beginPath(); g.arc(0, 0, 0.95, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * Math.max(0, left / PU_LIFE)); g.stroke();
@@ -533,7 +540,7 @@ function drawMenuArt() {
   for (let i = 0; i <= 26; i++) { const x = 10.6 - i * 0.22; pts.push({ x, y: cy + Math.sin(i * 0.3 + tAnim * 2.2) * 0.4 * Math.min(1, i / 6) }); }
   const s = { path: pts, r: 1.55 + 0.06 * Math.sin(tAnim * 2), ang: 0, dead: false, pulse: 0 };
   drawSnake(actx, s, [{ d: 3.0 + Math.sin(tAnim) * 0.3 }], { x: 14.3, y: cy }, false);
-  drawBurger(actx, 14.3, cy + 0.15, 1.7 + 0.08 * Math.sin(tAnim * 5));
+  drawBurger(actx, 14.2, cy + 0.15, 2.4 + 0.1 * Math.sin(tAnim * 5));
 }
 
 // ---------- HUD + overlays ----------
@@ -550,6 +557,8 @@ function refreshMenu() {
   $('menuBest').textContent = store.get('best-' + settings.diff, 0);
   $('sndBtn').setAttribute('aria-pressed', String(settings.sound));
   $('vibBtn').setAttribute('aria-pressed', String(settings.vib));
+  for (const b of document.querySelectorAll('.arrowsBtn')) b.setAttribute('aria-pressed', String(settings.arrows));
+  document.body.dataset.arrows = settings.arrows ? 'on' : 'off';
 }
 let toastT = 0;
 function toast(msg) {
@@ -668,7 +677,7 @@ document.addEventListener('visibilitychange', () => {
 const KEYS = { ArrowUp: U, ArrowDown: D, ArrowLeft: L, ArrowRight: R, w: U, s: D, a: L, d: R, W: U, S: D, A: L, D: R };
 window.addEventListener('keydown', e => {
   const d = KEYS[e.key];
-  if (d) { e.preventDefault(); steer(d); return; }
+  if (d) { e.preventDefault(); flashArrow(Object.keys(DPAD).find(k => DPAD[k] === d)); steer(d); return; }
   if (e.key === ' ' || e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
     if (state === 'play' || state === 'ready') { e.preventDefault(); pause(); }
     else if (state === 'pause') { e.preventDefault(); resume(); }
@@ -706,6 +715,21 @@ for (const b of document.querySelectorAll('#diffSeg button')) {
   b.onclick = () => { settings.diff = b.dataset.diff; store.set('diff', settings.diff); refreshMenu(); };
 }
 $('sndBtn').onclick = () => { settings.sound = !settings.sound; store.set('sound', settings.sound); if (settings.sound) { unlockAudio(); sfx.start(); } refreshMenu(); };
+for (const b of document.querySelectorAll('.arrowsBtn')) {
+  b.onclick = () => { settings.arrows = !settings.arrows; store.set('arrows', settings.arrows); refreshMenu(); };
+}
+// On-screen arrows: react on touch-down (no click delay) and don't start a swipe underneath.
+const DPAD = { up: U, down: D, left: L, right: R };
+for (const b of document.querySelectorAll('#dpad button')) {
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    flashArrow(b.dataset.d); steer(DPAD[b.dataset.d]); buzz(8);
+  });
+}
+function flashArrow(name) {
+  const b = document.querySelector(`#dpad button[data-d="${name}"]`); if (!b) return;
+  b.classList.add('on'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('on'), 140);
+}
 $('vibBtn').onclick = () => { settings.vib = !settings.vib; store.set('vib', settings.vib); buzz(20); refreshMenu(); };
 
 window.addEventListener('resize', resize);

@@ -54,6 +54,24 @@
   }
   #hint small { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-top: 2px; }
   body:not([data-state="ready"]) #hint { display: none; }
+  body[data-arrows="on"] #hint { bottom: auto; top: 10%; }
+
+  /* On-screen arrows: semi-transparent d-pad over the bottom of the arena */
+  #dpad {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2;
+    width: min(50vw, 200px, 30vh); aspect-ratio: 1; display: grid; gap: 6px; pointer-events: none;
+    grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  }
+  #dpad button {
+    pointer-events: auto; touch-action: none; border-radius: 18px; padding: 0; display: grid; place-items: center;
+    background: rgba(236, 255, 217, .12); border: 1.5px solid rgba(236, 255, 217, .28); color: rgba(236, 255, 217, .72);
+    transition: background .1s, transform .1s;
+  }
+  #dpad button svg { width: 52%; height: 52%; }
+  #dpad button.on, #dpad button:active { background: rgba(163, 228, 79, .45); color: #fff; transform: scale(.94); }
+  #dpad [data-d="up"] { grid-area: 1 / 2; } #dpad [data-d="left"] { grid-area: 2 / 1; }
+  #dpad [data-d="right"] { grid-area: 2 / 3; } #dpad [data-d="down"] { grid-area: 3 / 2; }
+  body[data-arrows="off"] #dpad, body:not([data-state="play"]):not([data-state="ready"]) #dpad { display: none; }
   @keyframes breathe { 50% { transform: translateX(-50%) scale(1.06); } }
 
   .overlay {
@@ -81,7 +99,7 @@
     background: linear-gradient(#c8f574, #8fd43c); box-shadow: 0 4px 0 #4f8a22;
   }
   .big:active { transform: translateY(2px); box-shadow: 0 2px 0 #4f8a22; }
-  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
   .btn {
     flex: 1; min-height: 48px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel);
     font-weight: 800; font-size: 17px;
@@ -118,7 +136,8 @@
     </header>
     <main id="stage">
       <canvas id="cv"></canvas>
-      <div id="hint">Swipe to start<small>or use the arrow keys</small></div>
+      <div id="hint">Swipe to start<small>or tap an arrow</small></div>
+      <div id="dpad"><button data-d="up" aria-label="Up"><svg viewBox="0 0 24 24" style="transform:rotate(0deg)"><path d="M12 5 21 17H3Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button><button data-d="left" aria-label="Left"><svg viewBox="0 0 24 24" style="transform:rotate(-90deg)"><path d="M12 5 21 17H3Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button><button data-d="right" aria-label="Right"><svg viewBox="0 0 24 24" style="transform:rotate(90deg)"><path d="M12 5 21 17H3Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button><button data-d="down" aria-label="Down"><svg viewBox="0 0 24 24" style="transform:rotate(180deg)"><path d="M12 5 21 17H3Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button></div>
     </main>
   </div>
 
@@ -133,7 +152,7 @@
       <p class="best">Best: <b id="menuBest">0</b> burgers</p>
       <button id="playBtn" class="big">Play</button>
       <ul class="how">
-        <li>Swipe (or use the arrow keys) to steer.</li>
+        <li>Swipe, tap the on-screen arrows or use the arrow keys to steer.</li>
         <li>Burgers make the snake fatter and heavier. It never gets longer.</li>
         <li>A fat snake needs more room to turn around.</li>
         <li>🥗 Salad slims you down at once. 🏋️ The gym burns fat for a few seconds (and you speed up).</li>
@@ -142,6 +161,7 @@
       <div class="row">
         <button id="sndBtn" class="chip" aria-pressed="true">🔊 Sound</button>
         <button id="vibBtn" class="chip" aria-pressed="true">📳 Vibration</button>
+        <button class="chip arrowsBtn" aria-pressed="true">✛ Arrows</button>
       </div>
     </div>
   </section>
@@ -153,6 +173,7 @@
       <div style="height:14px"></div>
       <button id="resumeBtn" class="big">Resume</button>
       <div class="row"><button id="restartBtn" class="btn">Restart</button><button id="quitBtn" class="btn">Menu</button></div>
+      <div class="row" style="justify-content:center"><button class="chip arrowsBtn" aria-pressed="true">✛ On-screen arrows</button></div>
     </div>
   </section>
 
