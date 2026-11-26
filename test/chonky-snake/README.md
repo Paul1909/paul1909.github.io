@@ -1,11 +1,12 @@
 # Chonky Snake (test build)
 
-Classic Snake with one twist: every apple makes the snake **fatter instead of longer**. The body length never changes, so the snake slowly turns from a noodle into a sausage into a blob that barely fits in the arena. Works offline once opened, installs as a fullscreen phone app.
+Classic Snake with one twist: every burger makes the snake **fatter instead of longer**. The body length never changes, so the snake slowly turns from a noodle into a sausage into a blob that barely fits in the arena. Works offline once opened, installs as a fullscreen phone app.
 
 - Swipe anywhere (or arrow keys / WASD) to steer. Space, P or Esc pauses; Android's back swipe pauses too.
 - A fat snake needs one body width of room to turn back on itself (a U-turn), so tight turns get harder as it grows.
 - Walls only kill you when you drive into them; self-bites count everywhere except right behind the head.
-- Every 6–9 apples a leaf appears for 8 seconds. Eating it slims the snake by three sizes.
+- Every 6–9 burgers a power-up appears for 8 seconds: 🥗 salad (instantly 3 sizes slimmer) or 🏋️ gym (5-second workout: headband, sweat, burns one size per second and moves 15% faster).
+- Crash into a wall and the snake throws up its burgers (the puddle stays on the share picture).
 - Weight in kg (starts at 1.0) grows with the square of the snake's width. Ranks go from Noodle up to Absolute Unit.
 - Easy / Normal / Hard change speed and how fast it fattens. Best score is kept per difficulty.
 - Share ↗ on the game-over screen sends a picture of the arena at the end plus the link.

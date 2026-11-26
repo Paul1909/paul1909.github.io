@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Chonky Snake">
-<meta name="description" content="Snake, but every apple makes it fatter instead of longer.">
+<meta name="description" content="Snake, but every burger makes it fatter instead of longer.">
 <title>Chonky Snake</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -111,7 +111,7 @@
 <body data-state="menu">
   <div id="app">
     <header id="hud">
-      <div class="pill" title="Apples eaten"><span>🍎</span><b id="score">0</b></div>
+      <div class="pill" title="Burgers eaten"><span>🍔</span><b id="score">0</b></div>
       <div class="pill" id="hudWeight" title="Snake weight"><span>⚖️</span><b id="weight">1.0</b><small>kg</small></div>
       <div class="spacer"></div>
       <button id="pauseBtn" class="icon-btn" aria-label="Pause">❚❚</button>
@@ -126,18 +126,18 @@
     <div class="card">
       <canvas id="menuArt"></canvas>
       <h1>Chonky Snake</h1>
-      <p class="tag">Every apple makes it <em>fatter</em>, not longer.</p>
+      <p class="tag">Every burger makes it <em>fatter</em>, not longer.</p>
       <div class="seg" id="diffSeg" role="group" aria-label="Difficulty">
         <button data-diff="easy">Easy</button><button data-diff="normal">Normal</button><button data-diff="hard">Hard</button>
       </div>
-      <p class="best">Best: <b id="menuBest">0</b> apples</p>
+      <p class="best">Best: <b id="menuBest">0</b> burgers</p>
       <button id="playBtn" class="big">Play</button>
       <ul class="how">
         <li>Swipe (or use the arrow keys) to steer.</li>
-        <li>Apples make the snake fatter and heavier. It never gets longer.</li>
+        <li>Burgers make the snake fatter and heavier. It never gets longer.</li>
         <li>A fat snake needs more room to turn around.</li>
-        <li>Catch a leaf before it wilts to slim down a bit.</li>
-        <li>Don't bonk the walls or bite your own belly.</li>
+        <li>🥗 Salad slims you down at once. 🏋️ The gym burns fat for a few seconds (and you speed up).</li>
+        <li>Don't bonk the walls (you'll throw up) or bite your own belly.</li>
       </ul>
       <div class="row">
         <button id="sndBtn" class="chip" aria-pressed="true">🔊 Sound</button>
@@ -161,7 +161,7 @@
       <p class="why" id="why">Bonk!</p>
       <h2 id="rank">Chonker</h2>
       <div class="stats">
-        <div><b id="oScore">0</b><span>apples</span></div>
+        <div><b id="oScore">0</b><span>burgers</span></div>
         <div><b id="oWeight">1.0</b><span>kg</span></div>
         <div><b id="oBest">0</b><span>best</span></div>
       </div>
