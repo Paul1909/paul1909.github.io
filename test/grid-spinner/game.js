@@ -284,12 +284,13 @@ function step(dt) {
 
   // money
   const rev = load * dH * YEAR * TARIFF, pen = Math.abs(g.f - f0) > BAND ? PENALTY * dt : 0;
-  if (SET.auto) g.cash += rev;
+  if (g.tut) { /* tutorial: unlimited budget, cash never moves */ }
+  else if (SET.auto) g.cash += rev;
   else { // each consumer runs up a bill you collect by tapping its money tag; past the cap they stop paying
     const lf = 1 + 3 * df / f0;
     for (const L of g.loads) L.bill = Math.min(BILL_CAP, (L.bill || 0) + L.P * lf * dH * YEAR * TARIFF);
   }
-  g.cash -= fuel + maint + pen;
+  if (!g.tut) g.cash -= fuel + maint + pen;
   g.stats.earned += rev;
   const k = Math.min(1, dt / 1.5), r = g.rate;
   r.rev += (rev / dt - r.rev) * k; r.fuel += (fuel / dt - r.fuel) * k; r.maint += (maint / dt - r.maint) * k; r.pen += (pen / dt - r.pen) * k;
@@ -471,10 +472,11 @@ function build(type) {
   const max = type === 'hydro' ? G.C.hydroMax : T.max;
   if (G.units.length >= MAX_GENS) return toast('The wheel is full: scrap something first');
   if (count >= max) return toast(type === 'hydro' ? `No more good valleys for dams in ${G.C.name}` : `Max ${max} × ${T.name}`);
-  if (G.cash < cost) return toast(`Need ${fmtMoney(cost)} to build ${T.name}`);
-  G.cash -= cost; G.stats.built++; G.stats.spent += cost;
+  if (!G.tut && G.cash < cost) return toast(`Need ${fmtMoney(cost)} to build ${T.name}`);
+  if (!G.tut) G.cash -= cost;
+  G.stats.built++; G.stats.spent += cost;
   addUnit(type, true, false);
-  toast(`${T.emoji} Building ${T.name} (−${fmtMoney(cost)})`);
+  toast(G.tut ? `Building ${T.name} (free in the tutorial)` : `Building ${T.name} (−${fmtMoney(cost)})`);
   if (G.tut) TUT[G.tut.i].onBuild?.(type);
   sfx('build'); buzz(15);
 }
@@ -484,8 +486,8 @@ function toggle(u) {
   if (u.repair > 0) return toast(`Under repair: ${Math.ceil(u.repair)} s`);
   if (u.scrapWhenIdle) { u.scrapWhenIdle = false; }
   if (!u.engaged && T.kind === 'sync') {
-    if (G.cash < T.start) return toast(`Start-up costs ${fmtMoney(T.start)}`);
-    G.cash -= T.start;
+    if (!G.tut && G.cash < T.start) return toast(`Start-up costs ${fmtMoney(T.start)}`);
+    if (!G.tut) G.cash -= T.start;
   }
   u.engaged = !u.engaged;
   if (T.kind === 'sync') toast(u.engaged ? `${T.emoji} ${T.name} ${u.n} spinning up (${T.ramp} s)` : `${T.emoji} ${T.name} ${u.n} winding down`);
@@ -774,6 +776,7 @@ function updateHud() {
   const net = g.rate.rev - g.rate.fuel - g.rate.maint - g.rate.pen;
   $('net').textContent = `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net) * DAY_S)}/yr`;
   $('net').className = net >= 0 ? 'pos' : 'neg';
+  if (g.tut) { $('cash').textContent = 'UNLIMITED'; $('net').textContent = 'tutorial budget'; $('net').className = 'pos'; }
   $('supTxt').textContent = Math.round(g.supply); $('demTxt').textContent = Math.round(g.demand); $('inTxt').textContent = Math.round(g.inertia);
   // mix bar
   const by = {}; let tot = 0;
@@ -975,11 +978,11 @@ const TUT = [
     done: () => tl('steel') && tu('ccgt')?.level >= 1 && stableFor(2),
     p: () => `You can't control consumers: they drag, and they pay. In a game you'll meet:<div class="cl">${Object.values(LOADS).map(D => `<span><i class="code" style="--c:var(--bad)">${D.code}</i> <b>${D.name}</b>: ${D.kind}</span>`).join('')}</div>Connect a steel mill to see an erratic one. It adds 30 MW, so balance it: as soon as the CCGT is repaired (its red ✕ disappears), <b>tap it</b> to switch it back on, then <b>tap the gas peaker</b> off.` },
   { e: '💶', h: 'Money', dom: ['#money'],
-    p: () => `Top right: your cash and your net income. Customers pay ${perMWh(TARIFF)}; fuel, CO₂ and upkeep come off, and so do penalties while you're outside the band. Prices are real-world ballparks, so <b>one game day books a whole year</b> of money. Tap the cash for the details. Bills are collected automatically; switch <b>Auto-collect bills</b> off in the menu (☰) and you'll have to tap the money tags on the consumers yourself. Below ${fmtMoney(BANKRUPT)} you're bankrupt.` },
+    p: () => `Top right: your cash and your net income. In this tutorial the budget is <b>unlimited</b>, so nothing here costs you anything. In a real game every plant has a real-world build cost, fuel, CO₂ and upkeep; customers pay ${perMWh(TARIFF)}; and penalties run while you're outside the band. <b>One game day books a whole year</b> of money. Tap the cash for the details.` },
   { e: '📢', h: 'In a real game', 
     p: () => `The clock runs once you press <b>▶ START</b> (and stops again with <b>⏸ PAUSE</b>): demand follows the day, with peaks in the morning and evening, and the sun sets. New customers are announced 📢 before they connect. Surprises happen: trips, storms, cold snaps, half-time kettle surges, gas price spikes. Each game day gets harder.` },
   { e: '🏁', h: "You're ready!", final: true,
-    p: () => `Keep the wheel at ${G.f0} Hz as long as you can. Pick a grid on the menu (Switzerland, Italy, Germany or France) and a difficulty, or jump straight in.` },
+    p: () => `One last thing: in a real game your budget is <b>not unlimited</b>. You start with ${fmtMoney(START_CASH)} and every plant, battery and start-up costs real money. Your income is the <b>bills your consumers pay</b>: they're collected automatically, or, if you switch <b>Auto-collect bills</b> off in the menu (☰), you must tap the green money tags on the consumers to cash in. Watch the net income, don't overbuild, and keep a reserve for surprises: below ${fmtMoney(BANKRUPT)} you're bankrupt and the game ends.<br><br>Keep the wheel at ${G.f0} Hz as long as you can. Pick a grid and a difficulty on the menu, or jump straight in.` },
 ];
 function tutAllows(type) { return (TUT[G.tut.i].dock || []).includes(type); }
 function startTutorial() {
@@ -1006,7 +1009,7 @@ function tutEnter(i) {
   for (const sel of st.dom || []) document.querySelectorAll(sel).forEach(el => el.classList.add('hl'));
   for (const t of st.dock || []) document.querySelectorAll(`.card[data-t=${t}]`).forEach((el, k) => { el.classList.add('hl'); if (!k) el.scrollIntoView({ block: 'nearest' }); });
   const el = $('tut'); el.classList.remove('hidden');
-  el.innerHTML = `<div class="tbox"><div class="th"><span class="e">${String(i + 1).padStart(2, '0')}</span><b>${st.h}</b><small>of ${TUT.length}</small><button class="skip" id="tutSkip">Skip</button></div>
+  el.innerHTML = `<div class="tbox${st.final ? ' final' : ''}"><div class="th"><span class="e">${String(i + 1).padStart(2, '0')}</span><b>${st.h}</b><small>of ${TUT.length}</small><button class="skip" id="tutSkip">Skip</button></div>
     <div class="tp">${st.p()}</div><div class="tb" id="tutBtns"></div></div>`;
   const btns = $('tutBtns');
   for (const a of st.acts || []) {
@@ -1032,7 +1035,7 @@ function tutTick() {
     if (b && !a.again && g.used[a.id]) b.disabled = true;
   }
   const nx = $('tutNext');
-  if (nx) { const ok = !st.done || st.done(); nx.disabled = !ok; nx.classList.toggle('go', ok && !!st.done); }
+  if (nx) { const done = !st.done || st.done(), ok = done || g.t > 40; nx.disabled = !ok; nx.classList.toggle('go', done && !!st.done); }
 }
 // Pulsing rings on the wheel around whatever the current step is about.
 function tutRings(ctx) {
