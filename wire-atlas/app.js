@@ -342,6 +342,7 @@ function onTap(x, y) {
 }
 function select(id) {
   selected = id; dirty = true;
+  if (typeof markDbRow === 'function') markDbRow(id);
   if (mode === 'browse') renderBrowse();
 }
 
@@ -560,7 +561,11 @@ const shapeOnly = () => cfg.show.includes('shape') || (cfg.ask.length === 1 && c
 const poolFor = () => QUIZ.filter(c => (!cfg.regions.length || cfg.regions.includes(c.r)) && !(noShape(c.id) && shapeOnly()));
 
 function openMenu() {
-  if (mode === 'browse') history.pushState({ s: 'menu' }, '');
+  if (mode === 'browse') {
+    // the desktop list sidebar may be open: close it and reuse its history entry
+    if (!dbEl.hidden) { setDbOpen(false); history.replaceState({ s: 'menu' }, ''); }
+    else history.pushState({ s: 'menu' }, '');
+  }
   mode = 'menu'; selected = null; dirty = true;
   document.body.classList.add('menuing');     // phones hide the globe on this page
   syncSearch();
@@ -854,6 +859,19 @@ function toBrowse() {
 const dbEl = document.getElementById('db'), dbList = document.getElementById('dblist');
 const dbBtn = document.getElementById('dbbtn');
 let dbGo = null;
+// On wide screens the list is a sidebar on the right; the globe stays visible and shrinks to make room
+const wideDb = matchMedia('(min-width: 760px)');
+function setDbOpen(open) {
+  dbEl.hidden = !open;
+  document.body.classList.toggle('dbopen', open);
+  if (open) markDbRow(selected);
+}
+function markDbRow(id) {
+  if (dbEl.hidden) return;
+  dbList.querySelectorAll('.dbrow.on').forEach(r => r.classList.remove('on'));
+  const row = id && dbList.querySelector(`.dbrow[data-id="${id}"]`);
+  if (row) { row.classList.add('on'); if (!row.hidden) row.scrollIntoView({ block: 'nearest' }); }
+}
 function openDb() {
   if (mode !== 'browse' || !dbEl.hidden) return;
   closeSearch(true);
@@ -862,10 +880,10 @@ function openDb() {
       <img src="${flagSrc(c.id)}" alt="" loading="lazy"><span>${capText(c)}</span></div>`).join('');
   }
   renderDbFilter();
-  dbEl.hidden = false;
+  setDbOpen(true);
   history.pushState({ s: 'db' }, '');
 }
-dbBtn.onclick = openDb;
+dbBtn.onclick = () => dbEl.hidden ? openDb() : history.back();   // the icon also closes the desktop sidebar
 // Region filter, same rules as the quiz: none selected = World; selecting all five = World
 let dbRegions = store.get('dbRegions', []);
 const dbFilter = document.getElementById('dbfilter');
@@ -894,6 +912,7 @@ dbFilter.addEventListener('click', e => {
 document.getElementById('dbclose').onclick = () => history.back();
 dbList.addEventListener('click', e => {
   const row = e.target.closest('.dbrow[data-id]'); if (!row) return;
+  if (wideDb.matches) { showShape(row.dataset.id); return; }   // sidebar stays open on desktop
   dbGo = row.dataset.id; history.back();
 });
 function showShape(id) {             // centre the country and zoom until it fills about 40% of the globe
@@ -904,7 +923,7 @@ function showShape(id) {             // centre the country and zoom until it fil
 }
 window.addEventListener('popstate', () => {
   if (!dbEl.hidden) {
-    dbEl.hidden = true;
+    setDbOpen(false);
     if (dbGo) { const id = dbGo; dbGo = null; showShape(id); }
     return;
   }

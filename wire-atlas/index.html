@@ -121,8 +121,12 @@
   #dblist b { font-weight: 600; }
   #dblist img { width: 36px; height: 27px; object-fit: cover; border: 1px solid var(--bd); border-radius: 2px; display: block; }
   #dblist span:last-child { color: #444; }
-  @media (min-width: 760px) { .dbfilter { max-width: 760px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-    .dbrow { max-width: 760px; margin: 0 auto; width: 100%; box-sizing: border-box; } }
+  #dblist .dbrow.on { background: #fff8d6; }
+  /* wide screens: the list is a sidebar on the right and the globe stays visible beside it */
+  @media (min-width: 760px) {
+    #db { left: auto; width: 400px; border-left: 1px solid var(--bd); box-shadow: -8px 0 24px rgba(0,0,0,.05); }
+    body.dbopen #app { margin-right: 400px; width: auto; }
+  }
   /* compact look during a quiz, so nothing needs scrolling */
   body.quizzing .btn { min-height: 46px; font-size: 16px; }
   body.quizzing footer { padding: 6px 16px 10px; }
