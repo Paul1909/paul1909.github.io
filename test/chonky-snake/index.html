@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1a12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chonky Snake">
+<meta name="description" content="Snake, but every apple makes it fatter instead of longer.">
+<title>Chonky Snake</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #0b1a12; --panel: #132a1c; --line: #24502f;
+    --lime: #a3e44f; --ink: #ecffd9; --muted: #93b89c; --pink: #ff8fab;
+  }
+  * { box-sizing: border-box; }
+  /* System fonts only: a Google Fonts link would fail offline. */
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; overscroll-behavior: none;
+    font-family: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button { font: inherit; cursor: pointer; user-select: none; -webkit-user-select: none; color: inherit; }
+
+  #app { height: 100%; display: flex; flex-direction: column; }
+  #hud { display: flex; align-items: center; gap: 8px; padding: 8px 10px 0; user-select: none; -webkit-user-select: none; }
+  .pill {
+    display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 14px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line); font-size: 18px;
+  }
+  .pill b { font-weight: 900; font-variant-numeric: tabular-nums; }
+  .pill small { color: var(--muted); font-weight: 700; }
+  .bump { animation: bump .35s ease-out; }
+  @keyframes bump { 40% { transform: scale(1.16); } }
+  .spacer { flex: 1; }
+  .icon-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel);
+    font-size: 15px; font-weight: 900; letter-spacing: -2px;
+  }
+  body:not([data-state="play"]):not([data-state="ready"]) #pauseBtn { visibility: hidden; }
+
+  #stage { position: relative; flex: 1; min-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #hint {
+    position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); pointer-events: none; text-align: center;
+    background: rgba(11, 26, 18, .5); border: 1px solid var(--line); border-radius: 18px; padding: 10px 18px;
+    font-weight: 900; font-size: 20px; white-space: nowrap; animation: breathe 1.6s ease-in-out infinite;
+  }
+  #hint small { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+  body:not([data-state="ready"]) #hint { display: none; }
+  @keyframes breathe { 50% { transform: translateX(-50%) scale(1.06); } }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 5; display: flex; overflow-y: auto;
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+    background: rgba(6, 16, 10, .74); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  }
+  .overlay[hidden] { display: none; }
+  .card {
+    width: 100%; max-width: 370px; margin: auto; padding: 18px 20px 20px; text-align: center; border-radius: 26px;
+    background: linear-gradient(#173520, #10261a); border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  }
+  #menuArt { width: 100%; aspect-ratio: 16 / 7; display: block; }
+  h1 { margin: 2px 0 4px; font-size: 40px; font-weight: 900; color: var(--lime); letter-spacing: -.5px; line-height: 1; }
+  h2 { margin: 4px 0 12px; font-size: 30px; font-weight: 900; color: var(--pink); line-height: 1.1; }
+  .tag { margin: 0 0 4px; color: var(--muted); font-size: 16px; font-weight: 700; }
+  .tag em { color: var(--ink); font-style: normal; font-weight: 900; }
+  .seg { display: flex; gap: 4px; padding: 4px; margin: 14px 0 6px; border-radius: 14px; background: #0d2015; }
+  .seg button { flex: 1; min-height: 42px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-weight: 800; font-size: 16px; }
+  .seg button[aria-pressed="true"] { background: var(--lime); color: #16300f; }
+  .best { margin: 6px 0 12px; color: var(--muted); font-weight: 700; }
+  .best b { color: var(--ink); }
+  .big {
+    width: 100%; min-height: 56px; border: 0; border-radius: 16px; font-size: 22px; font-weight: 900; color: #16300f;
+    background: linear-gradient(#c8f574, #8fd43c); box-shadow: 0 4px 0 #4f8a22;
+  }
+  .big:active { transform: translateY(2px); box-shadow: 0 2px 0 #4f8a22; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .btn {
+    flex: 1; min-height: 48px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel);
+    font-weight: 800; font-size: 17px;
+  }
+  .btn.accent { background: #3a1f2b; border-color: #6e3550; color: #ffd0de; }
+  .how { margin: 14px 0 0; padding: 0; list-style: none; text-align: left; font-size: 14.5px; color: var(--muted); line-height: 1.45; }
+  .how li { padding-left: 22px; position: relative; margin: 4px 0; }
+  .how li::before { content: "●"; position: absolute; left: 4px; color: var(--lime); font-size: 11px; top: 3px; }
+  .chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; font-weight: 800; font-size: 15px; }
+  .chip[aria-pressed="false"] { opacity: .45; }
+  .why { margin: 4px 0 0; font-size: 18px; font-weight: 800; color: var(--muted); }
+  .stats { display: flex; gap: 8px; margin: 4px 0 6px; }
+  .stats div { flex: 1; background: #0d2015; border-radius: 14px; padding: 10px 4px; }
+  .stats b { display: block; font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .newbest { margin: 6px 0 4px; color: #ffe066; font-weight: 900; font-size: 18px; }
+  .diff-tag { font-size: 13px; color: var(--muted); font-weight: 700; margin: 0 0 12px; }
+  #toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+    z-index: 9; background: #ecffd9; color: #16300f; font-weight: 800; padding: 10px 18px; border-radius: 999px;
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+<script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body data-state="menu">
+  <div id="app">
+    <header id="hud">
+      <div class="pill" title="Apples eaten"><span>🍎</span><b id="score">0</b></div>
+      <div class="pill" id="hudWeight" title="Snake weight"><span>⚖️</span><b id="weight">1.0</b><small>kg</small></div>
+      <div class="spacer"></div>
+      <button id="pauseBtn" class="icon-btn" aria-label="Pause">❚❚</button>
+    </header>
+    <main id="stage">
+      <canvas id="cv"></canvas>
+      <div id="hint">Swipe to start<small>or use the arrow keys</small></div>
+    </main>
+  </div>
+
+  <section id="menu" class="overlay">
+    <div class="card">
+      <canvas id="menuArt"></canvas>
+      <h1>Chonky Snake</h1>
+      <p class="tag">Every apple makes it <em>fatter</em>, not longer.</p>
+      <div class="seg" id="diffSeg" role="group" aria-label="Difficulty">
+        <button data-diff="easy">Easy</button><button data-diff="normal">Normal</button><button data-diff="hard">Hard</button>
+      </div>
+      <p class="best">Best: <b id="menuBest">0</b> apples</p>
+      <button id="playBtn" class="big">Play</button>
+      <ul class="how">
+        <li>Swipe (or use the arrow keys) to steer.</li>
+        <li>Apples make the snake fatter and heavier. It never gets longer.</li>
+        <li>A fat snake needs more room to turn around.</li>
+        <li>Catch a leaf before it wilts to slim down a bit.</li>
+        <li>Don't bonk the walls or bite your own belly.</li>
+      </ul>
+      <div class="row">
+        <button id="sndBtn" class="chip" aria-pressed="true">🔊 Sound</button>
+        <button id="vibBtn" class="chip" aria-pressed="true">📳 Vibration</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="pause" class="overlay" hidden>
+    <div class="card">
+      <h1>Paused</h1>
+      <p class="tag">Digesting…</p>
+      <div style="height:14px"></div>
+      <button id="resumeBtn" class="big">Resume</button>
+      <div class="row"><button id="restartBtn" class="btn">Restart</button><button id="quitBtn" class="btn">Menu</button></div>
+    </div>
+  </section>
+
+  <section id="over" class="overlay" hidden>
+    <div class="card">
+      <p class="why" id="why">Bonk!</p>
+      <h2 id="rank">Chonker</h2>
+      <div class="stats">
+        <div><b id="oScore">0</b><span>apples</span></div>
+        <div><b id="oWeight">1.0</b><span>kg</span></div>
+        <div><b id="oBest">0</b><span>best</span></div>
+      </div>
+      <p class="newbest" id="newBest" hidden>★ New best! ★</p>
+      <p class="diff-tag" id="oDiff">Normal</p>
+      <button id="againBtn" class="big">Play again</button>
+      <div class="row"><button id="shareBtn" class="btn accent">Share ↗</button><button id="menuBtn" class="btn">Menu</button></div>
+    </div>
+  </section>
+
+  <div id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
