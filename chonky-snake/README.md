@@ -1,4 +1,4 @@
-# Chonky Snake (test build)
+# Chonky Snake
 
 Classic Snake with one twist: every burger makes the snake **a lot fatter** and only **a little longer** (+0.45 units of length, about half a starting body width). It slowly turns from a noodle into a long fat sausage that barely fits in the arena. Salad and the gym slim it down but don't shorten it. Works offline once opened, installs as a fullscreen phone app.
 
@@ -14,7 +14,6 @@ Classic Snake with one twist: every burger makes the snake **a lot fatter** and 
 
 Files: `index.html` (markup + styles), `app.js` (game), `sw.js` (offline cache), `manifest.webmanifest`, Candy Tile icons.
 
-This build lives in `test/` and isn't linked from the homepage yet. To promote it: move the folder to the repo root, add the glyph to `icons/make_icons.py` and the card to the homepage, bump `VERSION` in `sw.js`.
 
 ## Install
 

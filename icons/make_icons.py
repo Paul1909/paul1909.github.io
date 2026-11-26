@@ -220,6 +220,17 @@ def g_mandel(k, a):
             disc(-0.1226, 0.7449, .104) + disc(-0.1226, -0.7449, .104) +
             f'<path d="M{P(-1.37, 0)} L{P(-1.96, 0)}" {S(k,12)}/>' + disc(-1.7549, 0, .028))
 
+def g_chonky(k, a):
+    # a short, very fat snake: thick curved body, big round head, cut-out eyes and cheeks
+    body = 'M182 322C172 270 232 290 262 248'
+    spots = ''.join(f'<circle cx="{x}" cy="{y}" r="12" fill="{a}" fill-opacity=".45"/>' for x, y in ((178, 334), (206, 294)))
+    return ('<rect x="56" y="56" width="400" height="400" fill="none" stroke="none"/>'   # keeps the shadow filter from clipping the thick stroke
+            f'<path d="{body}" fill="none" {S(k,150)}/>' + spots +
+            f'<circle cx="300" cy="212" r="88" fill="{k}"/>'
+            f'<circle cx="270" cy="194" r="23" fill="{a}"/><circle cx="330" cy="194" r="23" fill="{a}"/>'
+            f'<circle cx="276" cy="190" r="10" fill="{k}"/><circle cx="336" cy="190" r="10" fill="{k}"/>'
+            f'<ellipse cx="248" cy="238" rx="16" ry="10" fill="{a}" fill-opacity=".35"/><ellipse cx="352" cy="238" rx="16" ry="10" fill="{a}" fill-opacity=".35"/>')
+
 # slug, accent (same as the homepage card colour), glyph
 APPS = [
     ('matrix-message', '#00ff41', g_matrix), ('swatch', '#ff7a9c', g_swatch),
@@ -234,7 +245,7 @@ APPS = [
     ('atomic-chess', '#ffb347', g_atomic), ('finger-twist', '#ffe14a', g_twist),
     ('neon-ice-hockey', '#3ef2ff', g_hockey), ('neon-pong-duo', '#ff4fd8', g_pong),
     ('dots-and-lines', '#b6ff4a', g_dots), ('word-scramble-fun', '#03a9f4', g_scramble),
-    ('mandelbrot-explorer', '#1fd1b9', g_mandel),
+    ('mandelbrot-explorer', '#1fd1b9', g_mandel), ('chonky-snake', '#5cc93a', g_chonky),
 ]
 
 def build_svg(accent, glyph, rounded=True, coin=True):
