@@ -42,7 +42,10 @@
   .screen.on { display: flex; }
 
   /* ---------- Setup ---------- */
-  #setup { overflow-y: auto; padding: 28px 18px 40px; align-items: center; justify-content: center; text-align: center; }
+  /* Centred when it fits, scrolls from the top when it doesn't (justify-content: center would cut the title off) */
+  #setup { overflow-y: auto; padding: 24px 18px 32px; align-items: center; justify-content: flex-start; text-align: center; }
+  #setup > :first-child { margin-top: auto; padding-top: 4px; }
+  #setup > :last-child { margin-bottom: auto; }
   .title { color: var(--blue); font-size: 2em; line-height: 1.1; margin-bottom: 6px; }
   .title-tiles { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; }
   .title-tiles span { width: 38px; height: 38px; border-radius: 8px; background: #fff; border: 2px solid var(--header-line); display: grid; place-items: center; font-size: 1.3em; font-weight: 800; color: var(--blue-deep); box-shadow: 0 2px 4px rgba(0,0,0,.08); }
