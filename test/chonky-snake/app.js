@@ -1,5 +1,5 @@
 'use strict';
-/* Chonky Snake: classic Snake, except every burger makes the snake fatter instead of longer.
+/* Chonky Snake: classic Snake, except every burger makes the snake a lot fatter and a little longer.
    The body is a fixed-length polyline; its radius grows. All sizes are in arena units. */
 
 if ('serviceWorker' in navigator) {
@@ -23,7 +23,8 @@ const DIFFS = {
   hard:   { label: 'Hard',   speed: 8.2, grow: 0.11 },
 };
 const R0 = 0.5;        // starting body radius (diameter = 1 unit, like one classic Snake cell)
-const LEN = 7;         // body length, never changes
+const LEN = 7;         // starting body length
+const LEN_GROW = 0.45; // extra length per burger (salad and gym don't shrink it)
 const FOOD_R = 0.55, PU_R = 0.62, PU_LIFE = 8, GYM_TIME = 5;
 const FOOD_VIS = 0.62, PU_VIS = 0.95;   // drawn radius at scale 1
 // Burgers and power-ups grow with the snake, so they stay in proportion as it fattens.
@@ -114,7 +115,7 @@ function newGame() {
   layoutArena(); fit();
   const cx = AW / 2, cy = AH / 2 - 1;
   snake = {
-    path: [{ x: cx, y: cy }, { x: cx, y: cy + LEN }], dir: U, prevDir: U, since: Infinity, queue: [],
+    path: [{ x: cx, y: cy }, { x: cx, y: cy + LEN }], len: LEN, dir: U, prevDir: U, since: Infinity, queue: [],
     r: R0, rT: R0, ang: -Math.PI / 2, pulse: 0, dead: false, gym: 0,
   };
   bulges = []; parts = []; floats = []; puddles = []; score = 0; pu = null; puIn = 6; food = null; shake = 0; recap = null;
@@ -122,7 +123,7 @@ function newGame() {
   updateHud(false);
 }
 
-function findSpot(rad, vis) {
+function findSpot(rad, vis = rad) {
   const s = snake, rn = s.rT + diff().grow, sc = itemScale(rn);
   rad *= sc;
   const m = Math.max(0.9, 0.75 * rn, vis * sc + 0.15);
@@ -202,9 +203,9 @@ function step(h) {
   }
   const v = speed(), mv = v * h, H = s.path[0];
   H.x += s.dir.x * mv; H.y += s.dir.y * mv; s.since += mv;
-  trim(s.path, LEN);
+  trim(s.path, s.len);   // when len grows the tail simply waits while the head moves on
   for (const b of bulges) b.d += v * 0.5 * h;
-  bulges = bulges.filter(b => b.d < LEN + s.r);
+  bulges = bulges.filter(b => b.d < s.len + s.r);
 
   // Walls only count when moving into them, so growing fat next to a wall isn't an instant death.
   const m = s.r * 0.95;
@@ -217,7 +218,7 @@ function step(h) {
 
 function eat() {
   const s = snake, f = food;
-  score++; s.rT += diff().grow; s.pulse = 1; bulges.push({ d: 0 });
+  score++; s.rT += diff().grow; s.len += LEN_GROW; s.pulse = 1; bulges.push({ d: 0 });
   burst(f.x, f.y, ['#f0a848', '#6b3a1f', '#ffd23f', '#5fd45a'], 10);
   floats.push({ x: f.x, y: f.y, text: '+1', c: '#ffffff', t: 0 });
   sfx.munch(); if (score % 5 === 0) setTimeout(() => sfx.burp(), 260);
@@ -448,7 +449,7 @@ function drawSnake(g, s, bl, look, bodyColor) {
   const P = s.path, H = P[0];
   const r = s.r * (1 + 0.025 * Math.sin(tAnim * 7)) * (1 + 0.12 * s.pulse);
   const rh = r * 1.12;
-  const blobs = bl.map(b => ({ p: pointAt(P, b.d), r: r * (1.3 - 0.2 * Math.min(1, b.d / LEN)) }));
+  const blobs = bl.map(b => ({ p: pointAt(P, b.d), r: r * (1.3 - 0.2 * Math.min(1, b.d / (s.len || LEN))) }));
   const poly = (dx, dy) => { g.beginPath(); g.moveTo(P[0].x + dx, P[0].y + dy); for (let i = 1; i < P.length; i++) g.lineTo(P[i].x + dx, P[i].y + dy); };
   const shape = (color, extra, dx = 0, dy = 0, head = true) => {
     g.strokeStyle = g.fillStyle = color; g.lineWidth = 2 * r + 2 * extra; poly(dx, dy); g.stroke();

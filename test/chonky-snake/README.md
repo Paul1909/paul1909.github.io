@@ -1,6 +1,6 @@
 # Chonky Snake (test build)
 
-Classic Snake with one twist: every burger makes the snake **fatter instead of longer**. The body length never changes, so the snake slowly turns from a noodle into a sausage into a blob that barely fits in the arena. Works offline once opened, installs as a fullscreen phone app.
+Classic Snake with one twist: every burger makes the snake **a lot fatter** and only **a little longer** (+0.45 units of length, about half a starting body width). It slowly turns from a noodle into a long fat sausage that barely fits in the arena. Salad and the gym slim it down but don't shorten it. Works offline once opened, installs as a fullscreen phone app.
 
 - Swipe anywhere, tap the semi-transparent on-screen arrows (switch them off with ✛ Arrows in the menu or pause screen), or use arrow keys / WASD. Space, P or Esc pauses; Android's back swipe pauses too.
 - A fat snake needs one body width of room to turn back on itself (a U-turn), so tight turns get harder as it grows.
