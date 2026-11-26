@@ -931,15 +931,9 @@ window.addEventListener('popstate', () => {
 });
 
 /* ---------------- sound + vibration ---------------- */
-let muted = store.get('muted', false), actx = null;
-const muteBtn = document.getElementById('mute');
-function renderMute() {
-  muteBtn.innerHTML = muted
-    ? '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>'
-    : '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
-}
-muteBtn.onclick = () => { muted = !muted; store.set('muted', muted); renderMute(); if (!muted) blip(); };
-renderMute();
+// No sound toggle any more: sounds always play (at the phone's media volume)
+const muted = false;
+let actx = null;
 function audioUnlock() {
   try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch {}
 }
