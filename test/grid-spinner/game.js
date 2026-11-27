@@ -644,11 +644,11 @@ function pill(ctx, x, y, txt, col, fs, bg) {
   ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, y + 1);
   return w;
 }
-function drawIso(dt) {
+function drawIso(dt, frozen) {
   [W, H] = fitCanvas(wheel, wctx);
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
-  const P = V3.frame(dt, g, W, H, { sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
+  const P = V3.frame(dt, g, W, H, { speed: frozen ? 0 : speedVis(g.f, g.f0), sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
   hits = [];
   const fs = clamp(P.ppu * .36, 9, 15) * (UIK > 1 ? Math.min(UIK, 1.4) : 1);
   // generators: code + output, or their state
@@ -676,19 +676,18 @@ function drawIso(dt) {
       hits.push({ x: bx, y: by, r: br + 10, bill: L });
     }
   }
-  // the grid node: frequency readout
-  const hp = P.hub, col = statusColor(df), hfs = clamp(P.ppu * .7, 14, 40) * (UIK > 1 ? Math.min(UIK, 1.3) : 1);
-  ctx.font = `800 ${hfs}px ${MONO}`; const tw = ctx.measureText('00.00 Hz').width + hfs * .8, th = hfs * 1.9;
-  const bx = hp.lx - tw / 2, by = hp.ly - th;
-  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.strokeStyle = col; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, tw, th, 5) : ctx.rect(bx, by, tw, th); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = TH.muted; ctx.font = `700 ${Math.round(hfs * .32)}px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText('GRID FREQUENCY', hp.lx, by + hfs * .16);
-  ctx.fillStyle = col; ctx.font = `800 ${hfs}px ${MONO}`; ctx.textBaseline = 'alphabetic';
-  ctx.fillText(`${fmtHz(g.f)} Hz`, hp.lx, by + th - hfs * .3);
-  if (g.alarm > 0) { ctx.fillStyle = TH.bad; ctx.fillRect(bx, by + th - 4, tw * Math.min(1, g.alarm / g.D.grace), 4); }
-  hits.push({ x: hp.x, y: hp.y, r: hp.r, hub: true });
-  hits.push({ x: hp.lx, y: by + th / 2, r: th * .7, hub: true });
+  // the grid node: frequency in a round label in the middle of the spinning nexus
+  const hp = P.hub, col = statusColor(df), lr = clamp(hp.r * .56, 22, 90);
+  ctx.beginPath(); ctx.arc(hp.x, hp.y, lr, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.fill(); ctx.lineWidth = Math.max(3, lr * .07); ctx.strokeStyle = col; ctx.stroke();
+  if (g.alarm > 0) {
+    ctx.lineWidth = Math.max(4, lr * .11); ctx.strokeStyle = TH.bad;
+    ctx.beginPath(); ctx.arc(hp.x, hp.y, lr + ctx.lineWidth, -Math.PI / 2, -Math.PI / 2 + Math.min(1, g.alarm / g.D.grace) * Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.round(lr * .5)}px ${MONO}`; ctx.fillText(fmtHz(g.f), hp.x, hp.y - lr * .06);
+  ctx.font = `700 ${Math.round(lr * .22)}px ${MONO}`; ctx.fillStyle = TH.muted; ctx.fillText('Hz', hp.x, hp.y + lr * .42);
+  hits.push({ x: hp.x, y: hp.y, r: Math.max(lr, hp.r * .8), hub: true });
   // tutorial highlight
   if (g.tut) tutRings(ctx);
   // collected-money floats
@@ -700,8 +699,8 @@ function drawIso(dt) {
   ctx.globalAlpha = 1;
 }
 
-function drawWheel(dt) {
-  if (SET.iso && V3) return drawIso(dt);
+function drawWheel(dt, dtReal) {
+  if (SET.iso && V3) return drawIso(dtReal ?? dt, dt === 0);
   [W, H] = fitCanvas(wheel, wctx);
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
@@ -1047,7 +1046,7 @@ function loop(now) {
     let rem = dt; while (rem > 1e-6 && !G.over) { const s = Math.min(rem, 1 / 120); step(s); rem -= s; }
   }
   if (G && !$('game').classList.contains('hidden')) {
-    drawWheel(G.paused || G.hold || G.over ? 0 : dt); drawChart();
+    drawWheel(G.paused || G.hold || G.over ? 0 : dt, dt); drawChart();
     hudT -= dt; if (hudT <= 0) { hudT = .12; updateHud(); }
     hum(G.f - G.f0, !G.paused && !G.hold && !G.over);
   }

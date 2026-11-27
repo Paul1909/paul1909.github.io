@@ -61,17 +61,23 @@ export function create(wrap, api) {
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.012, 1.03, .48, 72), new THREE.MeshStandardMaterial({ color: '#9aa7a0', roughness: .9 }));
   rim.position.y = -.27; scene.add(rim);
   const hub = new THREE.Group(); scene.add(hub);
-  hub.add(cyl(1.7, 1.9, .35, mat('#5b6675'), 0, 0, 0, 6));
-  hub.add(cyl(1.25, 1.25, .12, mat('#2f3a47'), 0, .35, 0, 6));
-  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; hub.add(box(.16, 1.7, .16, mat('#6b7787'), Math.cos(a) * .75, .45, Math.sin(a) * .75)); }
-  hub.add(cyl(.32, .45, 1.9, mat('#8994a3'), 0, .45, 0, 8));
-  const orbMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#2b8a3e', emissiveIntensity: 1.4, roughness: .3 });
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(.62, 24, 16), orbMat); orb.position.y = 2.95; orb.castShadow = true; hub.add(orb);
-  const haloMat = new THREE.MeshBasicMaterial({ color: '#2b8a3e', transparent: true, opacity: .22, depthWrite: false });
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), haloMat); halo.position.y = 2.95; hub.add(halo);
+  hub.add(cyl(2.1, 2.35, .35, mat('#5b6675'), 0, 0, 0, 6));
+  hub.add(cyl(1.5, 1.5, .12, mat('#2f3a47'), 0, .35, 0, 6));
+  // the nexus: a rubber wheel lying flat on a short shaft. It is the one thing that spins: its speed is the grid frequency.
+  hub.add(cyl(.28, .38, 1.05, mat('#8994a3'), 0, .45, 0, 10));
+  const RY = 1.62, RR = 2.2;   // rotor height and radius
+  const orbMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#2b8a3e', emissiveIntensity: 1.3, roughness: .4 });
+  const statusRing = new THREE.Mesh(new THREE.TorusGeometry(RR + .22, .07, 8, 64), orbMat); statusRing.rotation.x = Math.PI / 2; statusRing.position.y = RY - .05; hub.add(statusRing);
+  const haloMat = new THREE.MeshBasicMaterial({ color: '#2b8a3e', transparent: true, opacity: .18, depthWrite: false });
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(RR + .22, .28, 8, 64), haloMat); halo.rotation.x = Math.PI / 2; halo.position.y = RY - .05; hub.add(halo);
+  const rotor = new THREE.Group(); rotor.position.y = RY; hub.add(rotor);
+  const tire = new THREE.Mesh(new THREE.TorusGeometry(RR, .2, 12, 64), new THREE.MeshStandardMaterial({ color: '#2d3540', roughness: .9 })); tire.rotation.x = Math.PI / 2; tire.castShadow = true; rotor.add(tire);
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(RR - .05, RR - .05, .08, 64), new THREE.MeshStandardMaterial({ color: '#f1f3f6', roughness: .8 })); face.receiveShadow = true; face.castShadow = true; rotor.add(face);
+  for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(RR * 1.9, .1, .13), new THREE.MeshStandardMaterial({ color: '#9aa5b1', roughness: .6 })); sp.position.y = .07; sp.rotation.y = i * Math.PI / 3; if (i < 3) rotor.add(sp); }
+  const mark = new THREE.Mesh(new THREE.SphereGeometry(.17, 10, 8), new THREE.MeshStandardMaterial({ color: '#e8590c', emissive: '#e8590c', emissiveIntensity: .5 })); mark.position.set(RR, .12, 0); rotor.add(mark);
   const alarmMat = new THREE.MeshBasicMaterial({ color: '#c92a2a', transparent: true, opacity: 0, depthWrite: false });
-  const alarmRing = new THREE.Mesh(new THREE.TorusGeometry(2.3, .09, 8, 48), alarmMat); alarmRing.rotation.x = Math.PI / 2; alarmRing.position.y = .4; hub.add(alarmRing);
-  const HUB_IN = new THREE.Vector3(0, 2.4, 0);
+  const alarmRing = new THREE.Mesh(new THREE.TorusGeometry(2.75, .09, 8, 48), alarmMat); alarmRing.rotation.x = Math.PI / 2; alarmRing.position.y = .4; hub.add(alarmRing);
+  const HUB_IN = new THREE.Vector3(0, RY, 0);
 
   // ---------- asset models
   function model(type) {
@@ -251,8 +257,9 @@ export function create(wrap, api) {
     if (key === w.key) return; w.key = key;
     const dir = new THREE.Vector3(-a.x, 0, -a.z).normalize();
     const start = new THREE.Vector3(a.x + dir.x * 1.45, .3, a.z + dir.z * 1.45);
-    const mid = start.clone().lerp(HUB_IN, .5); mid.y += 1.6;
-    w.curve = new THREE.QuadraticBezierCurve3(start, mid, HUB_IN.clone());
+    const end = new THREE.Vector3(-dir.x * (RR + .35), RY - .1, -dir.z * (RR + .35));
+    const mid = start.clone().lerp(end, .5); mid.y += 1.5;
+    w.curve = new THREE.QuadraticBezierCurve3(start, mid, end);
     if (w.core) { scene.remove(w.core, w.glow); w.core.geometry.dispose(); w.glow.geometry.dispose(); }
     w.core = new THREE.Mesh(new THREE.TubeGeometry(w.curve, 28, .055, 6), w.coreMat);
     w.glow = new THREE.Mesh(new THREE.TubeGeometry(w.curve, 28, .15, 8), w.glowMat);
@@ -380,13 +387,14 @@ export function create(wrap, api) {
     // hub: status colour, alarm pulse
     const col = new THREE.Color(opts.status);
     orbMat.emissive.copy(col); haloMat.color.copy(col);
-    const al = opts.alarm; halo.scale.setScalar(1.05 + .15 * Math.sin(time * (al ? 9 : 2)));
+    const al = opts.alarm; haloMat.opacity = al ? .2 + .2 * Math.sin(time * 9) : .14;
+    rotor.rotation.y -= dt * Math.PI * 2 * .3 * (opts.speed ?? 1);
     alarmMat.opacity = al ? .35 + .35 * Math.sin(time * 10) : 0;
     hub.position.y = 0;
     stepPuffs(dt);
     renderer.render(scene, cam);
-    const hp = project(new THREE.Vector3(0, 0, 0), 3.9), hc = project(new THREE.Vector3(0, 0, 0), 2.4);
-    out.hub = { x: hc.x, y: hc.y, lx: hp.x, ly: hp.y, r: 1.6 * ppu };
+    const hc = project(new THREE.Vector3(0, 0, 0), RY + .1);
+    out.hub = { x: hc.x, y: hc.y, lx: hc.x, ly: hc.y, r: RR * ppu };
     out.ppu = ppu;
     return out;
   }
