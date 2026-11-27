@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'grid-spinner';
-const VERSION = APP + '-v12';
+const VERSION = APP + '-v13';
 const FILES = [
   './',
   './index.html',

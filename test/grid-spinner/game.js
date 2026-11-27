@@ -722,19 +722,21 @@ function drawRoad(dt) {
   ctx.clearRect(0, 0, W, H);
   // layout in world units, then fit to the panel
   const gens = g.units.slice().sort((a, b) => unitOrder.indexOf(a.type) - unitOrder.indexOf(b.type) || a.id - b.id);
-  const n1 = Math.max(4, Math.ceil(gens.length / 2)), nL = Math.max(4, g.loads.length);
+  const nG = Math.max(4, gens.length), nL = Math.max(4, g.loads.length);
   const SG = 64, SL = 52, RG = 25, RT = 40;                   // wheel slot, load slot, wheel radius, road thickness
-  const ww = Math.max(n1 * SG + SG / 2, nL * SL) + 30;
-  const lift = Math.sqrt(Math.max(0, (2 * RG) ** 2 - (SG / 2) ** 2));   // second row sits on two wheels of the first
-  const above = 2 * RG + lift + RG * .45 + 10, below = RT + 14 + 8 + 42 + 12, wh = above + below;
-  const tagH = 2 * freqTagR() + 18;                            // keep the corner frequency tag clear
-  const k = Math.min(W / ww, (H - tagH) / wh, 2.3 * Math.max(1, UIK));
-  const ox = (W - ww * k) / 2, roadY = (tagH + (H - tagH - wh * k) / 2) / k + above;   // road top, world units
+  const ww = Math.max(nG * SG, nL * SL) + 30;                  // the road is as long as the fleet needs
+  const above = 2 * RG + RG * .45 + 12, below = RT + 14 + 8 + 42 + 12, wh = above + below;
+  const tagH = 2 * freqTagR() + 18;                            // keep the corner frequency tag clear at 1x
+  // 1x = a comfortable, tappable size set by the panel height; the road scrolls sideways when it's longer than the screen
+  const k = Math.min((H - tagH) / wh, 1.7 * Math.max(1, UIK));
+  RD = { k, cw: ww * k, ch: wh * k, top: tagH, zmin: Math.min(1, Math.max(.2, (W - 16) / (ww * k))) };
+  const roadY = above;                                          // world units, content top = 0
   clampView();
-  ctx.setTransform(DPR * VW.z * k, 0, 0, DPR * VW.z * k, DPR * (VW.x + VW.z * ox), DPR * VW.y);
+  const s = VW.z * k;
+  ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * VW.x, DPR * VW.y);
   hits = [];
   // road: endless, so draw it across the whole visible width
-  const x0 = (-VW.x / VW.z - ox) / k - 20, x1 = ((W - VW.x) / VW.z - ox) / k + 20;
+  const x0 = -VW.x / s - 20, x1 = (W - VW.x) / s + 20;
   roadOff += dt * 60 * spd; roadRef += dt * 60;
   ctx.fillStyle = '#3a4350'; ctx.fillRect(x0, roadY, x1 - x0, RT);
   ctx.fillStyle = '#2d3540'; ctx.fillRect(x0, roadY, x1 - x0, 3); ctx.fillRect(x0, roadY + RT - 3, x1 - x0, 3);
@@ -752,12 +754,12 @@ function drawRoad(dt) {
   // generators: wheels on top
   const roll = roadOff / RG;   // wheel angle so the rim moves with the road
   gens.forEach((u, i) => {
-    const T = u.T, row = i % 2, col = Math.floor(i / 2);
+    const T = u.T;
     const on = T.kind === 'sync' ? (u.engaged || u.level > 0) : u.engaged;
-    let x = (col + .5 + (row ? .5 : 0)) * SG + 15, y = roadY - RG - (row ? lift : 0);   // row 2 rests between two row-1 wheels
-    if (!on) y -= RG * .45;
+    let x = (i + .5) * SG + 15, y = roadY - RG;                 // every wheel stands on the road
+    if (!on) y -= RG * .45;                                     // idle: lifted off the road
     const live = T.kind === 'sync' ? u.level > 0 : (u.engaged && u.trip <= 0);
-    u.rphi = live ? (row ? -roll : roll) : (u.rphi || 0);
+    u.rphi = live ? roll : (u.rphi || 0);
     ctx.globalAlpha = on ? 1 : .45;
     const frac = clamp(Math.abs(u.P) / T.cap, 0, 1);
     ctx.lineWidth = 4; ctx.lineCap = 'round';
@@ -815,8 +817,23 @@ function drawRoad(dt) {
   }
   ctx.globalAlpha = 1;
   // world hit circles -> screen
-  for (const h of hits) { h.x = (h.x * k + ox) * VW.z + VW.x; h.y = h.y * k * VW.z + VW.y; h.r *= k * VW.z; }
+  for (const h of hits) { h.x = h.x * s + VW.x; h.y = h.y * s + VW.y; h.r *= s; }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // tutorial: glide the road to the highlighted item if it's off screen
+  if (g.tut && !press && !pinch) {
+    const hl = TUT[g.tut.i].hl, t = hl && hits.find(h => (hl.unit && h.u && h.u.type === hl.unit) || (hl.load && h.L && h.L.type === hl.load));
+    if (t && (t.x < t.r + 8 || t.x > W - t.r - 8)) { VW.x += (W / 2 - t.x) * .12; clampView(); }
+  }
+  // scroll bar: where you are along the road
+  const cw = RD.cw * VW.z;
+  if (cw > W + 1) {
+    const bw = W - 24, kx = bw / cw, by = H - 7;
+    ctx.fillStyle = 'rgba(31,42,55,.12)'; ctx.fillRect(12, by, bw, 4);
+    ctx.fillStyle = 'rgba(31,42,55,.55)'; ctx.fillRect(12 + -VW.x * kx, by, Math.max(18, W * kx), 4);
+    ctx.font = `700 ${11 * Math.min(UIK, 1.3)}px ${MONO}`; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(31,42,55,.45)';
+    if (VW.x < -2) { ctx.textAlign = 'left'; ctx.fillText('◀', 6, by - 12); }
+    if (VW.x > W - cw + 2) { ctx.textAlign = 'right'; ctx.fillText('▶', W - 6, by - 12); }
+  }
   freqTag(ctx, g, df);
 }
 
@@ -1143,12 +1160,22 @@ function renderSheet() {
 // Tap = switch on/off or collect, long-press = details. Pinch (or mouse wheel) zooms, drag pans when zoomed.
 const VW = { z: 1, x: 0, y: 0 };            // zoom and pan of the main view, in CSS px
 const ZMAX = 4;
+let RD = null;                               // road view: base scale and content size, set every frame
+const isRoad = () => SET.view === 'road' && RD;
+const zMin = () => isRoad() ? RD.zmin : 1;
 function clampView() {
-  VW.z = clamp(VW.z, 1, ZMAX);
-  VW.x = clamp(VW.x, W - W * VW.z, 0); VW.y = clamp(VW.y, H - H * VW.z, 0);
-  $('zoomReset').disabled = VW.z < 1.02; $('zoomOut').disabled = VW.z < 1.02; $('zoomIn').disabled = VW.z > ZMAX - .01;
+  VW.z = clamp(VW.z, zMin(), ZMAX);
+  if (isRoad()) {
+    // the road scrolls sideways; when it's shorter than the screen it sits centred
+    const cw = RD.cw * VW.z, ch = RD.ch * VW.z, room = H - RD.top;
+    VW.x = cw <= W ? (W - cw) / 2 : clamp(VW.x, W - cw, 0);
+    VW.y = ch <= room ? RD.top + (room - ch) / 2 : ch <= H ? clamp(VW.y, H - ch, RD.top) : clamp(VW.y, H - ch, 0);
+  } else { VW.x = clamp(VW.x, W - W * VW.z, 0); VW.y = clamp(VW.y, H - H * VW.z, 0); }
+  const zm = zMin();
+  $('zoomReset').disabled = Math.abs(VW.z - 1) < .02 && (!isRoad() || VW.x >= -1 || RD.cw * VW.z <= W); $('zoomOut').disabled = VW.z < zm + .02; $('zoomIn').disabled = VW.z > ZMAX - .01;
 }
-function zoomAt(mx, my, z) { const bx = (mx - VW.x) / VW.z, by = (my - VW.y) / VW.z; VW.z = clamp(z, 1, ZMAX); VW.x = mx - bx * VW.z; VW.y = my - by * VW.z; clampView(); }
+const canPan = () => isRoad() ? RD.cw * VW.z > W + 1 || RD.ch * VW.z > H - RD.top + 1 : VW.z > 1.01;
+function zoomAt(mx, my, z) { const bx = (mx - VW.x) / VW.z, by = (my - VW.y) / VW.z; VW.z = clamp(z, zMin(), ZMAX); VW.x = mx - bx * VW.z; VW.y = my - by * VW.z; clampView(); }
 function resetView() { VW.z = 1; VW.x = VW.y = 0; clampView(); }
 $('zoomReset').addEventListener('click', resetView);
 $('zoomIn').addEventListener('click', () => zoomAt(W / 2, H / 2, VW.z * 1.5));
@@ -1177,7 +1204,7 @@ wheel.addEventListener('pointermove', e => {
   const p = local(e); ptrs.set(e.pointerId, p);
   if (pinch && ptrs.size >= 2) {
     const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    const z = clamp(pinch.z * d / pinch.d, 1, ZMAX), bx = (pinch.mx - pinch.vx) / pinch.z, by = (pinch.my - pinch.vy) / pinch.z;
+    const z = clamp(pinch.z * d / pinch.d, zMin(), ZMAX), bx = (pinch.mx - pinch.vx) / pinch.z, by = (pinch.my - pinch.vy) / pinch.z;
     VW.z = z; VW.x = mx - bx * z; VW.y = my - by * z; clampView();
     return;
   }
@@ -1185,7 +1212,7 @@ wheel.addEventListener('pointermove', e => {
   const dx = p.x - press.x, dy = p.y - press.y;
   if (!press.pan && Math.hypot(dx, dy) > 10) {
     clearTimeout(press.timer);
-    if (VW.z > 1.01) press.pan = true; else { press = null; return; }
+    if (canPan()) press.pan = true; else { press = null; return; }
   }
   if (press.pan) { VW.x = press.vx + dx; VW.y = press.vy + dy; clampView(); }
 });
@@ -1202,7 +1229,12 @@ function pointerEnd(e) {
 }
 wheel.addEventListener('pointerup', pointerEnd);
 wheel.addEventListener('pointercancel', pointerEnd);
-wheel.addEventListener('wheel', e => { e.preventDefault(); const { x, y } = local(e); zoomAt(x, y, VW.z * Math.exp(-e.deltaY * .0015)); }, { passive: false });
+wheel.addEventListener('wheel', e => {
+  e.preventDefault();
+  // road: sideways scroll (trackpad swipe or Shift + wheel) moves along the road; plain wheel zooms
+  if (isRoad() && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey)) { VW.x -= e.deltaX || e.deltaY; clampView(); return; }
+  const { x, y } = local(e); zoomAt(x, y, VW.z * Math.exp(-e.deltaY * .0015));
+}, { passive: false });
 wheel.addEventListener('contextmenu', e => e.preventDefault());
 
 // ---------------------------------------------------------------- loop
