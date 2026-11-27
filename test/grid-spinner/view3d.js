@@ -313,10 +313,12 @@ export function create(wrap, api) {
     renderer.setSize(w, h, false); cv.style.width = w + 'px'; cv.style.height = h + 'px';
     fit();
   }
+  // orbit: yaw around the hub, pitch = how far from above (null = the default for this screen shape)
+  let orbit = { yaw: Math.PI / 4, pitch: null }, pitch = .72;
   function fit() {
-    // portrait screens look more from above, so the round world fills more of the tall panel
-    const aspect = W / H, e = aspect < .9 ? .98 : .72, d = 70;
-    cam.position.set(target.x + Math.cos(e) * d / Math.SQRT2, target.y + Math.sin(e) * d, target.z + Math.cos(e) * d / Math.SQRT2); cam.lookAt(target);
+    // portrait screens look more from above by default, so the round world fills more of the tall panel
+    const aspect = W / H, e = orbit.pitch ?? (aspect < .9 ? .98 : .72), d = 70; pitch = e;
+    cam.position.set(target.x + Math.cos(e) * d * Math.sin(orbit.yaw), target.y + Math.sin(e) * d, target.z + Math.cos(e) * d * Math.cos(orbit.yaw)); cam.lookAt(target);
     const halfW = worldR * 1.02, halfH = worldR * Math.sin(e) * 1.02 + 2.6 * Math.cos(e) + .4;
     let hw = halfW, hh = halfH;
     if (aspect > halfW / halfH) hw = hh * aspect; else hh = hw / aspect;
@@ -336,6 +338,7 @@ export function create(wrap, api) {
   // ---------- per-frame update; returns screen positions for the 2D overlay and taps
   function frame(dt, G, w, h, opts) {
     resize(w, h);
+    if (opts.orbit && (opts.orbit.yaw !== orbit.yaw || opts.orbit.pitch !== orbit.pitch)) { orbit = { ...opts.orbit }; fit(); }
     if (opts.view && (opts.view.z !== view.z || opts.view.x !== view.x || opts.view.y !== view.y)) { view = { ...opts.view }; applyView(); }
     const time = performance.now() / 1000;
     // day and night
@@ -403,7 +406,7 @@ export function create(wrap, api) {
     renderer.render(scene, cam);
     const hc = project(new THREE.Vector3(0, 0, 0), RY + .1);
     out.hub = { x: hc.x, y: hc.y, lx: hc.x, ly: hc.y, r: RR * ppu * view.z };
-    out.ppu = ppu * view.z;
+    out.ppu = ppu * view.z; out.pitch = pitch;
     return out;
   }
   function proj(o) {

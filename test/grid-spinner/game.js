@@ -670,7 +670,9 @@ function drawIso(dt, frozen) {
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
   clampView();
-  const P = V3.frame(dt, g, W, H, { view: VW, speed: frozen ? 0 : speedVis(g.f, g.f0), sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
+  const P = V3.frame(dt, g, W, H, { view: VW, orbit: ORB, speed: frozen ? 0 : speedVis(g.f, g.f0), sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
+  lastPitch = P.pitch;
+  if (!hinted && !g.tut && !g.paused) orbitHint();
   hits = [];
   const fs = clamp(P.ppu * .36, 9, 19) * (UIK > 1 ? Math.min(UIK, 1.4) : 1);
   // generators: code + output, or their state
@@ -1162,7 +1164,12 @@ const VW = { z: 1, x: 0, y: 0 };            // zoom and pan of the main view, in
 const ZMAX = 4;
 let RD = null;                               // road view: base scale and content size, set every frame
 const isRoad = () => SET.view === 'road' && RD;
-const zMin = () => isRoad() ? RD.zmin : 1;
+const is3D = () => SET.view === '3d' && V3;
+const zMin = () => isRoad() ? RD.zmin : is3D() ? .5 : 1;
+// 3D orbit: yaw around the grid node, pitch from low (.22) to straight down (1.5); pitch null = default for the screen shape
+const ORB_YAW = Math.PI / 4, ORB = { yaw: ORB_YAW, pitch: null };
+let lastPitch = .72;
+const orbitMoved = () => Math.abs(ORB.yaw - ORB_YAW) > .01 || ORB.pitch !== null;
 function clampView() {
   VW.z = clamp(VW.z, zMin(), ZMAX);
   if (isRoad()) {
@@ -1170,13 +1177,16 @@ function clampView() {
     const cw = RD.cw * VW.z, ch = RD.ch * VW.z, room = H - RD.top;
     VW.x = cw <= W ? (W - cw) / 2 : clamp(VW.x, W - cw, 0);
     VW.y = ch <= room ? RD.top + (room - ch) / 2 : ch <= H ? clamp(VW.y, H - ch, RD.top) : clamp(VW.y, H - ch, 0);
+  } else if (is3D()) {
+    // free pan, but keep at least a third of the world on screen
+    VW.x = clamp(VW.x, W * .35 - W * VW.z, W * .65); VW.y = clamp(VW.y, H * .35 - H * VW.z, H * .65);
   } else { VW.x = clamp(VW.x, W - W * VW.z, 0); VW.y = clamp(VW.y, H - H * VW.z, 0); }
   const zm = zMin();
-  $('zoomReset').disabled = Math.abs(VW.z - 1) < .02 && (!isRoad() || VW.x >= -1 || RD.cw * VW.z <= W); $('zoomOut').disabled = VW.z < zm + .02; $('zoomIn').disabled = VW.z > ZMAX - .01;
+  $('zoomReset').disabled = Math.abs(VW.z - 1) < .02 && (isRoad() ? VW.x >= -1 || RD.cw * VW.z <= W : !is3D() || (Math.abs(VW.x) < 1 && Math.abs(VW.y) < 1 && !orbitMoved())); $('zoomOut').disabled = VW.z < zm + .02; $('zoomIn').disabled = VW.z > ZMAX - .01;
 }
-const canPan = () => isRoad() ? RD.cw * VW.z > W + 1 || RD.ch * VW.z > H - RD.top + 1 : VW.z > 1.01;
+const canPan = () => isRoad() ? RD.cw * VW.z > W + 1 || RD.ch * VW.z > H - RD.top + 1 : is3D() || VW.z > 1.01;
 function zoomAt(mx, my, z) { const bx = (mx - VW.x) / VW.z, by = (my - VW.y) / VW.z; VW.z = clamp(z, zMin(), ZMAX); VW.x = mx - bx * VW.z; VW.y = my - by * VW.z; clampView(); }
-function resetView() { VW.z = 1; VW.x = VW.y = 0; clampView(); }
+function resetView() { VW.z = 1; VW.x = VW.y = 0; ORB.yaw = ORB_YAW; ORB.pitch = null; clampView(); }
 $('zoomReset').addEventListener('click', resetView);
 $('zoomIn').addEventListener('click', () => zoomAt(W / 2, H / 2, VW.z * 1.5));
 $('zoomOut').addEventListener('click', () => zoomAt(W / 2, H / 2, VW.z / 1.5));
@@ -1196,7 +1206,8 @@ wheel.addEventListener('pointerdown', e => {
   }
   let best = null, bd = 1e9;
   for (const h of hits) { const d = Math.hypot(h.x - x, h.y - y) - (h.bill ? 12 : 0); if (d < h.r && d < bd) { bd = d; best = h; } }
-  press = { x, y, hit: best, long: false, vx: VW.x, vy: VW.y, pan: false };
+  press = { x, y, hit: best, long: false, vx: VW.x, vy: VW.y, pan: false, yaw: ORB.yaw, pitch: ORB.pitch ?? lastPitch,
+    panBtn: e.pointerType === 'mouse' && (e.button === 2 || e.button === 1 || e.shiftKey) };
   if (best) press.timer = setTimeout(() => { if (press && !press.pan) { press.long = true; openSheet(best); buzz(20); } }, 450);
 });
 wheel.addEventListener('pointermove', e => {
@@ -1212,15 +1223,20 @@ wheel.addEventListener('pointermove', e => {
   const dx = p.x - press.x, dy = p.y - press.y;
   if (!press.pan && Math.hypot(dx, dy) > 10) {
     clearTimeout(press.timer);
-    if (canPan()) press.pan = true; else { press = null; return; }
+    if (is3D() && !press.panBtn) press.orbit = true;
+    else if (canPan()) press.pan = true; else { press = null; return; }
   }
-  if (press.pan) { VW.x = press.vx + dx; VW.y = press.vy + dy; clampView(); }
+  if (press.orbit) {
+    ORB.yaw = press.yaw - dx * .009;
+    ORB.pitch = clamp(press.pitch + dy * .007, .22, 1.5);
+    clampView();
+  } else if (press.pan) { VW.x = press.vx + dx; VW.y = press.vy + dy; clampView(); }
 });
 function pointerEnd(e) {
   ptrs.delete(e.pointerId);
   if (pinch) { if (ptrs.size < 2) pinch = null; return; }
   if (!press) return; clearTimeout(press.timer);
-  const h = press.hit, long = press.long, panned = press.pan; press = null;
+  const h = press.hit, long = press.long, panned = press.pan || press.orbit; press = null;
   if (e.type === 'pointercancel' || !h || long || panned || !G || G.paused || G.over) return;
   audioInit();
   if (h.bill) return collect(h.bill);
@@ -1236,6 +1252,12 @@ wheel.addEventListener('wheel', e => {
   const { x, y } = local(e); zoomAt(x, y, VW.z * Math.exp(-e.deltaY * .0015));
 }, { passive: false });
 wheel.addEventListener('contextmenu', e => e.preventDefault());
+let hinted = false;
+function orbitHint() {
+  if (hinted) return; hinted = true;
+  if (store.get('orbitHint', false)) return; store.set('orbitHint', true);
+  toast(matchMedia('(pointer: coarse)').matches ? 'Drag to orbit · two fingers to pan and pinch to zoom · 1× resets the view' : 'Drag to orbit · right-drag or Shift-drag to pan · wheel to zoom · 1× resets the view');
+}
 
 // ---------------------------------------------------------------- loop
 let last = performance.now(), hudT = 0, running = false;
