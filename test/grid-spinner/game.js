@@ -120,16 +120,22 @@ const windCurve = v => v < 3 ? 0 : v >= 12 ? 1 : (v * v * v - 27) / (1728 - 27);
 // ---------------------------------------------------------------- state
 let G = null, uid = 0;
 // Settings: auto-collect bills (default on), sound, vibration.
-const SET = Object.assign({ iso: false, auto: true, sound: !store.get('muted', false), vibe: store.get('vibe', true) }, store.get('settings', {}));
+const SET = Object.assign({ view: 'wheel', auto: true, sound: !store.get('muted', false), vibe: store.get('vibe', true) }, store.get('settings', {}));
+if (SET.iso && !store.get('settings', {}).view) SET.view = '3d';   // older saved setting
+delete SET.iso;
 function setSetting(k, v) {
   SET[k] = v; store.set('settings', SET);
   if (k === 'sound') { AU.muted = !v; if (v) audioInit(); }
   if (k === 'auto' && v && G) collectAll();
-  if (k === 'iso') applyView();
+  if (k === 'view') { applyView(); resetView(); }
   syncSwitches();
 }
-function syncSwitches() { document.querySelectorAll('.switch[data-set]').forEach(b => { b.classList.toggle('on', !!SET[b.dataset.set]); b.setAttribute('aria-pressed', !!SET[b.dataset.set]); }); }
+function syncSwitches() {
+  document.querySelectorAll('.switch[data-set]').forEach(b => { b.classList.toggle('on', !!SET[b.dataset.set]); b.setAttribute('aria-pressed', !!SET[b.dataset.set]); });
+  document.querySelectorAll('.vseg button').forEach(b => b.classList.toggle('on', SET.view === b.dataset.v));
+}
 document.querySelectorAll('.switch[data-set]').forEach(b => b.addEventListener('click', () => setSetting(b.dataset.set, !SET[b.dataset.set])));
+document.querySelectorAll('.vseg button').forEach(b => b.addEventListener('click', () => setSetting('view', b.dataset.v)));
 let selCountry = store.get('country', 'ch'), selDiff = store.get('diff', 'normal');
 
 const TUT_D = { name: 'Tutorial', grace: 10, E: .5, eventGap: 52, loadGap: 1e9, loads: [] };
@@ -630,12 +636,12 @@ function label(ctx, txt, x, y, size) {
 // ---------------------------------------------------------------- 3D world view (loaded only when switched on)
 let V3 = null, V3loading = false, V3failed = false;
 function applyView() {
-  if (SET.iso && !V3 && !V3loading && !V3failed) {
+  if (SET.view === '3d' && !V3 && !V3loading && !V3failed) {
     V3loading = true;
-    import('./view3d.js').then(m => { V3 = m.create($('wheelWrap')); V3loading = false; V3.setVisible(SET.iso); })
-      .catch(() => { V3loading = false; V3failed = true; SET.iso = false; syncSwitches(); toast('3D view is not available on this device'); });
+    import('./view3d.js').then(m => { V3 = m.create($('wheelWrap')); V3loading = false; V3.setVisible(SET.view === '3d'); })
+      .catch(() => { V3loading = false; V3failed = true; SET.view = 'wheel'; syncSwitches(); toast('3D view is not available on this device'); });
   }
-  if (V3) V3.setVisible(!!SET.iso);
+  if (V3) V3.setVisible(SET.view === '3d');
 }
 function pill(ctx, x, y, txt, col, fs, bg) {
   ctx.font = `800 ${fs}px ${MONO}`; const w = ctx.measureText(txt).width + fs * .9, h = fs * 1.55;
@@ -643,6 +649,21 @@ function pill(ctx, x, y, txt, col, fs, bg) {
   ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - h / 2, w, h, 3) : ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke();
   ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, y + 1);
   return w;
+}
+// Round frequency tag in the top-left corner of the view (used by the road and 3D views).
+const freqTagR = () => clamp(Math.min(W, H) * .11, 30, 64) * (UIK > 1 ? Math.min(UIK, 1.3) : 1);
+function freqTag(ctx, g, df) {
+  const col = statusColor(df), r = freqTagR(), x = r + 12, y = r + 12;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.fill(); ctx.lineWidth = Math.max(3, r * .08); ctx.strokeStyle = col; ctx.stroke();
+  if (g.alarm > 0) {
+    ctx.lineWidth = Math.max(4, r * .11); ctx.strokeStyle = TH.bad;
+    ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth, -Math.PI / 2, -Math.PI / 2 + Math.min(1, g.alarm / g.D.grace) * Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.round(r * .5)}px ${MONO}`; ctx.fillText(fmtHz(g.f), x, y - r * .06);
+  ctx.font = `700 ${Math.round(r * .22)}px ${MONO}`; ctx.fillStyle = TH.muted; ctx.fillText('Hz', x, y + r * .42);
+  hits.push({ x, y, r: r + 4, hub: true });
 }
 function drawIso(dt, frozen) {
   [W, H] = fitCanvas(wheel, wctx);
@@ -677,18 +698,9 @@ function drawIso(dt, frozen) {
       hits.push({ x: bx, y: by, r: br + 10, bill: L });
     }
   }
-  // the grid node: frequency in a round label in the middle of the spinning nexus
-  const hp = P.hub, col = statusColor(df), lr = clamp(hp.r * .56, 22, 90);
-  ctx.beginPath(); ctx.arc(hp.x, hp.y, lr, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.fill(); ctx.lineWidth = Math.max(3, lr * .07); ctx.strokeStyle = col; ctx.stroke();
-  if (g.alarm > 0) {
-    ctx.lineWidth = Math.max(4, lr * .11); ctx.strokeStyle = TH.bad;
-    ctx.beginPath(); ctx.arc(hp.x, hp.y, lr + ctx.lineWidth, -Math.PI / 2, -Math.PI / 2 + Math.min(1, g.alarm / g.D.grace) * Math.PI * 2); ctx.stroke();
-  }
-  ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `800 ${Math.round(lr * .5)}px ${MONO}`; ctx.fillText(fmtHz(g.f), hp.x, hp.y - lr * .06);
-  ctx.font = `700 ${Math.round(lr * .22)}px ${MONO}`; ctx.fillStyle = TH.muted; ctx.fillText('Hz', hp.x, hp.y + lr * .42);
-  hits.push({ x: hp.x, y: hp.y, r: Math.max(lr, hp.r * .8), hub: true });
+  // the grid node spins in the middle; the frequency sits in a round tag in the top-left corner
+  hits.push({ x: P.hub.x, y: P.hub.y, r: P.hub.r * .9, hub: true });
+  freqTag(ctx, g, df);
   // tutorial highlight
   if (g.tut) tutRings(ctx);
   // collected-money floats
@@ -700,8 +712,117 @@ function drawIso(dt, frozen) {
   ctx.globalAlpha = 1;
 }
 
+// ---------------------------------------------------------------- road view
+// An endless road moving at the grid's pace. Generators are wheels standing on it (a second row rides on the first)
+// and keep it rolling; consumers are brake blocks underneath that drag it back.
+let roadOff = 0, roadRef = 0;
+function drawRoad(dt) {
+  [W, H] = fitCanvas(wheel, wctx);
+  const ctx = wctx, g = G, df = g.f - g.f0, spd = speedVis(g.f, g.f0);
+  ctx.clearRect(0, 0, W, H);
+  // layout in world units, then fit to the panel
+  const gens = g.units.slice().sort((a, b) => unitOrder.indexOf(a.type) - unitOrder.indexOf(b.type) || a.id - b.id);
+  const n1 = Math.max(4, Math.ceil(gens.length / 2)), nL = Math.max(4, g.loads.length);
+  const SG = 64, SL = 52, RG = 25, RT = 40;                   // wheel slot, load slot, wheel radius, road thickness
+  const ww = Math.max(n1 * SG + SG / 2, nL * SL) + 30;
+  const lift = Math.sqrt(Math.max(0, (2 * RG) ** 2 - (SG / 2) ** 2));   // second row sits on two wheels of the first
+  const above = 2 * RG + lift + RG * .45 + 10, below = RT + 14 + 8 + 42 + 12, wh = above + below;
+  const tagH = 2 * freqTagR() + 18;                            // keep the corner frequency tag clear
+  const k = Math.min(W / ww, (H - tagH) / wh, 2.3 * Math.max(1, UIK));
+  const ox = (W - ww * k) / 2, roadY = (tagH + (H - tagH - wh * k) / 2) / k + above;   // road top, world units
+  clampView();
+  ctx.setTransform(DPR * VW.z * k, 0, 0, DPR * VW.z * k, DPR * (VW.x + VW.z * ox), DPR * VW.y);
+  hits = [];
+  // road: endless, so draw it across the whole visible width
+  const x0 = (-VW.x / VW.z - ox) / k - 20, x1 = ((W - VW.x) / VW.z - ox) / k + 20;
+  roadOff += dt * 60 * spd; roadRef += dt * 60;
+  ctx.fillStyle = '#3a4350'; ctx.fillRect(x0, roadY, x1 - x0, RT);
+  ctx.fillStyle = '#2d3540'; ctx.fillRect(x0, roadY, x1 - x0, 3); ctx.fillRect(x0, roadY + RT - 3, x1 - x0, 3);
+  // road sections (joints) and the dashed centre line move with the road
+  const SEC = 120, sec0 = Math.floor((x0 + roadOff) / SEC) * SEC - roadOff;
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  for (let x = sec0; x < x1; x += SEC) ctx.fillRect(x, roadY + 3, 2, RT - 6);
+  ctx.fillStyle = '#f1f3f5';
+  const D = 40, d0 = Math.floor((x0 + roadOff) / D) * D - roadOff;
+  for (let x = d0; x < x1; x += D) ctx.fillRect(x + 6, roadY + RT / 2 - 1.5, 20, 3);
+  // reference marks at exactly nominal pace along the lower edge: if the dashes drift against them, the grid is off speed
+  ctx.fillStyle = 'rgba(255,212,59,.9)';
+  const r0 = Math.floor((x0 + roadRef) / D) * D - roadRef;
+  for (let x = r0; x < x1; x += D) { ctx.beginPath(); ctx.moveTo(x, roadY + RT - 3); ctx.lineTo(x + 4, roadY + RT - 9); ctx.lineTo(x + 8, roadY + RT - 3); ctx.fill(); }
+  // generators: wheels on top
+  const roll = roadOff / RG;   // wheel angle so the rim moves with the road
+  gens.forEach((u, i) => {
+    const T = u.T, row = i % 2, col = Math.floor(i / 2);
+    const on = T.kind === 'sync' ? (u.engaged || u.level > 0) : u.engaged;
+    let x = (col + .5 + (row ? .5 : 0)) * SG + 15, y = roadY - RG - (row ? lift : 0);   // row 2 rests between two row-1 wheels
+    if (!on) y -= RG * .45;
+    const live = T.kind === 'sync' ? u.level > 0 : (u.engaged && u.trip <= 0);
+    u.rphi = live ? (row ? -roll : roll) : (u.rphi || 0);
+    ctx.globalAlpha = on ? 1 : .45;
+    const frac = clamp(Math.abs(u.P) / T.cap, 0, 1);
+    ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(27,21,53,.08)'; ctx.beginPath(); ctx.arc(x, y, RG + 4, 0, Math.PI * 2); ctx.stroke();
+    if (frac > .01) { ctx.strokeStyle = u.P >= 0 ? TH.ok : TH.cyan; ctx.beginPath(); ctx.arc(x, y, RG + 4, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke(); }
+    disc(ctx, x, y, RG, RG * .2, u.rphi, T.kind === 'fly' ? 6 : 4, T.color, TH.faceGen, 2.6);
+    if (T.kind === 'bess' || T.kind === 'fly') {
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(27,21,53,.1)'; ctx.beginPath(); ctx.arc(x, y, RG * .66, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = u.soc < .15 ? TH.bad : TH.ok; ctx.beginPath(); ctx.arc(x, y, RG * .66, Math.PI / 2, Math.PI / 2 + u.soc * Math.PI * 2); ctx.stroke();
+    }
+    if (T.kind === 'sync' && u.level > 0 && u.level < 1) {
+      ctx.setLineDash([3, 3]); ctx.strokeStyle = TH.ink; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, RG * .66, -Math.PI / 2, -Math.PI / 2 + u.level * Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 ${T.code.length > 3 ? 8.5 : 10.5}px ${MONO}`; ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round';
+    ctx.strokeText(T.code, x, y - 4); ctx.fillStyle = T.color; ctx.fillText(T.code, x, y - 4);
+    label(ctx, Math.round(u.P), x, y + 8, 9);
+    ctx.globalAlpha = 1;
+    if (u.repair > 0 || u.trip > 0) {
+      ctx.strokeStyle = TH.bad; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x - 12, y - 12); ctx.lineTo(x + 12, y + 12); ctx.moveTo(x + 12, y - 12); ctx.lineTo(x - 12, y + 12); ctx.stroke();
+    }
+    hits.push({ x, y, r: RG + 6, u });
+  });
+  // consumers: brake blocks under the road
+  const lw = SL - 10, lh = 42;
+  g.loads.forEach((L, i) => {
+    const x = (i + .5) * (ww - 30) / nL + 15, heat = L.off > 0 ? 0 : clamp(L.P / (L.base * 1.4 + 1), 0, 1);
+    const shoeY = roadY + RT, y = shoeY + 14 + (L.off > 0 ? 8 : 0);
+    // brake shoe pressing the underside of the road
+    ctx.fillStyle = L.off > 0 ? '#c9ced6' : `rgb(${Math.round(150 + 90 * heat)}, ${Math.round(70 - 30 * heat)}, ${Math.round(70 - 30 * heat)})`;
+    ctx.fillRect(x - lw * .35, shoeY + (L.off > 0 ? 6 : 0), lw * .7, 6);
+    ctx.fillStyle = '#8d97a3'; ctx.fillRect(x - 2, shoeY + 6, 4, y - shoeY - 6);
+    ctx.fillStyle = L.off > 0 ? '#e4e2ec' : `rgb(255, ${Math.round(236 - 110 * heat)}, ${Math.round(240 - 100 * heat)})`;
+    ctx.strokeStyle = L.off > 0 ? '#aab4c0' : TH.bad; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - lw / 2, y, lw, lh, 4) : ctx.rect(x - lw / 2, y, lw, lh); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = TH.bad;
+    ctx.font = `800 ${L.D.code.length > 3 ? 9 : 11}px ${MONO}`; ctx.fillText(L.D.code, x, y + 13);
+    label(ctx, Math.round(L.P), x, y + 29, 9.5);
+    L.hx = x; L.hy = y;
+    hits.push({ x, y: y + lh / 2, r: lw * .6, L });
+    if (!SET.auto && L.bill >= BILL_MIN) {
+      const br = 10, bx = x + lw / 2 - 2, by = y + 2, full = L.bill >= BILL_CAP - 1;
+      ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fillStyle = full ? TH.warn : TH.ok; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = `800 ${g.C.cur === 'CHF' ? 6.5 : 11}px ${MONO}`; ctx.fillText(g.C.cur === 'CHF' ? 'CHF' : '€', bx, by + 1);
+      hits.push({ x: bx, y: by, r: br + 8, bill: L });
+    }
+  });
+  if (g.tut) tutRings(ctx);
+  g.floats = g.floats.filter(f => (f.t += Math.max(dt, 1 / 60)) < 1.4);
+  for (const f of g.floats) {
+    ctx.globalAlpha = 1 - f.t / 1.4; ctx.font = `800 12px ${MONO}`; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText(f.txt, f.x, f.y - 14 - f.t * 30); ctx.fillStyle = TH.ok; ctx.fillText(f.txt, f.x, f.y - 14 - f.t * 30);
+  }
+  ctx.globalAlpha = 1;
+  // world hit circles -> screen
+  for (const h of hits) { h.x = (h.x * k + ox) * VW.z + VW.x; h.y = h.y * k * VW.z + VW.y; h.r *= k * VW.z; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  freqTag(ctx, g, df);
+}
+
 function drawWheel(dt, dtReal) {
-  if (SET.iso && V3) return drawIso(dtReal ?? dt, dt === 0);
+  if (SET.view === '3d' && V3) return drawIso(dtReal ?? dt, dt === 0);
+  if (SET.view === 'road') return drawRoad(dt);
   [W, H] = fitCanvas(wheel, wctx);
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
@@ -1025,11 +1146,13 @@ const ZMAX = 4;
 function clampView() {
   VW.z = clamp(VW.z, 1, ZMAX);
   VW.x = clamp(VW.x, W - W * VW.z, 0); VW.y = clamp(VW.y, H - H * VW.z, 0);
-  $('zoomReset').classList.toggle('hidden', VW.z < 1.02);
+  $('zoomReset').disabled = VW.z < 1.02; $('zoomOut').disabled = VW.z < 1.02; $('zoomIn').disabled = VW.z > ZMAX - .01;
 }
 function zoomAt(mx, my, z) { const bx = (mx - VW.x) / VW.z, by = (my - VW.y) / VW.z; VW.z = clamp(z, 1, ZMAX); VW.x = mx - bx * VW.z; VW.y = my - by * VW.z; clampView(); }
 function resetView() { VW.z = 1; VW.x = VW.y = 0; clampView(); }
 $('zoomReset').addEventListener('click', resetView);
+$('zoomIn').addEventListener('click', () => zoomAt(W / 2, H / 2, VW.z * 1.5));
+$('zoomOut').addEventListener('click', () => zoomAt(W / 2, H / 2, VW.z / 1.5));
 const ptrs = new Map();
 let press = null, pinch = null;
 const cancelPress = () => { if (press) clearTimeout(press.timer); press = null; };
@@ -1115,7 +1238,7 @@ const TUT = [
   { e: '🌀', h: 'Spinning up', hl: { hub: 1 }, done: () => Math.abs(G.f - G.f0) < .02,
     p: () => `Watch the plant accelerate the wheel up to <b>${G.f0} Hz</b>, the nominal frequency. Every generator in continental Europe turns in step at exactly this rate.` },
   { e: '🎯', h: 'Reading the wheel', dom: ['#chartWrap'], hl: { hub: 1 },
-    p: () => `The <b>orange dot</b> turns with the wheel; the <b>black arrow</b> turns at exactly ${G.f0} Hz. If they drift apart, the grid has been running slow or fast. The chart shows the last 90 seconds: keep the line inside the <b>green band</b> (${G.f0 - BAND} to ${G.f0 + BAND} Hz). Tip: <b>pinch</b> (or use the mouse wheel) to zoom in, drag to move around, and <b>⤢ 1×</b> zooms back out.` },
+    p: () => `The <b>orange dot</b> turns with the wheel; the <b>black arrow</b> turns at exactly ${G.f0} Hz. If they drift apart, the grid has been running slow or fast. The chart shows the last 90 seconds: keep the line inside the <b>green band</b> (${G.f0 - BAND} to ${G.f0 + BAND} Hz). Tip: zoom with the <b>+ / −</b> buttons (or pinch), drag to move around, and <b>1×</b> zooms back out. Settings also has a <b>Road</b> and a <b>3D</b> view.` },
   { e: '🏘️', h: 'Your first customers', acts: [{ id: 'town', label: '🏘️ Connect a town (45 MW)', fn: () => tutLoad('city', 45) }], done: () => tl('city')?.conn >= 1,
     p: () => `Consumers are the <b>red brake pads inside</b> the wheel. Every home, motor and kettle drags on it. Connect a small town and watch the plant take the load.` },
   { e: '⚖️', h: 'Push equals drag', dom: ['#mix'], hl: { unit: 'hydro' },

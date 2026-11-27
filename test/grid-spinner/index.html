@@ -105,8 +105,15 @@
   #wheel { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
   .v3 { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 4px; display: block; }
   .plabel { position: absolute; top: 5px; left: 8px; font: 700 9.5px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
-  #zoomReset { position: absolute; right: 6px; top: 6px; z-index: 3; min-height: 36px; padding: 0 10px; border-radius: 4px; background: var(--head); color: #fff; font: 700 12px var(--mono); }
-  #holdTag { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); background: var(--head); color: #fff; font: 700 12px var(--mono);
+  #zoomBox { position: absolute; right: 6px; top: 6px; z-index: 3; display: flex; gap: 3px; }
+  #zoomBox button { width: 40px; height: 40px; border-radius: 4px; background: var(--head); color: #fff; font: 800 18px var(--mono); opacity: .9; }
+  #zoomBox #zoomReset { font-size: 12px; }
+  #zoomBox button:disabled { opacity: .35; }
+  .vseg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; flex: none; }
+  .vseg button { min-height: 34px; padding: 0 11px; font-size: 13px; font-weight: 700; border-left: 1px solid var(--line); }
+  .vseg button:first-child { border-left: 0; }
+  .vseg button.on { background: var(--accent); color: #fff; }
+  #holdTag { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); background: var(--head); color: #fff; font: 700 12px var(--mono);
     padding: 5px 10px; border-radius: 3px; pointer-events: none; white-space: nowrap; letter-spacing: .03em; }
 
   #mission { display: flex; gap: 6px; font: 11px var(--mono); margin-bottom: 3px; white-space: nowrap; overflow: hidden; }
@@ -196,7 +203,8 @@
     .card .pm { grid-column: 2; grid-row: 1 / span 4; margin: 0; flex-direction: row; }
     .card .pm button { width: 42px; height: 42px; flex: none; font-size: 20px; } .card .pm .n { font-size: 14px; min-width: 18px; }
     #alarm { font-size: calc(17px * var(--kz, 1)); padding: 8px 18px; bottom: 16px; }
-    #holdTag { font-size: calc(15px * var(--kz, 1)); top: calc(38px * var(--kz, 1)); padding: 7px 14px; }
+    #holdTag { font-size: calc(15px * var(--kz, 1)); bottom: 14px; padding: 7px 14px; }
+    #zoomBox { zoom: var(--kz, 1); right: 10px; top: 10px; }
     #toast { font-size: calc(15px * var(--kz, 1)); }
     #sheet .box { max-width: 460px; margin: 0 20px 0 auto; }
     #toast { font-size: 15px; padding: 9px 16px; }
@@ -310,7 +318,7 @@
 
     <div class="label">Settings</div>
     <div class="settings">
-      <div class="setting"><span>3D world view<small>Off: the spinning-wheel view</small></span><button class="switch" data-set="iso" aria-label="3D world view"></button></div>
+      <div class="setting"><span>View<small>How the grid is drawn</small></span><div class="vseg" role="group" aria-label="View"><button data-v="wheel">Wheel</button><button data-v="road">Road</button><button data-v="3d">3D</button></div></div>
       <div class="setting"><span>Auto-collect bills<small>Off: tap the money tags on consumers to cash in</small></span><button class="switch" data-set="auto" aria-label="Auto-collect bills"></button></div>
       <div class="setting"><span>Sound</span><button class="switch" data-set="sound" aria-label="Sound"></button></div>
       <div class="setting"><span>Vibration</span><button class="switch" data-set="vibe" aria-label="Vibration"></button></div>
@@ -337,7 +345,7 @@
   <div id="main">
     <div id="wheelWrap">
       <canvas id="wheel"></canvas>
-      <button id="zoomReset" class="hidden" aria-label="Reset zoom">⤢ 1×</button>
+      <div id="zoomBox"><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" aria-label="Reset zoom">1×</button></div>
       <div id="holdTag" class="hidden">Clock stopped · press ▶ START</div>
       <div id="alarm" class="hidden"></div>
     </div>
@@ -370,7 +378,7 @@
   <div class="box">
     <h2>Menu</h2>
     <div class="settings">
-      <div class="setting"><span>3D world view<small>Off: the spinning-wheel view</small></span><button class="switch" data-set="iso" aria-label="3D world view"></button></div>
+      <div class="setting"><span>View<small>How the grid is drawn</small></span><div class="vseg" role="group" aria-label="View"><button data-v="wheel">Wheel</button><button data-v="road">Road</button><button data-v="3d">3D</button></div></div>
       <div class="setting"><span>Auto-collect bills<small>Off: tap the money tags on consumers to cash in</small></span><button class="switch" data-set="auto" aria-label="Auto-collect bills"></button></div>
       <div class="setting"><span>Sound</span><button class="switch" data-set="sound" aria-label="Sound"></button></div>
       <div class="setting"><span>Vibration</span><button class="switch" data-set="vibe" aria-label="Vibration"></button></div>
@@ -458,8 +466,9 @@
     <p>Every grid starts with gas plants. Your job is to phase them out: build wind, solar, hydro and batteries, plus nuclear for base load where the country allows it, and switch the gas plants off and scrap them, without letting the frequency leave the band. The <b>clean share</b> counts the energy from hydro, nuclear, wind and solar over the last 24 game hours (batteries only shift energy, so they're left out). Each mission step pays a green subsidy, and the CO₂ price goes up every day, so gas gets more expensive the longer you wait. Run a full day without burning gas, with every fossil plant gone, and the mission is complete.</p>
     <p>New nuclear: France may build it. Switzerland keeps its existing plant, but new ones still await a public vote. Italy passed a law in 2026 to bring nuclear back with small modular reactors, not expected before the 2030s. Germany closed its last reactors in 2023.</p>
 
-    <h3>Two ways to look at it</h3>
-    <p>The default view is the spinning wheel. Switch on <b>3D world view</b> in Settings to see the same grid as a little isometric world instead: every plant, battery and consumer is a small model, joined by neon wires (green to generators, red to consumers) to one central node, the grid, where you read the frequency. Energy pulses run along the wires (towards the grid from producers, out to consumers and charging batteries). The rules are exactly the same.</p>
+    <h3>Three ways to look at it</h3>
+    <p>Pick the <b>View</b> in Settings. <b>Wheel</b> (the default) is the spinning grid wheel. <b>Road</b> turns it into an endless road that moves at the grid's pace: the generators are wheels standing on it and keep it rolling (a second row rides on the first), the consumers are brake blocks underneath that drag it back, and the yellow marks along the edge move at exactly 50 Hz, so you see the road drift when the frequency is off. <b>3D</b> shows the same grid as a little isometric world.</p>
+    <p>In the 3D view every plant, battery and consumer is a small model, joined by neon wires (green to generators, red to consumers) to one central spinning node, the grid; the frequency sits in the round tag in the corner. Energy pulses run along the wires (towards the grid from producers, out to consumers and charging batteries). The rules are exactly the same.</p>
 
     <h3>When it goes wrong</h3>
     <p>If the frequency keeps falling, grids protect themselves by switching off whole areas of customers on purpose (automatic load shedding), starting around 49 Hz in Europe. Too fast or too slow for too long, and generators disconnect to protect themselves, which makes things worse. That cascade is a blackout.</p>
@@ -472,7 +481,7 @@
       <li><b>Tap</b> a generator on the wheel to switch it on or off. <b>Long-press</b> for details or to scrap it.</li>
       <li>Build more with <b>+</b> on the cards. New assets arrive <b>disconnected</b>: tap them to connect them. Keep some idle as a reserve for emergencies.</li>
       <li>Consumers pay for every MWh you deliver.</li>
-      <li><b>Pinch</b> to zoom into the wheel or the 3D world (mouse wheel on a computer), drag to move around when zoomed, and tap <b>⤢ 1×</b> to zoom back out.</li>
+      <li>Zoom with the <b>+ / −</b> buttons, by pinching, or with the mouse wheel; drag to move around when zoomed; <b>1×</b> zooms back out. Works in every view.</li>
       <li>Prices are real-world ballparks (build cost, yearly upkeep, fuel and CO₂). To make that playable, money runs on a yearly clock: one game day books a full year of bills, fuel and upkeep.</li>
       <li>Each new day brings more customers, wilder loads and more surprises.</li>
     </ul>
