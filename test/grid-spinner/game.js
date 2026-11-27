@@ -648,9 +648,10 @@ function drawIso(dt, frozen) {
   [W, H] = fitCanvas(wheel, wctx);
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
-  const P = V3.frame(dt, g, W, H, { speed: frozen ? 0 : speedVis(g.f, g.f0), sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
+  clampView();
+  const P = V3.frame(dt, g, W, H, { view: VW, speed: frozen ? 0 : speedVis(g.f, g.f0), sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
   hits = [];
-  const fs = clamp(P.ppu * .36, 9, 15) * (UIK > 1 ? Math.min(UIK, 1.4) : 1);
+  const fs = clamp(P.ppu * .36, 9, 19) * (UIK > 1 ? Math.min(UIK, 1.4) : 1);
   // generators: code + output, or their state
   for (const u of g.units) {
     const p = P.units.get(u.id); if (!p) continue;
@@ -704,6 +705,12 @@ function drawWheel(dt, dtReal) {
   [W, H] = fitCanvas(wheel, wctx);
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
+  clampView(); ctx.setTransform(DPR * VW.z, 0, 0, DPR * VW.z, DPR * VW.x, DPR * VW.y);
+  drawWheelBase(dt, ctx, g, df);
+  for (const h of hits) { h.x = h.x * VW.z + VW.x; h.y = h.y * VW.z + VW.y; h.r *= VW.z; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function drawWheelBase(dt, ctx, g, df) {
   const Mx = Math.min(W, H) / 2 - 6;
   const cx = W / 2, cy = H / 2;
   const gens = g.units.slice().sort((a, b) => unitOrder.indexOf(a.type) - unitOrder.indexOf(b.type) || a.id - b.id);
@@ -1011,31 +1018,68 @@ function renderSheet() {
   }
 }
 
-// ---------------------------------------------------------------- input on the wheel
-let press = null;
+// ---------------------------------------------------------------- input on the wheel / 3D world
+// Tap = switch on/off or collect, long-press = details. Pinch (or mouse wheel) zooms, drag pans when zoomed.
+const VW = { z: 1, x: 0, y: 0 };            // zoom and pan of the main view, in CSS px
+const ZMAX = 4;
+function clampView() {
+  VW.z = clamp(VW.z, 1, ZMAX);
+  VW.x = clamp(VW.x, W - W * VW.z, 0); VW.y = clamp(VW.y, H - H * VW.z, 0);
+  $('zoomReset').classList.toggle('hidden', VW.z < 1.02);
+}
+function zoomAt(mx, my, z) { const bx = (mx - VW.x) / VW.z, by = (my - VW.y) / VW.z; VW.z = clamp(z, 1, ZMAX); VW.x = mx - bx * VW.z; VW.y = my - by * VW.z; clampView(); }
+function resetView() { VW.z = 1; VW.x = VW.y = 0; clampView(); }
+$('zoomReset').addEventListener('click', resetView);
+const ptrs = new Map();
+let press = null, pinch = null;
+const cancelPress = () => { if (press) clearTimeout(press.timer); press = null; };
+const local = e => { const r = wheel.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 wheel.addEventListener('pointerdown', e => {
   audioInit();
-  const r = wheel.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  try { wheel.setPointerCapture(e.pointerId); } catch {}
+  const { x, y } = local(e); ptrs.set(e.pointerId, { x, y });
+  if (ptrs.size >= 2) { // second finger: start a pinch, forget the tap
+    cancelPress();
+    const [a, b] = [...ptrs.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, z: VW.z, vx: VW.x, vy: VW.y };
+    return;
+  }
   let best = null, bd = 1e9;
   for (const h of hits) { const d = Math.hypot(h.x - x, h.y - y) - (h.bill ? 12 : 0); if (d < h.r && d < bd) { bd = d; best = h; } }
-  press = { x, y, hit: best, long: false };
-  if (best) press.timer = setTimeout(() => { press.long = true; openSheet(best); buzz(20); }, 450);
+  press = { x, y, hit: best, long: false, vx: VW.x, vy: VW.y, pan: false };
+  if (best) press.timer = setTimeout(() => { if (press && !press.pan) { press.long = true; openSheet(best); buzz(20); } }, 450);
 });
 wheel.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const p = local(e); ptrs.set(e.pointerId, p);
+  if (pinch && ptrs.size >= 2) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const z = clamp(pinch.z * d / pinch.d, 1, ZMAX), bx = (pinch.mx - pinch.vx) / pinch.z, by = (pinch.my - pinch.vy) / pinch.z;
+    VW.z = z; VW.x = mx - bx * z; VW.y = my - by * z; clampView();
+    return;
+  }
   if (!press) return;
-  const r = wheel.getBoundingClientRect();
-  if (Math.hypot(e.clientX - r.left - press.x, e.clientY - r.top - press.y) > 12) { clearTimeout(press.timer); press = null; }
+  const dx = p.x - press.x, dy = p.y - press.y;
+  if (!press.pan && Math.hypot(dx, dy) > 10) {
+    clearTimeout(press.timer);
+    if (VW.z > 1.01) press.pan = true; else { press = null; return; }
+  }
+  if (press.pan) { VW.x = press.vx + dx; VW.y = press.vy + dy; clampView(); }
 });
-wheel.addEventListener('pointerup', () => {
+function pointerEnd(e) {
+  ptrs.delete(e.pointerId);
+  if (pinch) { if (ptrs.size < 2) pinch = null; return; }
   if (!press) return; clearTimeout(press.timer);
-  const h = press.hit, long = press.long; press = null;
-  if (!h || long || !G || G.paused || G.over) return;
+  const h = press.hit, long = press.long, panned = press.pan; press = null;
+  if (e.type === 'pointercancel' || !h || long || panned || !G || G.paused || G.over) return;
   audioInit();
   if (h.bill) return collect(h.bill);
   if (h.L && !SET.auto && h.L.bill >= BILL_MIN) return collect(h.L);
   if (h.u) toggle(h.u); else openSheet(h);
-});
-wheel.addEventListener('pointercancel', () => { if (press) clearTimeout(press.timer); press = null; });
+}
+wheel.addEventListener('pointerup', pointerEnd);
+wheel.addEventListener('pointercancel', pointerEnd);
+wheel.addEventListener('wheel', e => { e.preventDefault(); const { x, y } = local(e); zoomAt(x, y, VW.z * Math.exp(-e.deltaY * .0015)); }, { passive: false });
 wheel.addEventListener('contextmenu', e => e.preventDefault());
 
 // ---------------------------------------------------------------- loop
@@ -1071,7 +1115,7 @@ const TUT = [
   { e: '🌀', h: 'Spinning up', hl: { hub: 1 }, done: () => Math.abs(G.f - G.f0) < .02,
     p: () => `Watch the plant accelerate the wheel up to <b>${G.f0} Hz</b>, the nominal frequency. Every generator in continental Europe turns in step at exactly this rate.` },
   { e: '🎯', h: 'Reading the wheel', dom: ['#chartWrap'], hl: { hub: 1 },
-    p: () => `The <b>orange dot</b> turns with the wheel; the <b>black arrow</b> turns at exactly ${G.f0} Hz. If they drift apart, the grid has been running slow or fast. The chart shows the last 90 seconds: keep the line inside the <b>green band</b> (${G.f0 - BAND} to ${G.f0 + BAND} Hz).` },
+    p: () => `The <b>orange dot</b> turns with the wheel; the <b>black arrow</b> turns at exactly ${G.f0} Hz. If they drift apart, the grid has been running slow or fast. The chart shows the last 90 seconds: keep the line inside the <b>green band</b> (${G.f0 - BAND} to ${G.f0 + BAND} Hz). Tip: <b>pinch</b> (or use the mouse wheel) to zoom in, drag to move around, and <b>⤢ 1×</b> zooms back out.` },
   { e: '🏘️', h: 'Your first customers', acts: [{ id: 'town', label: '🏘️ Connect a town (45 MW)', fn: () => tutLoad('city', 45) }], done: () => tl('city')?.conn >= 1,
     p: () => `Consumers are the <b>red brake pads inside</b> the wheel. Every home, motor and kettle drags on it. Connect a small town and watch the plant take the load.` },
   { e: '⚖️', h: 'Push equals drag', dom: ['#mix'], hl: { unit: 'hydro' },
@@ -1130,7 +1174,7 @@ function startTutorial() {
   ['over', 'pause', 'coach'].forEach(i => $(i).classList.add('hidden')); closeSheet();
   $('ticker').innerHTML = ''; tickQ.length = 0; tickCur = null;
   document.body.classList.add('tut');
-  show('game'); buildDock(); G.hold = false; renderRun(); tutEnter(0); updateHud();
+  show('game'); buildDock(); G.hold = false; renderRun(); resetView(); tutEnter(0); updateHud();
   try { history.pushState({ g: 1 }, ''); } catch {}
   wake();
 }
@@ -1198,7 +1242,7 @@ function startGame() {
   newGame(selCountry, selDiff);
   $('ticker').innerHTML = ''; tickQ.length = 0; tickCur = null;
   ['over', 'pause', 'coach'].forEach(i => $(i).classList.add('hidden')); closeSheet();
-  show('game'); buildDock(); G.hold = true; renderRun(); updateHud();
+  show('game'); buildDock(); G.hold = true; renderRun(); resetView(); updateHud();
   try { history.pushState({ g: 1 }, ''); } catch {}
   wake();
   if (!store.get('coached', false)) coach(0);

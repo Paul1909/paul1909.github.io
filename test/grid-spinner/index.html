@@ -105,6 +105,7 @@
   #wheel { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
   .v3 { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 4px; display: block; }
   .plabel { position: absolute; top: 5px; left: 8px; font: 700 9.5px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
+  #zoomReset { position: absolute; right: 6px; top: 6px; z-index: 3; min-height: 36px; padding: 0 10px; border-radius: 4px; background: var(--head); color: #fff; font: 700 12px var(--mono); }
   #holdTag { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); background: var(--head); color: #fff; font: 700 12px var(--mono);
     padding: 5px 10px; border-radius: 3px; pointer-events: none; white-space: nowrap; letter-spacing: .03em; }
 
@@ -336,6 +337,7 @@
   <div id="main">
     <div id="wheelWrap">
       <canvas id="wheel"></canvas>
+      <button id="zoomReset" class="hidden" aria-label="Reset zoom">⤢ 1×</button>
       <div id="holdTag" class="hidden">Clock stopped · press ▶ START</div>
       <div id="alarm" class="hidden"></div>
     </div>
@@ -470,6 +472,7 @@
       <li><b>Tap</b> a generator on the wheel to switch it on or off. <b>Long-press</b> for details or to scrap it.</li>
       <li>Build more with <b>+</b> on the cards. New assets arrive <b>disconnected</b>: tap them to connect them. Keep some idle as a reserve for emergencies.</li>
       <li>Consumers pay for every MWh you deliver.</li>
+      <li><b>Pinch</b> to zoom into the wheel or the 3D world (mouse wheel on a computer), drag to move around when zoomed, and tap <b>⤢ 1×</b> to zoom back out.</li>
       <li>Prices are real-world ballparks (build cost, yearly upkeep, fuel and CO₂). To make that playable, money runs on a yearly clock: one game day books a full year of bills, fuel and upkeep.</li>
       <li>Each new day brings more customers, wilder loads and more surprises.</li>
     </ul>

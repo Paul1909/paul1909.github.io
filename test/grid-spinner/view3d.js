@@ -320,8 +320,15 @@ export function create(wrap, api) {
     const halfW = worldR * 1.02, halfH = worldR * Math.sin(e) * 1.02 + 2.6 * Math.cos(e) + .4;
     let hw = halfW, hh = halfH;
     if (aspect > halfW / halfH) hw = hh * aspect; else hh = hw / aspect;
-    Object.assign(cam, { left: -hw, right: hw, top: hh, bottom: -hh }); cam.updateProjectionMatrix();
-    ppu = H / (2 * hh);
+    base = { hw, hh }; ppu = H / (2 * hh); applyView();
+  }
+  // zoom / pan from the 2D layer: screen point s shows the unzoomed point (s - offset) / zoom
+  let base = { hw: 10, hh: 10 }, view = { z: 1, x: 0, y: 0 };
+  function applyView() {
+    const { hw, hh } = base, z = view.z, L = -hw, T = hh, sx = 2 * hw / W, sy = 2 * hh / H;
+    cam.left = L + (-view.x / z) * sx; cam.right = L + ((W - view.x) / z) * sx;
+    cam.top = T - (-view.y / z) * sy; cam.bottom = T - ((H - view.y) / z) * sy;
+    cam.updateProjectionMatrix();
   }
   const v = new THREE.Vector3();
   function project(p, y) { v.set(p.x, y, p.z).project(cam); return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H }; }
@@ -329,6 +336,7 @@ export function create(wrap, api) {
   // ---------- per-frame update; returns screen positions for the 2D overlay and taps
   function frame(dt, G, w, h, opts) {
     resize(w, h);
+    if (opts.view && (opts.view.z !== view.z || opts.view.x !== view.x || opts.view.y !== view.y)) { view = { ...opts.view }; applyView(); }
     const time = performance.now() / 1000;
     // day and night
     const s = opts.sun, k = Math.min(1, s * 1.6);
@@ -340,7 +348,7 @@ export function create(wrap, api) {
     let far = 7.4; for (const p of gs.concat(ls)) far = Math.max(far, Math.hypot(p.x, p.z));
     const wr = far + 2.3; if (Math.abs(wr - worldR) > .01) { worldR += (wr - worldR) * Math.min(1, dt * 4 + (objs.size ? 0 : 1)); fit(); }
     ground.scale.set(worldR, 1, worldR); rim.scale.set(worldR, 1, worldR);
-    const seen = new Set(), out = { units: new Map(), loads: new Map(), hub: null, ppu };
+    const seen = new Set(), out = { units: new Map(), loads: new Map(), hub: null, ppu: ppu * view.z };
     const place = (o, p) => { o.tgt.copy(p); if (!o.placed) { o.g.position.copy(p); o.placed = true; } else o.g.position.lerp(p, Math.min(1, dt * 5)); };
     gens.forEach((u, i) => {
       const o = getObj('u' + u.id, u.type, false); seen.add(o.key); place(o, gs[i]);
@@ -394,13 +402,13 @@ export function create(wrap, api) {
     stepPuffs(dt);
     renderer.render(scene, cam);
     const hc = project(new THREE.Vector3(0, 0, 0), RY + .1);
-    out.hub = { x: hc.x, y: hc.y, lx: hc.x, ly: hc.y, r: RR * ppu };
-    out.ppu = ppu;
+    out.hub = { x: hc.x, y: hc.y, lx: hc.x, ly: hc.y, r: RR * ppu * view.z };
+    out.ppu = ppu * view.z;
     return out;
   }
   function proj(o) {
     const p = o.g.position, c = project(p, 1), t = project(p, MS * (o.isLoad ? 1.6 : (o.type === 'wind' ? 3.3 : o.type === 'nuclear' ? 2.7 : 1.9)));
-    return { x: c.x, y: c.y, lx: t.x, ly: t.y, r: 1.5 * ppu };
+    return { x: c.x, y: c.y, lx: t.x, ly: t.y, r: 1.5 * ppu * view.z };
   }
   function wireState(o, flow, on, dt, isLoad) {
     const w = o.wire; if (!w.curve) return;
