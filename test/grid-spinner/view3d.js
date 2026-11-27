@@ -4,7 +4,9 @@
 import * as THREE from './three.min.js';
 
 const ORDER = ['nuclear', 'ccgt', 'hydro', 'peaker', 'solar', 'wind', 'bess', 'flywheel'];
-const NEON = new THREE.Color('#38bdf8'), WIRE_OFF = new THREE.Color('#aab4c0');
+// Wire colours: green neon to generators, red neon to consumers (a battery's wire turns red while it charges)
+const NEON_GEN = new THREE.Color('#40e070'), NEON_LOAD = new THREE.Color('#ff4d5e'), WIRE_OFF = new THREE.Color('#aab4c0');
+const CORE_GEN = new THREE.Color('#2b8a3e'), CORE_LOAD = new THREE.Color('#c92a2a');
 const GREY = new THREE.Color('#b9c0c8');
 const MS = 1.3;   // model scale
 const easeOutBack = t => { const c = 1.7; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
@@ -239,9 +241,9 @@ export function create(wrap, api) {
   const pulseGeo = new THREE.SphereGeometry(.11, 8, 6);
   function makeWire(o) {
     const w = { core: null, glow: null, curve: null, pulses: [], key: '' };
-    w.coreMat = new THREE.MeshStandardMaterial({ color: '#1c7ed6', emissive: NEON, emissiveIntensity: 1, roughness: .3 });
-    w.glowMat = new THREE.MeshBasicMaterial({ color: NEON, transparent: true, opacity: .22, depthWrite: false });
-    for (let i = 0; i < 3; i++) { const p = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color: '#e7f5ff' })); p.userData.t = i / 3; scene.add(p); w.pulses.push(p); }
+    w.coreMat = new THREE.MeshStandardMaterial({ color: '#2b8a3e', emissive: NEON_GEN, emissiveIntensity: 1, roughness: .3 });
+    w.glowMat = new THREE.MeshBasicMaterial({ color: NEON_GEN, transparent: true, opacity: .22, depthWrite: false });
+    for (let i = 0; i < 3; i++) { const p = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color: '#ffffff' })); p.userData.t = i / 3; scene.add(p); w.pulses.push(p); }
     o.wire = w;
   }
   function layoutWire(o) {
@@ -395,9 +397,11 @@ export function create(wrap, api) {
   function wireState(o, flow, on, dt, isLoad) {
     const w = o.wire; if (!w.curve) return;
     const lit = Math.min(1, Math.abs(flow) * 1.5) * on;
-    w.coreMat.emissive.copy(WIRE_OFF).lerp(NEON, Math.min(1, on * 1.5)); w.coreMat.emissiveIntensity = .15 + 1.2 * lit;
-    w.coreMat.color.copy(WIRE_OFF).lerp(new THREE.Color('#1c7ed6'), on);
-    w.glowMat.opacity = .05 + .3 * lit;
+    const red = isLoad || flow < -.01, neon = red ? NEON_LOAD : NEON_GEN;
+    w.coreMat.emissive.copy(WIRE_OFF).lerp(neon, Math.min(1, on * 1.5)); w.coreMat.emissiveIntensity = .15 + 1.2 * lit;
+    w.coreMat.color.copy(WIRE_OFF).lerp(red ? CORE_LOAD : CORE_GEN, on);
+    w.glowMat.color.copy(neon); w.glowMat.opacity = .05 + .3 * lit;
+    for (const p of w.pulses) p.material.color.copy(neon).lerp(new THREE.Color('#ffffff'), .55);
     // pulses run towards the grid for producers, towards the asset for consumers and charging batteries
     const sp = .25 + Math.abs(flow) * .9, toHub = flow > 0;
     for (const p of w.pulses) {
