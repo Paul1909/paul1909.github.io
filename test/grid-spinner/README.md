@@ -19,6 +19,8 @@ The power grid as one giant shared rubber wheel. Its speed is the grid frequency
 - Learn page with an interactive push/drag demo, plus a short first-game coach.
 - Share ↗ on the game-over screen: recap picture plus link.
 
+Views: the spinning wheel (default) or, with **3D world view** on in Settings, an isometric three.js world (`view3d.js` + bundled `three.min.js` r187, loaded only when switched on): cute low-poly plants, batteries, houses, offices, data centre, factory, chargers, steel mill, railway and heat pumps, all joined by neon wires to a central grid node that shows the frequency. Nothing spins: build pops up, scrap sinks, on/off shows as lights, smoke, steam, water and energy pulses on the wires; day and night follow the game clock. Same rules, same taps.
+
 Controls: ▶ START / ⏸ PAUSE runs or stops the clock (a game starts stopped, so you can look around first). Tap a generator disc to switch it on/off, long-press for details. Each card has **+** (build one) and **−** (remove one: idle units go first, a running plant winds down and is then scrapped), so everything fits on a phone screen without scrolling. ☰ opens the menu: settings and the cash flow.
 
 Bills: with **Auto-collect bills** on (the default, in Settings) customers' payments go straight to your cash. Switch it off and each consumer runs up a bill; a green money tag appears from 2 M and you tap it (or the consumer) to cash in. Uncollected bills stop growing at 12 M.
@@ -29,6 +31,7 @@ Bills: with **Auto-collect bills** on (the default, in Settings) customers' paym
 |---|---|
 | `index.html` | Markup, styles, Learn page |
 | `game.js` | Simulation, drawing, menus, sound, share, service worker registration |
+| `view3d.js`, `three.min.js` | 3D world view (three.js r187, MIT) |
 | `sw.js` | Offline cache |
 | `manifest.webmanifest` | Install + fullscreen |
 | `icon*.png`, `icon.svg`, `apple-touch-icon.png` | Icons, made by `icons/make_icons.py` |

@@ -1,10 +1,12 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'grid-spinner';
-const VERSION = APP + '-v7';
+const VERSION = APP + '-v8';
 const FILES = [
   './',
   './index.html',
   './game.js',
+  './view3d.js',
+  './three.min.js',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',

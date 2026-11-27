@@ -120,11 +120,12 @@ const windCurve = v => v < 3 ? 0 : v >= 12 ? 1 : (v * v * v - 27) / (1728 - 27);
 // ---------------------------------------------------------------- state
 let G = null, uid = 0;
 // Settings: auto-collect bills (default on), sound, vibration.
-const SET = Object.assign({ auto: true, sound: !store.get('muted', false), vibe: store.get('vibe', true) }, store.get('settings', {}));
+const SET = Object.assign({ iso: false, auto: true, sound: !store.get('muted', false), vibe: store.get('vibe', true) }, store.get('settings', {}));
 function setSetting(k, v) {
   SET[k] = v; store.set('settings', SET);
   if (k === 'sound') { AU.muted = !v; if (v) audioInit(); }
   if (k === 'auto' && v && G) collectAll();
+  if (k === 'iso') applyView();
   syncSwitches();
 }
 function syncSwitches() { document.querySelectorAll('.switch[data-set]').forEach(b => { b.classList.toggle('on', !!SET[b.dataset.set]); b.setAttribute('aria-pressed', !!SET[b.dataset.set]); }); }
@@ -535,7 +536,7 @@ function build(type) {
   if (!G.tut) G.cash -= cost;
   G.stats.built++; G.stats.spent += cost; if (CLEAN[type]) G.stats.cleanBuilt++;
   addUnit(type, false, false);   // new assets arrive disconnected: tap them on the wheel to connect
-  toast(G.tut ? `${T.name} built (free in the tutorial) · tap it on the wheel to connect` : `${T.name} built (−${fmtMoney(cost)}) · tap it on the wheel to connect`);
+  toast(G.tut ? `${T.name} built (free in the tutorial) · tap it to connect` : `${T.name} built (−${fmtMoney(cost)}) · tap it to connect`);
   if (G.tut) TUT[G.tut.i].onBuild?.(type);
   sfx('build'); buzz(15);
 }
@@ -626,7 +627,81 @@ function label(ctx, txt, x, y, size) {
   ctx.strokeText(txt, x, y); ctx.fillStyle = TH.ink; ctx.fillText(txt, x, y);
 }
 
+// ---------------------------------------------------------------- 3D world view (loaded only when switched on)
+let V3 = null, V3loading = false, V3failed = false;
+function applyView() {
+  if (SET.iso && !V3 && !V3loading && !V3failed) {
+    V3loading = true;
+    import('./view3d.js').then(m => { V3 = m.create($('wheelWrap')); V3loading = false; V3.setVisible(SET.iso); })
+      .catch(() => { V3loading = false; V3failed = true; SET.iso = false; syncSwitches(); toast('3D view is not available on this device'); });
+  }
+  if (V3) V3.setVisible(!!SET.iso);
+}
+function pill(ctx, x, y, txt, col, fs, bg) {
+  ctx.font = `800 ${fs}px ${MONO}`; const w = ctx.measureText(txt).width + fs * .9, h = fs * 1.55;
+  ctx.fillStyle = bg || 'rgba(255,255,255,.92)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - h / 2, w, h, 3) : ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, y + 1);
+  return w;
+}
+function drawIso(dt) {
+  [W, H] = fitCanvas(wheel, wctx);
+  const ctx = wctx, g = G, df = g.f - g.f0;
+  ctx.clearRect(0, 0, W, H);
+  const P = V3.frame(dt, g, W, H, { sun: sunAt(g.hour) * g.cloudHit * (.6 + .4 * g.cloud), status: statusColor(df), alarm: g.alarm > 0 && Math.abs(df) > BAND });
+  hits = [];
+  const fs = clamp(P.ppu * .36, 9, 15) * (UIK > 1 ? Math.min(UIK, 1.4) : 1);
+  // generators: code + output, or their state
+  for (const u of g.units) {
+    const p = P.units.get(u.id); if (!p) continue;
+    const T = u.T, idle = T.kind === 'sync' ? (!u.engaged && u.level <= 0) : !u.engaged;
+    const txt = u.repair > 0 ? `${T.code} TRIP ${Math.ceil(u.repair)}s` : u.trip > 0 ? `${T.code} OFF ${Math.ceil(u.trip)}s` : idle ? `${T.code} idle`
+      : T.kind === 'sync' && u.level < 1 && u.engaged ? `${T.code} ${Math.round(u.level * 100)}%` : `${T.code} ${(T.kind === 'bess' || T.kind === 'fly') && u.P > .5 ? '+' : ''}${Math.round(u.P)}`;
+    ctx.globalAlpha = idle ? .75 : 1;
+    pill(ctx, p.lx, p.ly, txt, u.repair > 0 || u.trip > 0 ? TH.bad : idle ? TH.muted : T.color, fs);
+    ctx.globalAlpha = 1;
+    hits.push({ x: p.x, y: p.y, r: p.r, u });
+  }
+  // consumers: code + demand, money tags
+  for (const L of g.loads) {
+    const p = P.loads.get(L.id); if (!p) continue;
+    const w = pill(ctx, p.lx, p.ly, `${L.D.code} ${Math.round(L.P)}`, L.off > 0 ? TH.muted : TH.bad, fs);
+    L.hx = p.lx; L.hy = p.ly;
+    hits.push({ x: p.x, y: p.y, r: p.r, L });
+    if (!SET.auto && L.bill >= BILL_MIN) {
+      const br = Math.max(11, fs * 1.05), bx = p.lx + w / 2 + br * .9, by = p.ly - br * .6, full = L.bill >= BILL_CAP - 1;
+      ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fillStyle = full ? TH.warn : TH.ok; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(br * (g.C.cur === 'CHF' ? .62 : 1.05))}px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(g.C.cur === 'CHF' ? 'CHF' : '€', bx, by + 1);
+      hits.push({ x: bx, y: by, r: br + 10, bill: L });
+    }
+  }
+  // the grid node: frequency readout
+  const hp = P.hub, col = statusColor(df), hfs = clamp(P.ppu * .7, 14, 40) * (UIK > 1 ? Math.min(UIK, 1.3) : 1);
+  ctx.font = `800 ${hfs}px ${MONO}`; const tw = ctx.measureText('00.00 Hz').width + hfs * .8, th = hfs * 1.9;
+  const bx = hp.lx - tw / 2, by = hp.ly - th;
+  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, tw, th, 5) : ctx.rect(bx, by, tw, th); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = TH.muted; ctx.font = `700 ${Math.round(hfs * .32)}px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('GRID FREQUENCY', hp.lx, by + hfs * .16);
+  ctx.fillStyle = col; ctx.font = `800 ${hfs}px ${MONO}`; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(`${fmtHz(g.f)} Hz`, hp.lx, by + th - hfs * .3);
+  if (g.alarm > 0) { ctx.fillStyle = TH.bad; ctx.fillRect(bx, by + th - 4, tw * Math.min(1, g.alarm / g.D.grace), 4); }
+  hits.push({ x: hp.x, y: hp.y, r: hp.r, hub: true });
+  hits.push({ x: hp.lx, y: by + th / 2, r: th * .7, hub: true });
+  // tutorial highlight
+  if (g.tut) tutRings(ctx);
+  // collected-money floats
+  g.floats = g.floats.filter(f => (f.t += Math.max(dt, 1 / 60)) < 1.4);
+  for (const f of g.floats) {
+    ctx.globalAlpha = 1 - f.t / 1.4; ctx.font = `800 ${Math.round(fs * 1.3)}px ${MONO}`; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText(f.txt, f.x, f.y - 20 - f.t * 40); ctx.fillStyle = TH.ok; ctx.fillText(f.txt, f.x, f.y - 20 - f.t * 40);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawWheel(dt) {
+  if (SET.iso && V3) return drawIso(dt);
   [W, H] = fitCanvas(wheel, wctx);
   const ctx = wctx, g = G, df = g.f - g.f0;
   ctx.clearRect(0, 0, W, H);
@@ -993,7 +1068,7 @@ const TUT = [
   { e: '🎡', h: 'Meet the grid', hl: { hub: 1 },
     p: () => `This big rubber disc is the power grid. How fast it spins is the grid <b>frequency</b>, shown in the middle. Nothing drives it yet, so it stands still at <b>0 Hz</b>.` },
   { e: '💧', h: 'Build your first power plant', dock: ['hydro'], hl: { unit: 'hydro' }, done: () => !!tu('hydro')?.engaged,
-    p: () => `Press <b>+</b> on the <b>Hydro</b> card. New assets arrive <b>disconnected</b>: a grey disc standing back from the wheel, not spinning. Then <b>tap it on the wheel</b> to connect it. Its disc presses on the big wheel from outside, like a friction drive.` },
+    p: () => `Press <b>+</b> on the <b>Hydro</b> card. New assets arrive <b>disconnected</b>: a grey disc standing back from the wheel, not spinning. Then <b>tap it</b> to connect it. Its disc presses on the big wheel from outside, like a friction drive.` },
   { e: '🌀', h: 'Spinning up', hl: { hub: 1 }, done: () => Math.abs(G.f - G.f0) < .02,
     p: () => `Watch the plant accelerate the wheel up to <b>${G.f0} Hz</b>, the nominal frequency. Every generator in continental Europe turns in step at exactly this rate.` },
   { e: '🎯', h: 'Reading the wheel', dom: ['#chartWrap'], hl: { hub: 1 },
@@ -1006,12 +1081,12 @@ const TUT = [
     done: () => tl('office')?.conn >= 1 && G.f < G.f0 - .1,
     p: () => `Connect some offices. The hydro plant is nearly flat out, so the wheel will <b>slow down</b>. Outside the green band an alarm counts down to blackout (in the tutorial nothing breaks).` },
   { e: '🔥', h: 'Gas peaker to the rescue', dock: ['peaker'], hl: { unit: 'peaker' }, done: () => tu('peaker')?.level >= 1 && inBand(),
-    p: () => `Build a <b>Gas peaker</b> with <b>+</b>, then <b>tap it on the wheel</b> to connect it. An open-cycle gas turbine, basically a jet engine: full power in about <b>4 s</b>, but its fuel and CO₂ are pricey. Your emergency button.` },
+    p: () => `Build a <b>Gas peaker</b> with <b>+</b>, then <b>tap it</b> to connect it. An open-cycle gas turbine, basically a jet engine: full power in about <b>4 s</b>, but its fuel and CO₂ are pricey. Your emergency button.` },
   { e: '🏭', h: 'Gas CCGT: the workhorse', dock: ['ccgt'], hl: { unit: 'ccgt' }, done: () => tu('ccgt')?.level >= 1,
     onConnect: t => { if (t === 'ccgt' && !tl('data')) tutLoad('data', 85, TYPES.ccgt.ramp); },
     p: () => `A data centre wants 85 MW. Build a <b>Gas CCGT</b> and tap it to connect it (combined cycle: a gas turbine plus a steam turbine). Cheaper fuel and more spinning mass than the peaker, but it needs <b>14 s</b> to warm up: watch the dashed ring. The data centre connects as it ramps.` },
   { e: '✋', h: 'Switching plants on and off', hl: { unit: 'peaker' }, done: () => tu('peaker') && !tu('peaker').engaged && tu('peaker').level <= 0,
-    p: () => `<b>Tap</b> a generator on the wheel to switch it on or off. Idle ones turn grey and back off the wheel. <b>Long-press</b> one for its details. The <b>−</b> on a card removes one for good. Try it: tap the <b>gas peaker</b> to switch it off. The wheel slows a little, and the other plants push harder by themselves.` },
+    p: () => `<b>Tap</b> a generator to switch it on or off. Idle ones turn grey and back off the wheel. <b>Long-press</b> one for its details. The <b>−</b> on a card removes one for good. Try it: tap the <b>gas peaker</b> to switch it off. The wheel slows a little, and the other plants push harder by themselves.` },
   { e: '⚛️', h: 'Nuclear (just a look)', dom: ['.card[data-t=nuclear]'],
     p: () => `Not for this small grid, but good to know: <b>250 MW</b>, a <b>45 s</b> spin-up, the heaviest rotor of all (most inertia), cheap fuel, no CO₂ and a huge build cost: ideal base load. Whether you may build one depends on the country. ${G.C.nukeLock ? G.C.name + ': ' + G.C.nukeLock : 'France may build new reactors.'}` },
   { e: '🌤️', h: 'Weather and forecast', dom: ['#wx'],
@@ -1178,7 +1253,7 @@ function coachSteps() {
     ['', 'This wheel is the grid', `Its speed is the frequency, shown in the middle. Keep it at ${f0} Hz, inside the green band of the chart. New to this? The Tutorial on the menu walks you through every piece.`],
     ['', 'Outside: generators push', 'Tap one to switch it on or off. Grey ones are idle. They take time to spin up (nuclear takes ages). Long-press for details.'],
     ['', 'Inside: consumers drag', "Homes, offices, factories. You can't control them: some are steady, some are wild. When morning comes, demand climbs fast."],
-    ['', 'Build with + and −', 'Each card at the bottom builds (+) or removes (−) a plant, wind or solar farm, battery or flywheel. New assets arrive disconnected: tap them on the wheel to connect them, and keep some idle as a reserve. Consumers pay their bills to finance you.'],
+    ['', 'Build with + and −', 'Each card at the bottom builds (+) or removes (−) a plant, wind or solar farm, battery or flywheel. New assets arrive disconnected: tap them to connect them, and keep some idle as a reserve. Consumers pay their bills to finance you.'],
     ['', 'Your mission', `Phase out the gas plants. Replace them with wind, solar, hydro and batteries, plus nuclear for base load where ${G ? G.C.name : 'the country'} allows it. The green line under the chart shows the next step and your clean share. The CO₂ price rises every day.`],
     ['', "Don't let it stop", `Outside the green band an alarm counts down to blackout. Hit ${f0 - 1} Hz and the grid sheds load instantly. The clock starts when you press ▶ START. How long can you last?`],
   ];
@@ -1404,3 +1479,4 @@ let wakeLock = null;
 async function wake() { try { if (navigator.wakeLock && (!wakeLock || wakeLock.released)) wakeLock = await navigator.wakeLock.request('screen'); } catch {} }
 
 renderMenu();
+applyView();

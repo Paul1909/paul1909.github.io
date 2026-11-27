@@ -103,6 +103,7 @@
   #mix { order: 4; flex: none; }
   #dock { order: 5; flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
   #wheel { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .v3 { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 4px; display: block; }
   .plabel { position: absolute; top: 5px; left: 8px; font: 700 9.5px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
   #holdTag { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); background: var(--head); color: #fff; font: 700 12px var(--mono);
     padding: 5px 10px; border-radius: 3px; pointer-events: none; white-space: nowrap; letter-spacing: .03em; }
@@ -308,6 +309,7 @@
 
     <div class="label">Settings</div>
     <div class="settings">
+      <div class="setting"><span>3D world view<small>Off: the spinning-wheel view</small></span><button class="switch" data-set="iso" aria-label="3D world view"></button></div>
       <div class="setting"><span>Auto-collect bills<small>Off: tap the money tags on consumers to cash in</small></span><button class="switch" data-set="auto" aria-label="Auto-collect bills"></button></div>
       <div class="setting"><span>Sound</span><button class="switch" data-set="sound" aria-label="Sound"></button></div>
       <div class="setting"><span>Vibration</span><button class="switch" data-set="vibe" aria-label="Vibration"></button></div>
@@ -366,6 +368,7 @@
   <div class="box">
     <h2>Menu</h2>
     <div class="settings">
+      <div class="setting"><span>3D world view<small>Off: the spinning-wheel view</small></span><button class="switch" data-set="iso" aria-label="3D world view"></button></div>
       <div class="setting"><span>Auto-collect bills<small>Off: tap the money tags on consumers to cash in</small></span><button class="switch" data-set="auto" aria-label="Auto-collect bills"></button></div>
       <div class="setting"><span>Sound</span><button class="switch" data-set="sound" aria-label="Sound"></button></div>
       <div class="setting"><span>Vibration</span><button class="switch" data-set="vibe" aria-label="Vibration"></button></div>
@@ -453,6 +456,9 @@
     <p>Every grid starts with gas plants. Your job is to phase them out: build wind, solar, hydro and batteries, plus nuclear for base load where the country allows it, and switch the gas plants off and scrap them, without letting the frequency leave the band. The <b>clean share</b> counts the energy from hydro, nuclear, wind and solar over the last 24 game hours (batteries only shift energy, so they're left out). Each mission step pays a green subsidy, and the CO₂ price goes up every day, so gas gets more expensive the longer you wait. Run a full day without burning gas, with every fossil plant gone, and the mission is complete.</p>
     <p>New nuclear: France may build it. Switzerland keeps its existing plant, but new ones still await a public vote. Italy passed a law in 2026 to bring nuclear back with small modular reactors, not expected before the 2030s. Germany closed its last reactors in 2023.</p>
 
+    <h3>Two ways to look at it</h3>
+    <p>The default view is the spinning wheel. Switch on <b>3D world view</b> in Settings to see the same grid as a little isometric world instead: every plant, battery and consumer is a small model, joined by neon wires to one central node, the grid, where you read the frequency. Energy pulses run along the wires (towards the grid from producers, out to consumers and charging batteries). The rules are exactly the same.</p>
+
     <h3>When it goes wrong</h3>
     <p>If the frequency keeps falling, grids protect themselves by switching off whole areas of customers on purpose (automatic load shedding), starting around 49 Hz in Europe. Too fast or too slow for too long, and generators disconnect to protect themselves, which makes things worse. That cascade is a blackout.</p>
 
@@ -462,7 +468,7 @@
       <li>Outside the band an alarm counts down. Get back in time, or it's a blackout.</li>
       <li>Hit ±1 Hz (49 Hz or 51 Hz) and it's an instant blackout.</li>
       <li><b>Tap</b> a generator on the wheel to switch it on or off. <b>Long-press</b> for details or to scrap it.</li>
-      <li>Build more with <b>+</b> on the cards. New assets arrive <b>disconnected</b>: tap them on the wheel to connect them. Keep some idle as a reserve for emergencies.</li>
+      <li>Build more with <b>+</b> on the cards. New assets arrive <b>disconnected</b>: tap them to connect them. Keep some idle as a reserve for emergencies.</li>
       <li>Consumers pay for every MWh you deliver.</li>
       <li>Prices are real-world ballparks (build cost, yearly upkeep, fuel and CO₂). To make that playable, money runs on a yearly clock: one game day books a full year of bills, fuel and upkeep.</li>
       <li>Each new day brings more customers, wilder loads and more surprises.</li>
