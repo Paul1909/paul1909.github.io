@@ -1,5 +1,9 @@
 # Grid Spinner
 
+**Mission: phase out fossil fuels.** Every grid starts with gas plants; replace them with wind, solar, hydro and batteries, plus nuclear for base load where the country allows it (new nuclear only in France; Switzerland keeps its existing plant), without letting the grid fall over. Six mission steps (first clean build, clean share 50 / 75 / 90 % over 24 h, last fossil plant scrapped, 24 h without gas) pay green subsidies; the CO₂ price rises every day. Completing the mission shows a FOSSIL-FREE screen with share and keep-playing.
+
+New assets arrive **disconnected** (grey, not spinning): tap them on the wheel to connect them, and keep some idle as a reserve for emergencies.
+
 The power grid as one giant shared rubber wheel. Its speed is the grid frequency (50 Hz). Generators are smaller discs pressing on it from outside, consumers are brake pads on the inside. Keep it in the ±0.2 Hz band as long as you can. Works offline once opened, installs as a fullscreen phone app.
 
 - 4 grids: Switzerland (money in MCHF), Italy, Germany, France (MEUR), each with its own mix, weather and a starting fleet.

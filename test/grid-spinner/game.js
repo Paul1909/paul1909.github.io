@@ -78,20 +78,23 @@ const LOAD_ERRATIC = { steel: 1, rail: 1, factory: 1, ev: 1 };
 const COUNTRIES = [
   { id: 'ch', nb: 150, cur: 'CHF', fx: .93, flag: '🇨🇭', name: 'Switzerland', hz: 50, sun: .85, wind: .9, windMean: 5.5, hydroMax: 10,
     types: ['peaker', 'hydro', 'ccgt', 'nuclear', 'solar', 'wind', 'bess', 'flywheel'],
-    start: [['nuclear', 1], ['hydro', 1], ['hydro', 1], ['hydro', 1], ['hydro', 0], ['hydro', 0], ['solar', 1]],
-    tag: 'Alpine hydro + nuclear', fact: 'Hydropower from the Alps makes more than half of Swiss electricity, and the Swiss grid spins in sync with the rest of continental Europe.' },
+    start: [['nuclear', 1], ['hydro', 1], ['hydro', 1], ['ccgt', 1], ['solar', 1], ['hydro', 0], ['peaker', 0]],
+    nukeLock: 'No new nuclear plants yet: the ban dates from 2018. Parliament voted in 2026 to lift it, but voters still have the last word. You keep the existing plant.',
+    tag: 'Hydro + nuclear · new nuclear on hold', fact: 'Hydropower from the Alps makes more than half of Swiss electricity, and the Swiss grid spins in sync with the rest of continental Europe.' },
   { id: 'it', nb: 120, flag: '🇮🇹', name: 'Italy', hz: 50, sun: 1.2, wind: .9, windMean: 6.5, hydroMax: 5, noNuke: true, hot: true,
-    types: ['peaker', 'hydro', 'ccgt', 'solar', 'wind', 'bess', 'flywheel'],
+    types: ['peaker', 'hydro', 'ccgt', 'nuclear', 'solar', 'wind', 'bess', 'flywheel'],
     start: [['ccgt', 1], ['ccgt', 1], ['ccgt', 1], ['hydro', 1], ['peaker', 0], ['peaker', 0], ['solar', 1], ['solar', 1]],
-    tag: 'Gas + strong sun', fact: 'Italy closed its nuclear plants after the 1987 referendum. Gas does the heavy lifting, and the southern sun is pushing solar up fast.' },
+    nukeLock: 'No nuclear yet: a 2026 law opens the door to small modular reactors, but the first units are not expected before the 2030s.',
+    tag: 'Gas-heavy, strong sun · no nuclear', fact: 'Italy closed its nuclear plants after the 1987 referendum. Gas does the heavy lifting, and the southern sun is pushing solar up fast.' },
   { id: 'de', nb: 150, flag: '🇩🇪', name: 'Germany', hz: 50, sun: .9, wind: 1, windMean: 8.5, hydroMax: 2, noNuke: true,
-    types: ['peaker', 'hydro', 'ccgt', 'solar', 'wind', 'bess', 'flywheel'],
+    types: ['peaker', 'hydro', 'ccgt', 'nuclear', 'solar', 'wind', 'bess', 'flywheel'],
     start: [['ccgt', 1], ['ccgt', 1], ['hydro', 1], ['wind', 1], ['wind', 1], ['solar', 1], ['solar', 1], ['bess', 1], ['peaker', 0], ['peaker', 0]],
-    tag: 'Wind + sun, little inertia', fact: 'Germany shut its last nuclear plants in April 2023. Wind and sun lead the mix, so keeping enough spinning mass is a real engineering topic.' },
+    nukeLock: 'No nuclear: Germany shut its last reactors in April 2023 and is not building new ones.',
+    tag: 'Wind + sun · no nuclear', fact: 'Germany shut its last nuclear plants in April 2023. Wind and sun lead the mix, so keeping enough spinning mass is a real engineering topic.' },
   { id: 'fr', nb: 130, flag: '🇫🇷', name: 'France', hz: 50, sun: .95, wind: 1, windMean: 7.5, hydroMax: 5,
     types: ['peaker', 'hydro', 'ccgt', 'nuclear', 'solar', 'wind', 'bess', 'flywheel'],
-    start: [['nuclear', 1], ['hydro', 1], ['hydro', 1], ['wind', 1], ['solar', 1], ['ccgt', 0], ['peaker', 0]],
-    tag: 'Nuclear giant', fact: 'Roughly two thirds of French electricity is nuclear: big, heavy, steady machines. Great inertia, slow to change.' },
+    start: [['nuclear', 1], ['hydro', 1], ['ccgt', 1], ['wind', 1], ['solar', 1], ['ccgt', 0], ['peaker', 0]],
+    tag: 'Nuclear giant · may build new reactors', fact: 'Roughly two thirds of French electricity is nuclear: big, heavy, steady machines. Great inertia, slow to change.' },
 ];
 const DIFFS = {
   easy:   { name: 'Calm', grace: 14, E: .6, eventGap: 75, loadGap: 95, loads: ['city', 'office', 'data'] },
@@ -140,7 +143,8 @@ function newGame(cid, did, tut) {
     nextEvent: 60, nextLoad: 75 + rand(-10, 10), announced: null,
     alarm: 0, nbP: 0, over: false, hold: false, floats: [], paused: false, theta: 0, thetaRef: 0,
     rate: { rev: 0, fuel: 0, maint: 0, pen: 0 }, supply: 0, demand: 0, inertia: 0,
-    stats: { minF: C.hz, maxF: C.hz, peak: 0, built: 0, events: 0, spent: 0, earned: 0 },
+    stats: { minF: C.hz, maxF: C.hz, peak: 0, built: 0, events: 0, spent: 0, earned: 0, cleanBuilt: 0 },
+    eh: {}, ms: {}, won: false, co2: 1, mix: { share: 0, full: false, fossil24: 0 },
   };
   uid = 0;
   if (tut) { G.tut = { i: 0, t: 0, wind: 9, cloud: 1, used: {} }; G.scale = 1; G.wind = 9; G.cloud = .95; ensurePlan(G.hour); layoutDirty = true; return; }
@@ -245,7 +249,7 @@ function step(dt) {
         M += T.inertia;
       } else u.droopP = 0;
       u.P = clamp(u.level * (T.cap - reserve + u.droopP), 0, T.cap);
-      fuel += u.P * dH * YEAR * T.fuel * (T.gas ? g.fuelMul : 1);
+      fuel += u.P * dH * YEAR * T.fuel * (T.gas ? g.fuelMul * g.co2 : 1);
     } else if (T.kind === 'solar' || T.kind === 'wind') {
       if (u.trip > 0) { u.trip -= dt; if (u.trip <= 0) u.tripWhy = ''; }
       let tgt = 0;
@@ -295,6 +299,9 @@ function step(dt) {
   const k = Math.min(1, dt / 1.5), r = g.rate;
   r.rev += (rev / dt - r.rev) * k; r.fuel += (fuel / dt - r.fuel) * k; r.maint += (maint / dt - r.maint) * k; r.pen += (pen / dt - r.pen) * k;
 
+  // energy by source, per game hour, for the clean share (storage is left out: it only shifts energy)
+  const ek = Math.floor(g.hour), eb = g.eh[ek] || (g.eh[ek] = { c: 0, f: 0 });
+  for (const u of g.units) if (u.P > 0) { if (FOSSIL[u.type]) eb.f += u.P * dH; else if (CLEAN[u.type]) eb.c += u.P * dH; }
   record(g, dt, load);
   const d2 = g.f - f0;
 
@@ -329,7 +336,8 @@ const gap = base => Math.max(14, base * Math.pow(.85, G.day - 1) * rand(.7, 1.3)
 
 function newDay() {
   for (const L of G.loads) L.grow *= 1.04;
-  ticker(`🌅 Day ${G.day}`, 'Demand grows, loads get wilder, surprises come faster.', 'info');
+  G.co2 = 1 + .1 * (G.day - 1);
+  ticker(`Day ${G.day}: the CO₂ price goes up again`, `Gas plants now cost ${Math.round((G.co2 - 1) * 100)} % more to run. Demand grows, loads get wilder, surprises come faster.`, 'info');
   sfx('day');
 }
 
@@ -456,6 +464,56 @@ function connectLoad() {
   ticker(`🔌 ${L.D.emoji} ${L.D.name} connects`, L.D.kind[0].toUpperCase() + L.D.kind.slice(1) + '.', 'info');
 }
 
+// ---------------------------------------------------------------- mission: phase out fossil fuels
+const FOSSIL = { peaker: 1, ccgt: 1 }, CLEAN = { hydro: 1, nuclear: 1, solar: 1, wind: 1 };
+const MISSION = [
+  { id: 'build', h: 'Build a new clean plant (hydro, solar, wind or nuclear)', bonus: 20e6, test: () => G.stats.cleanBuilt > 0 },
+  { id: 's50', h: 'Clean share above 50 % over the last 24 h', bonus: 40e6, test: () => G.mix.full && G.mix.share >= .5 },
+  { id: 's75', h: 'Clean share above 75 % over the last 24 h', bonus: 60e6, test: () => G.mix.full && G.mix.share >= .75 },
+  { id: 's90', h: 'Clean share above 90 % over the last 24 h', bonus: 80e6, test: () => G.mix.full && G.mix.share >= .9 },
+  { id: 'scrap', h: 'Scrap your last fossil plant', bonus: 100e6, test: () => !G.units.some(u => FOSSIL[u.type]) },
+  { id: 'free', h: 'Run 24 h without burning any gas', bonus: 0, final: true, test: () => G.mix.full && G.mix.fossil24 < .5 && !G.units.some(u => FOSSIL[u.type]) },
+];
+function updateMix() {
+  const g = G, k = Math.floor(g.hour); let c = 0, f = 0;
+  for (let i = k - 23; i <= k; i++) { const e = g.eh[i]; if (e) { c += e.c; f += e.f; } }
+  g.mix.share = c + f > 0 ? c / (c + f) : 0; g.mix.fossil24 = f; g.mix.full = g.hour - 6 >= 24;
+}
+function checkMission() {
+  const g = G; if (g.tut || g.over) return;
+  updateMix();
+  for (const m of MISSION) {
+    if (g.ms[m.id] || !m.test()) continue;
+    g.ms[m.id] = true;
+    if (m.final) { missionComplete(); continue; }
+    g.cash += m.bonus;
+    ticker(`Mission step done: ${m.h}`, `Green subsidy: +${fmtMoney(m.bonus)}.`, 'good'); sfx('day');
+  }
+  const done = MISSION.filter(m => g.ms[m.id]).length, next = MISSION.find(m => !g.ms[m.id]);
+  $('missionN').textContent = `MISSION ${done}/${MISSION.length}`;
+  $('missionTxt').textContent = next ? `${next.h} · clean ${Math.round(g.mix.share * 100)} %${g.mix.full ? '' : ' so far'}` : `Fossil-free! Clean ${Math.round(g.mix.share * 100)} %`;
+}
+function missionList() {
+  return MISSION.map(m => `<li class="${G.ms[m.id] ? 'ok' : ''}">${G.ms[m.id] ? '✓' : '○'} ${m.h}${m.bonus ? ` <small>+${fmtMoney(m.bonus)}</small>` : ''}</li>`).join('');
+}
+function missionComplete() {
+  const g = G; g.won = true; g.hold = true; renderRun(); closeSheet();
+  const hrs = g.hour - 6, key = `win:${g.C.id}:${g.did}`, best = store.get(key, 0), isBest = !best || hrs < best;
+  if (isBest) store.set(key, hrs);
+  g.endTitle = 'FOSSIL-FREE';
+  sfx('day'); buzz([40, 40, 40]);
+  $('overH').textContent = 'FOSSIL-FREE'; $('overH').classList.add('win');
+  $('overReason').textContent = `You ran the ${g.C.name} grid for a full day without burning gas, and every fossil plant is gone. Mission complete.`;
+  $('overTime').textContent = survived();
+  $('overBest').textContent = isBest ? '🏆 Fastest phase-out on this grid!' : `Fastest on this grid: ${fmtHours(best)}`;
+  fillOverStats();
+  $('keepBtn').classList.remove('hidden'); $('againBtn').classList.add('hidden');
+  $('over').classList.remove('hidden');
+  requestAnimationFrame(drawOverChart);
+  recap = buildRecap();
+}
+$('keepBtn').addEventListener('click', () => { $('over').classList.add('hidden'); ticker('Keep the grid fossil-free and stable as long as you can.', 'The days keep getting harder.', 'info'); });
+
 // ---------------------------------------------------------------- player actions
 function collect(L, quiet) {
   if (!L.bill) return 0;
@@ -467,16 +525,17 @@ function collectAll() { for (const L of G.loads) collect(L, true); }
 function build(type) {
   if (!G || G.over) return;
   if (G.tut && !tutAllows(type)) return toast('Follow the tutorial: use the highlighted card');
-  const T = TYPES[type], cost = T.capex + (T.start || 0);
+  if (type === 'nuclear' && G.C.nukeLock) return toast(G.C.nukeLock);
+  const T = TYPES[type], cost = T.capex;
   const count = G.units.filter(u => u.type === type).length;
   const max = type === 'hydro' ? G.C.hydroMax : T.max;
   if (G.units.length >= MAX_GENS) return toast('The wheel is full: scrap something first');
   if (count >= max) return toast(type === 'hydro' ? `No more good valleys for dams in ${G.C.name}` : `Max ${max} × ${T.name}`);
   if (!G.tut && G.cash < cost) return toast(`Need ${fmtMoney(cost)} to build ${T.name}`);
   if (!G.tut) G.cash -= cost;
-  G.stats.built++; G.stats.spent += cost;
-  addUnit(type, true, false);
-  toast(G.tut ? `Building ${T.name} (free in the tutorial)` : `Building ${T.name} (−${fmtMoney(cost)})`);
+  G.stats.built++; G.stats.spent += cost; if (CLEAN[type]) G.stats.cleanBuilt++;
+  addUnit(type, false, false);   // new assets arrive disconnected: tap them on the wheel to connect
+  toast(G.tut ? `${T.name} built (free in the tutorial) · tap it on the wheel to connect` : `${T.name} built (−${fmtMoney(cost)}) · tap it on the wheel to connect`);
   if (G.tut) TUT[G.tut.i].onBuild?.(type);
   sfx('build'); buzz(15);
 }
@@ -490,6 +549,7 @@ function toggle(u) {
     if (!G.tut) G.cash -= T.start;
   }
   u.engaged = !u.engaged;
+  if (u.engaged && G.tut) TUT[G.tut.i].onConnect?.(u.type);
   if (T.kind === 'sync') toast(u.engaged ? `${T.emoji} ${T.name} ${u.n} spinning up (${T.ramp} s)` : `${T.emoji} ${T.name} ${u.n} winding down`);
   else toast(`${T.emoji} ${T.name} ${u.n} ${u.engaged ? 'connected' : 'disconnected'}`);
   sfx(u.engaged ? 'on' : 'off'); buzz(12);
@@ -762,6 +822,7 @@ function buildDock() {
     b.innerHTML = `<span class="nm">${T.name}</span><span class="sb">${sub}</span><span class="x">upkeep ${fmtMoney(T.maint)}/yr</span><span class="p">${fmtMoney(T.capex)}</span>
       <div class="pm"><button class="minus" aria-label="Remove one ${T.name}">−</button><span class="n">0</span><button class="plus" aria-label="Build a ${T.name}">+</button></div>`;
     b.title = `${T.name}: ${T.desc}`;
+    if (type === 'nuclear' && G.C.nukeLock) { b.querySelector('.sb').textContent = 'not allowed'; b.querySelector('.p').textContent = 'locked'; b.addEventListener('click', e => { if (!e.target.closest('.minus')) toast(G.C.nukeLock); }); }
     b.querySelector('.plus').addEventListener('click', () => build(type));
     b.querySelector('.minus').addEventListener('click', () => removeOne(type));
     dock.appendChild(b);
@@ -786,7 +847,9 @@ function updateHud() {
   // dock
   for (const c of $('dock').children) {
     const t = c.dataset.t, T = TYPES[t], cnt = g.units.filter(u => u.type === t).length, max = t === 'hydro' ? g.C.hydroMax : T.max;
-    const canBuild = g.tut ? tutAllows(t) : (g.cash >= T.capex + (T.start || 0) && cnt < max && g.units.length < MAX_GENS);
+    const locked = t === 'nuclear' && !!g.C.nukeLock;
+    const canBuild = !locked && (g.tut ? tutAllows(t) : (g.cash >= T.capex && cnt < max && g.units.length < MAX_GENS));
+    c.classList.toggle('lock', locked);
     c.querySelector('.plus').disabled = !canBuild; c.querySelector('.minus').disabled = !cnt || !!g.tut;
     c.classList.toggle('na', !!g.tut && !tutAllows(t));
     c.querySelector('.n').textContent = cnt;
@@ -800,7 +863,7 @@ function updateHud() {
   if (sheetFor) renderSheet();
   pumpTicker(false);
   renderWx();
-  if (G.tut) tutTick();
+  if (G.tut) { tutTick(); $('missionN').textContent = 'MISSION'; $('missionTxt').textContent = 'Phase out fossil fuels (starts in a real game)'; } else checkMission();
 }
 function hhmm(h) { h = ((h % 24) + 24) % 24; const m = Math.floor((h % 1) * 60 / 10) * 10; return `${String(Math.floor(h)).padStart(2, '0')}:${String(m).padStart(2, '0')}`; }
 
@@ -828,7 +891,7 @@ let toastT = 0;
 function toast(m) {
   const t = $('toast'), ww = $('wheelWrap').getBoundingClientRect();
   t.style.top = ww.height ? `${Math.round(ww.top + 8)}px` : '';
-  t.textContent = clean(m); t.classList.remove('hidden'); t.style.opacity = '1'; clearTimeout(toastT); toastT = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.classList.add('hidden'), 260); }, 1700); }
+  t.textContent = clean(m); t.classList.remove('hidden'); t.style.opacity = '1'; clearTimeout(toastT); toastT = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.classList.add('hidden'), 260); }, Math.max(1700, t.textContent.length * 45)); }
 
 // ---------------------------------------------------------------- unit / consumer sheet
 let sheetFor = null;
@@ -860,7 +923,7 @@ function renderSheet() {
   let rows = `<span>Status</span><b>${st}</b><span>Output</span><b>${Math.round(u.P)} / ${T.cap} MW</b>`;
   if (T.kind === 'bess' || T.kind === 'fly') rows += `<span>Charge</span><b>${Math.round(u.soc * 100)} % of ${T.energy} MWh</b>`;
   rows += `<span>Inertia</span><b>${T.inertia ? T.inertia : 'none'}</b>`;
-  if (T.kind === 'sync') rows += `<span>Spin-up time</span><b>${T.ramp} s</b><span>Fuel + CO₂</span><b>${perMWh(T.fuel * (T.gas ? G.fuelMul : 1))}</b>`;
+  if (T.kind === 'sync') rows += `<span>Spin-up time</span><b>${T.ramp} s</b><span>Fuel + CO₂</span><b>${perMWh(T.fuel * (T.gas ? G.fuelMul * G.co2 : 1))}</b>`;
   rows += `<span>Upkeep</span><b>${fmtMoney(T.maint)}/yr</b><span>Build cost</span><b>${fmtMoney(T.capex)}</b>`;
   body.innerHTML = `<div class="stats">${rows}</div>${T.desc}`;
   const on = T.kind === 'sync' ? u.engaged : u.engaged;
@@ -929,8 +992,8 @@ function stableFor(sec) { return G.tut.sb && G.t - G.tut.sb >= sec; }
 const TUT = [
   { e: '🎡', h: 'Meet the grid', hl: { hub: 1 },
     p: () => `This big rubber disc is the power grid. How fast it spins is the grid <b>frequency</b>, shown in the middle. Nothing drives it yet, so it stands still at <b>0 Hz</b>.` },
-  { e: '💧', h: 'Build your first power plant', dock: ['hydro'], done: () => !!tu('hydro'),
-    p: () => `Press <b>+</b> on the <b>Hydro</b> card. Water spins a turbine, and the turbine's small disc presses on the big wheel from outside, like a friction drive.` },
+  { e: '💧', h: 'Build your first power plant', dock: ['hydro'], hl: { unit: 'hydro' }, done: () => !!tu('hydro')?.engaged,
+    p: () => `Press <b>+</b> on the <b>Hydro</b> card. New assets arrive <b>disconnected</b>: a grey disc standing back from the wheel, not spinning. Then <b>tap it on the wheel</b> to connect it. Its disc presses on the big wheel from outside, like a friction drive.` },
   { e: '🌀', h: 'Spinning up', hl: { hub: 1 }, done: () => Math.abs(G.f - G.f0) < .02,
     p: () => `Watch the plant accelerate the wheel up to <b>${G.f0} Hz</b>, the nominal frequency. Every generator in continental Europe turns in step at exactly this rate.` },
   { e: '🎯', h: 'Reading the wheel', dom: ['#chartWrap'], hl: { hub: 1 },
@@ -943,42 +1006,44 @@ const TUT = [
     done: () => tl('office')?.conn >= 1 && G.f < G.f0 - .1,
     p: () => `Connect some offices. The hydro plant is nearly flat out, so the wheel will <b>slow down</b>. Outside the green band an alarm counts down to blackout (in the tutorial nothing breaks).` },
   { e: '🔥', h: 'Gas peaker to the rescue', dock: ['peaker'], hl: { unit: 'peaker' }, done: () => tu('peaker')?.level >= 1 && inBand(),
-    p: () => `Build a <b>Gas peaker</b>: an open-cycle gas turbine, basically a jet engine. It's at full power in about <b>4 s</b>, but its fuel is pricey. Your emergency button.` },
+    p: () => `Build a <b>Gas peaker</b> with <b>+</b>, then <b>tap it on the wheel</b> to connect it. An open-cycle gas turbine, basically a jet engine: full power in about <b>4 s</b>, but its fuel and CO₂ are pricey. Your emergency button.` },
   { e: '🏭', h: 'Gas CCGT: the workhorse', dock: ['ccgt'], hl: { unit: 'ccgt' }, done: () => tu('ccgt')?.level >= 1,
-    onBuild: t => { if (t === 'ccgt' && !tl('data')) tutLoad('data', 85, TYPES.ccgt.ramp); },
-    p: () => `A data centre wants 85 MW. Build a <b>Gas CCGT</b> (combined cycle: a gas turbine plus a steam turbine). Cheaper fuel and more spinning mass than the peaker, but it needs <b>14 s</b> to warm up: watch the dashed ring. The data centre connects as it ramps.` },
+    onConnect: t => { if (t === 'ccgt' && !tl('data')) tutLoad('data', 85, TYPES.ccgt.ramp); },
+    p: () => `A data centre wants 85 MW. Build a <b>Gas CCGT</b> and tap it to connect it (combined cycle: a gas turbine plus a steam turbine). Cheaper fuel and more spinning mass than the peaker, but it needs <b>14 s</b> to warm up: watch the dashed ring. The data centre connects as it ramps.` },
   { e: '✋', h: 'Switching plants on and off', hl: { unit: 'peaker' }, done: () => tu('peaker') && !tu('peaker').engaged && tu('peaker').level <= 0,
     p: () => `<b>Tap</b> a generator on the wheel to switch it on or off. Idle ones turn grey and back off the wheel. <b>Long-press</b> one for its details. The <b>−</b> on a card removes one for good. Try it: tap the <b>gas peaker</b> to switch it off. The wheel slows a little, and the other plants push harder by themselves.` },
   { e: '⚛️', h: 'Nuclear (just a look)', dom: ['.card[data-t=nuclear]'],
-    p: () => `Not for this small grid, but good to know: <b>250 MW</b>, a <b>45 s</b> spin-up, the heaviest rotor of all (most inertia), cheap fuel and a huge build cost. Switzerland and France start with one; Italy and Germany have none.` },
+    p: () => `Not for this small grid, but good to know: <b>250 MW</b>, a <b>45 s</b> spin-up, the heaviest rotor of all (most inertia), cheap fuel, no CO₂ and a huge build cost: ideal base load. Whether you may build one depends on the country. ${G.C.nukeLock ? G.C.name + ': ' + G.C.nukeLock : 'France may build new reactors.'}` },
   { e: '🌤️', h: 'Weather and forecast', dom: ['#wx'],
     p: () => `This strip shows the weather <b>now</b> (☀️ how much sun reaches the panels, 🌬️ wind speed) and the <b>forecast</b> for the next 6 hours. In a game, watch it for cloud fronts 🌧️, storms 🌪️ and calm spells 🍃: they hit solar and wind hard.` },
   { e: '☀️', h: 'Solar farm', dock: ['solar'], hl: { unit: 'solar' }, done: () => tu('solar')?.P > 20,
-    onBuild: t => { if (t === 'solar' && !tl('factory')) tutLoad('factory', 50); },
-    p: () => `A factory (50 MW) is coming. Build a <b>Solar farm</b>: free fuel, up to 80 MW at noon, nothing at night. It connects through an inverter, so it adds <b>no inertia</b> and can't push back on its own.` },
+    onConnect: t => { if (t === 'solar' && !tl('factory')) tutLoad('factory', 50); },
+    p: () => `A factory (50 MW) is coming. Build a <b>Solar farm</b> and connect it: free fuel, up to 80 MW at noon, nothing at night. It connects through an inverter, so it adds <b>no inertia</b> and can't push back on its own.` },
   { e: '☁️', h: 'A cloud passes', acts: [{ id: 'cloud', label: '☁️ Send a cloud', fn: () => { G.tut.cloud = .2; } }], done: () => G.tut.used.cloud && G.f < G.f0 - .15,
     p: () => `Send a cloud over the solar farm and watch: its output collapses within seconds and the wheel slows down. The forecast now shows rain 🌧️.` },
-  { e: '🔋', h: 'BESS: the battery', dock: ['bess'], hl: { unit: 'bess' }, done: () => !!tu('bess') && stableFor(2),
-    p: () => `Build a <b>BESS</b> (50 MW / 200 MWh). It reacts by itself in a fraction of a second: <b>discharging</b> pushes the wheel (green arc), <b>charging</b> brakes it (blue arc). The inner ring is its charge. No inertia, and it only holds so much energy.` },
+  { e: '🔋', h: 'BESS: the battery', dock: ['bess'], hl: { unit: 'bess' }, done: () => !!tu('bess')?.engaged && stableFor(2),
+    p: () => `Build a <b>BESS</b> (50 MW / 200 MWh) and tap it to connect it. It reacts by itself in a fraction of a second: <b>discharging</b> pushes the wheel (green arc), <b>charging</b> brakes it (blue arc). The inner ring is its charge. No inertia, and it only holds so much energy.` },
   { e: '🌞', h: 'The sun is back', acts: [{ id: 'clear', label: '🌞 Clear the sky', fn: () => { G.tut.cloud = 1; } }], hl: { unit: 'bess' }, done: () => G.tut.used.clear && G.tut.t > 4,
     p: () => `Clear the sky before the battery runs empty. Solar comes back, and the battery soaks up the extra power to recharge (blue arc).` },
   { e: '🌬️', h: 'Wind farm', dock: ['wind'], hl: { unit: 'wind' }, done: () => tu('wind')?.P > 10,
-    onBuild: t => { if (t === 'wind' && !tl('heat')) tutLoad('heat', 30); },
-    acts: [{ id: 'gust', label: '💨 Strong wind', fn: () => { G.tut.wind = 14; }, after: () => !!tu('wind'), again: 1 },
-      { id: 'calm', label: '🍃 Calm', fn: () => { G.tut.wind = 2; }, after: () => !!tu('wind'), again: 1 },
-      { id: 'norm', label: '🌬️ Normal', fn: () => { G.tut.wind = 9; }, after: () => !!tu('wind'), again: 1 }],
-    p: () => `Heat pumps (30 MW) connect. Build a <b>Wind farm</b>: free fuel, no inertia. Power grows with the <b>cube</b> of wind speed (half the wind, an eighth of the power) and turbines shut down above 25 m/s. Then play with the wind.` },
-  { e: '🌀', h: 'Flywheel', dock: ['flywheel'], dom: ['#mixTxt'], hl: { unit: 'flywheel' }, done: () => !!tu('flywheel'),
-    p: () => `Build a <b>Flywheel</b>: a heavy wheel on magnetic bearings. It adds real <b>inertia</b> (watch the Inertia number jump), so the grid wobbles less, and it reacts in milliseconds. It stores only a few minutes of energy.` },
+    onConnect: t => { if (t === 'wind' && !tl('heat')) tutLoad('heat', 30); },
+    acts: [{ id: 'gust', label: '💨 Strong wind', fn: () => { G.tut.wind = 14; }, after: () => !!tu('wind')?.engaged, again: 1 },
+      { id: 'calm', label: '🍃 Calm', fn: () => { G.tut.wind = 2; }, after: () => !!tu('wind')?.engaged, again: 1 },
+      { id: 'norm', label: '🌬️ Normal', fn: () => { G.tut.wind = 9; }, after: () => !!tu('wind')?.engaged, again: 1 }],
+    p: () => `Heat pumps (30 MW) are waiting. Build a <b>Wind farm</b> and connect it: free fuel, no inertia. Power grows with the <b>cube</b> of wind speed (half the wind, an eighth of the power) and turbines shut down above 25 m/s. Then play with the wind.` },
+  { e: '🌀', h: 'Flywheel', dock: ['flywheel'], dom: ['#mixTxt'], hl: { unit: 'flywheel' }, done: () => !!tu('flywheel')?.engaged,
+    p: () => `Build a <b>Flywheel</b> and connect it: a heavy wheel on magnetic bearings. It adds real <b>inertia</b> (watch the Inertia number jump), so the grid wobbles less, and it reacts in milliseconds. It stores only a few minutes of energy.` },
   { e: '⚠️', h: 'A plant trips', hl: { unit: 'peaker' }, dock: ['hydro', 'peaker'],
     acts: [{ id: 'trip', label: '⚡ Trip the CCGT', fn: () => { const u = tu('ccgt'); if (u) { u.engaged = false; u.level = 0; u.droopP = 0; u.repair = 30; sfx('trip'); buzz([80, 50, 80]); } } }],
-    done: () => G.tut.used.trip && G.units.filter(u => u.type === 'hydro').length > 1 && stableFor(2),
-    p: () => `Plants sometimes trip offline in an instant. Trip the CCGT and watch: inertia slows the fall, the battery and flywheel catch it, but only for a while. Replace the lost power: <b>tap the gas peaker</b> to bring it back and <b>build a second Hydro</b> plant. (The CCGT needs 30 s of repairs.)` },
+    done: () => G.tut.used.trip && G.units.filter(u => u.type === 'hydro' && u.engaged).length > 1 && stableFor(2),
+    p: () => `Plants sometimes trip offline in an instant. Trip the CCGT and watch: inertia slows the fall, the battery and flywheel catch it, but only for a while. Replace the lost power: <b>tap the gas peaker</b> to bring it back and <b>build a second Hydro</b> plant (connect it too). In a real game, keep a few idle plants as a reserve for moments like this. (The CCGT needs 30 s of repairs.)` },
   { e: '🔌', h: 'Who are the consumers?', hl: { unit: 'ccgt' }, acts: [{ id: 'steel', label: '⚒️ Connect a steel mill (30 MW)', fn: () => tutLoad('steel', 30) }],
     done: () => tl('steel') && tu('ccgt')?.level >= 1 && stableFor(2),
     p: () => `You can't control consumers: they drag, and they pay. In a game you'll meet:<div class="cl">${Object.values(LOADS).map(D => `<span><i class="code" style="--c:var(--bad)">${D.code}</i> <b>${D.name}</b>: ${D.kind}</span>`).join('')}</div>Connect a steel mill to see an erratic one. It adds 30 MW, so balance it: as soon as the CCGT is repaired (its red ✕ disappears), <b>tap it</b> to switch it back on, then <b>tap the gas peaker</b> off.` },
   { e: '💶', h: 'Money', dom: ['#money'],
     p: () => `Top right: your cash and your net income. In this tutorial the budget is <b>unlimited</b>, so nothing here costs you anything. In a real game every plant has a real-world build cost, fuel, CO₂ and upkeep; customers pay ${perMWh(TARIFF)}; and penalties run while you're outside the band. <b>One game day books a whole year</b> of money. Tap the cash for the details.` },
+  { e: '🌱', h: 'Your mission', dom: ['#mission'],
+    p: () => `In a real game you start with gas plants. Your mission is to <b>phase them out</b>: build wind, solar, hydro and batteries, plus nuclear for base load where the country allows it, then switch off and scrap the gas plants. The green line under the chart tracks your progress and the <b>clean share</b> of the last 24 hours. Each step pays a green subsidy, and the CO₂ price rises every day. Run a full day with no gas and no fossil plants left, and the mission is complete.` },
   { e: '📢', h: 'In a real game', 
     p: () => `The clock runs once you press <b>▶ START</b> (and stops again with <b>⏸ PAUSE</b>): demand follows the day, with peaks in the morning and evening, and the sun sets. New customers are announced 📢 before they connect. Surprises happen: trips, storms, cold snaps, half-time kettle surges, gas price spikes. Each game day gets harder.` },
   { e: '🏁', h: "You're ready!", final: true,
@@ -1085,6 +1150,8 @@ function pause(on) {
 }
 function renderEcon() {
   $('bankrupt').textContent = fmtMoney(BANKRUPT);
+  updateMix(); $('missionList').innerHTML = missionList();
+  $('co2Txt').textContent = G.co2 > 1 ? `CO₂ price: +${Math.round((G.co2 - 1) * 100)} % since day 1 (gas plants cost more every day).` : 'The CO₂ price rises every new day, so gas plants get more expensive to run.';
   const r = G.rate, net = r.rev - r.fuel - r.maint - r.pen;
   const row = (a, v, c) => `<tr><td>${a}</td><td class="${c}">${v}</td></tr>`;
   $('econ').innerHTML = row('Cash', fmtMoney(G.cash), G.cash < 0 ? 'neg' : '') +
@@ -1111,7 +1178,8 @@ function coachSteps() {
     ['', 'This wheel is the grid', `Its speed is the frequency, shown in the middle. Keep it at ${f0} Hz, inside the green band of the chart. New to this? The Tutorial on the menu walks you through every piece.`],
     ['', 'Outside: generators push', 'Tap one to switch it on or off. Grey ones are idle. They take time to spin up (nuclear takes ages). Long-press for details.'],
     ['', 'Inside: consumers drag', "Homes, offices, factories. You can't control them: some are steady, some are wild. When morning comes, demand climbs fast."],
-    ['', 'Build with + and −', 'Each card at the bottom builds (+) or removes (−) a plant, wind or solar farm, battery or flywheel. They cost money and upkeep; consumers pay their bills to finance you. Batteries and flywheels react by themselves.'],
+    ['', 'Build with + and −', 'Each card at the bottom builds (+) or removes (−) a plant, wind or solar farm, battery or flywheel. New assets arrive disconnected: tap them on the wheel to connect them, and keep some idle as a reserve. Consumers pay their bills to finance you.'],
+    ['', 'Your mission', `Phase out the gas plants. Replace them with wind, solar, hydro and batteries, plus nuclear for base load where ${G ? G.C.name : 'the country'} allows it. The green line under the chart shows the next step and your clean share. The CO₂ price rises every day.`],
     ['', "Don't let it stop", `Outside the green band an alarm counts down to blackout. Hit ${f0 - 1} Hz and the grid sheds load instantly. The clock starts when you press ▶ START. How long can you last?`],
   ];
 }
@@ -1151,16 +1219,23 @@ function gameOver(why) {
   $('overH').textContent = title; $('overReason').textContent = text;
   $('overTime').textContent = survived();
   $('overBest').textContent = isBest ? '🏆 New record for this grid!' : `Best on this grid: ${fmtHours(best)}`;
-  const s = G.stats;
-  $('overStats').innerHTML = `<span>Grid</span><b>${G.C.flag} ${G.C.name} · ${G.D.name}</b><span>Peak demand</span><b>${Math.round(s.peak)} MW</b>
+  $('overH').classList.remove('win'); $('keepBtn').classList.add('hidden'); $('againBtn').classList.remove('hidden');
+  fillOverStats();
+  $('over').classList.remove('hidden');
+  requestAnimationFrame(drawOverChart);
+  recap = buildRecap();
+}
+function fillOverStats() {
+  const s = G.stats; updateMix();
+  const done = MISSION.filter(m => G.ms[m.id]).length;
+  $('overStats').innerHTML = `<span>Grid</span><b>${G.C.flag} ${G.C.name} · ${G.D.name}</b><span>Mission</span><b>${done} / ${MISSION.length} steps</b>
+    <span>Clean share (24 h)</span><b>${Math.round(G.mix.share * 100)} %</b><span>Peak demand</span><b>${Math.round(s.peak)} MW</b>
     <span>Lowest / highest</span><b>${fmtHz(s.minF)} / ${fmtHz(s.maxF)} Hz</b><span>Surprises survived</span><b>${s.events}</b>
     <span>Plants built</span><b>${s.built}</b><span>Cash left</span><b>${fmtMoney(G.cash)}</b>`;
-  $('over').classList.remove('hidden');
-  requestAnimationFrame(() => {
-    const cv = $('overChart'), ctx = cv.getContext('2d'), [w, h] = fitCanvas(cv, ctx);
-    ctx.clearRect(0, 0, w, h); drawFreqChart(ctx, w, h, G.full, G.f0, { pad: { l: 34, r: 6, t: 8, b: 8 } });
-  });
-  recap = buildRecap();
+}
+function drawOverChart() {
+  const cv = $('overChart'), ctx = cv.getContext('2d'), [w, h] = fitCanvas(cv, ctx);
+  ctx.clearRect(0, 0, w, h); drawFreqChart(ctx, w, h, G.full, G.f0, { pad: { l: 34, r: 6, t: 8, b: 8 } });
 }
 function fmtHours(hrs) { if (!hrs) return '–'; const d = Math.floor(hrs / 24), h = Math.floor(hrs % 24), m = Math.floor((hrs % 1) * 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; }
 $('againBtn').addEventListener('click', startGame);
@@ -1180,16 +1255,17 @@ async function buildRecap() {
   c.fillStyle = gr; c.font = `800 64px ${MONO}`; c.fillText('GRID SPINNER', 240, 172);
   c.fillStyle = '#a9b6c5'; c.font = `500 32px ${MONO}`; c.fillText(`${G.C.name.toUpperCase()} · ${G.D.name} · ${G.f0} Hz`, 240, 232);
   c.textAlign = 'center';
-  c.fillStyle = TH.ink; c.font = '600 40px system-ui, sans-serif'; c.fillText(`I kept the grid at ${G.f0} Hz for`, 540, 360);
+  c.fillStyle = TH.ink; c.font = '600 40px system-ui, sans-serif'; c.fillText(G.endTitle === 'FOSSIL-FREE' ? 'I phased out fossil fuels in' : `I kept the grid at ${G.f0} Hz for`, 540, 360);
   c.fillStyle = TH.ink; c.font = `800 120px ${MONO}`; c.fillText(survived(), 540, 500);
-  c.fillStyle = TH.bad; c.font = `900 44px ${MONO}`; c.fillText(G.endTitle, 540, 580);
+  c.fillStyle = G.endTitle === 'FOSSIL-FREE' ? TH.ok : TH.bad; c.font = `900 44px ${MONO}`; c.fillText(G.endTitle, 540, 580);
   // chart
   c.fillStyle = '#ffffff'; c.strokeStyle = 'rgba(27,21,53,.12)'; c.lineWidth = 2;
   c.beginPath(); c.roundRect ? c.roundRect(70, 630, 940, 330, 28) : c.rect(70, 630, 940, 330); c.fill(); c.stroke();
   c.save(); c.translate(70, 630); drawFreqChart(c, 940, 330, G.full, G.f0, { pad: { l: 90, r: 24, t: 28, b: 28 }, font: 24, lw: 3 }); c.restore();
   // stats
-  const s = G.stats, cells = [['Peak demand', `${Math.round(s.peak)} MW`], ['Lowest', `${fmtHz(s.minF)} Hz`], ['Highest', `${fmtHz(s.maxF)} Hz`],
-    ['Surprises', `${s.events}`], ['Plants built', `${s.built}`], ['Cash left', fmtMoney(G.cash)]];
+  updateMix();
+  const s = G.stats, cells = [['Clean share', `${Math.round(G.mix.share * 100)} %`], ['Mission', `${MISSION.filter(m => G.ms[m.id]).length}/${MISSION.length}`], ['Lowest', `${fmtHz(s.minF)} Hz`],
+    ['Peak demand', `${Math.round(s.peak)} MW`], ['Plants built', `${s.built}`], ['Cash left', fmtMoney(G.cash)]];
   cells.forEach(([k, v], i) => {
     const x = 70 + (i % 3) * 320 + 150, y = 1040 + Math.floor(i / 3) * 120;
     c.fillStyle = TH.muted; c.font = '500 30px system-ui, sans-serif'; c.fillText(k, x, y);
@@ -1199,7 +1275,8 @@ async function buildRecap() {
   return new Promise(res => cv.toBlob(res, 'image/png'));
 }
 async function share() {
-  const text = `I kept the ${G.C.flag} ${G.C.name} grid at ${G.f0} Hz for ${survived()} in Grid Spinner (${G.D.name}). Can you hold it longer? ${GAME_URL}`;
+  const text = G.won && G.endTitle === 'FOSSIL-FREE' ? `I phased out fossil fuels on the ${G.C.flag} ${G.C.name} grid in ${survived()} in Grid Spinner (${G.D.name}), and kept it at ${G.f0} Hz. Can you do it faster? ${GAME_URL}`
+    : `I kept the ${G.C.flag} ${G.C.name} grid at ${G.f0} Hz for ${survived()} in Grid Spinner (${G.D.name}), ${Math.round(G.mix.share * 100)} % clean. Can you hold it longer? ${GAME_URL}`;
   const blob = recap ? await recap : null;
   const file = blob && new File([blob], 'grid-spinner.png', { type: 'image/png' });
   try {
