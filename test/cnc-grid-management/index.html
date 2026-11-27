@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101010">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="C&amp;C Grid">
+<meta name="description" content="A grid operator strategy game in classic 90s RTS style: build plants, lay lines, keep the villages lit through the winter.">
+<title>Command and Conquer: Grid Management</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --metal1: #5b5a52; --metal2: #3d3c36; --metal3: #24231f; --hi: #8d8b80; --lo: #141411;
+    --gold: #e2c45c; --green: #4dff4d; --red: #e0281c; --txt: #e8e2c8;
+    --mono: "Lucida Console", Consolas, "DejaVu Sans Mono", "Courier New", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--txt); font-family: var(--mono); overflow: hidden; overscroll-behavior: none; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); user-select: none; -webkit-user-select: none; }
+  button { font-family: var(--mono); cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ---------- game layout ---------- */
+  #app { display: flex; height: 100%; width: 100%; }
+  #view { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: #000; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; image-rendering: pixelated; }
+  #side { width: 152px; flex: none; display: flex; flex-direction: column; gap: 3px; padding: 4px;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0 2px, transparent 2px 4px), linear-gradient(90deg, var(--metal2), var(--metal1) 40%, var(--metal2));
+    border-left: 2px solid var(--lo); box-shadow: inset 1px 0 0 var(--hi); }
+  .bev { border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); }
+  .bevin { border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); }
+  #credTab { display: flex; justify-content: center; }
+  #credits { background: #0c0b08; color: var(--gold); font-weight: 700; font-size: 15px; padding: 2px 10px; letter-spacing: 1px; min-width: 110px; text-align: center; text-shadow: 0 0 6px rgba(226,196,92,.35); }
+  #radarWrap { position: relative; background: #000; aspect-ratio: 4 / 3; }
+  #radar { width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; }
+  #tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+  .tbtn { background: linear-gradient(#56554c, #34332d); color: #d9d2b0; font-size: 9.5px; font-weight: 700; padding: 5px 0; letter-spacing: .5px; }
+  .tbtn.on { background: linear-gradient(#7a2a20, #4a120c); color: #fff; }
+  #buildArea { flex: 1; min-height: 0; display: flex; gap: 3px; }
+  #pbar { width: 11px; flex: none; position: relative; background: #0a0a0a; }
+  #pfill { position: absolute; left: 1px; right: 1px; bottom: 1px; background: var(--green); transition: height .3s, background .3s; }
+  #pdem { position: absolute; left: -3px; right: -3px; height: 2px; background: #fff; box-shadow: 0 0 0 1px #000; transition: bottom .3s; }
+  #pticks { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 9px, rgba(0,0,0,.55) 9px 10px); pointer-events: none; }
+  #cameos { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; align-content: start; scrollbar-width: none; }
+  #cameos::-webkit-scrollbar { display: none; }
+  .cam { position: relative; aspect-ratio: 4 / 3; background: #000; touch-action: manipulation; }
+  .cam canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .cam .lab { position: absolute; left: 0; right: 0; bottom: 0; font-size: 8.5px; text-align: center; color: #e6e0c4; background: rgba(0,0,0,.55); padding: 1px 0; pointer-events: none; white-space: nowrap; overflow: hidden; }
+  .cam .ov { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000, 1px 1px 0 #000; pointer-events: none; }
+  .cam.lock canvas { filter: grayscale(1) brightness(.45); }
+  .cam.hl { outline: 2px solid #ffe14a; animation: pulse .8s infinite alternate; z-index: 1; }
+  @keyframes pulse { from { outline-color: #ffe14a; } to { outline-color: rgba(255,225,74,.15); } }
+  #status { font-size: 9px; line-height: 1.3; min-height: 36px; max-height: 48px; overflow: hidden; color: #d9d2b0; background: rgba(0,0,0,.35); padding: 3px 4px; }
+  #status b { color: var(--gold); }
+
+  /* HUD on the map */
+  #hud { position: absolute; left: 0; right: 0; top: 0; display: flex; gap: 4px; align-items: flex-start; padding: 4px; pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+  .hb { background: rgba(10,10,8,.78); color: #e8e2c8; border: 1px solid #555; font-size: 11px; padding: 4px 7px; font-weight: 700; }
+  #clock { flex: 1; text-align: center; font-size: 11px; line-height: 1.35; pointer-events: none; }
+  #clock .k { color: var(--gold); } #clock .w { color: #ffb84a; } #clock .bad { color: #ff5a4a; } #clock .good { color: #7dff6a; }
+  #eva { position: absolute; left: 6px; top: 34px; max-width: 70%; pointer-events: none; }
+  .msg { color: var(--green); font-size: 12px; font-weight: 700; text-shadow: 1px 1px 0 #000, 0 0 4px #000; margin-bottom: 2px; transition: opacity .6s; pointer-events: auto; }
+  .msg.warn { color: #ffcf40; } .msg.bad { color: #ff6a50; }
+  #sel { position: absolute; left: 6px; bottom: 6px; max-width: min(280px, 70%); background: rgba(10,10,8,.86); border: 1px solid #6a6a60; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
+  #sel h4 { margin: 0 0 2px; color: var(--gold); font-size: 12px; }
+  #sel .row { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+  #sel .row button { background: linear-gradient(#56554c, #34332d); color: #fff; border: 2px solid; border-color: #8d8b80 #141411 #141411 #8d8b80; font-size: 11px; padding: 5px 8px; font-weight: 700; }
+  #sel .row button.red { background: linear-gradient(#8a2a20, #4a120c); }
+  .bar { height: 5px; background: #111; margin: 2px 0; } .bar i { display: block; height: 100%; }
+  #placeBar { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; gap: 6px; align-items: center; background: rgba(10,10,8,.86); border: 1px solid #6a6a60; padding: 5px 6px; font-size: 11px; }
+  #placeBar button { background: linear-gradient(#56554c, #34332d); color: #fff; border: 2px solid; border-color: #8d8b80 #141411 #141411 #8d8b80; font-size: 12px; padding: 6px 10px; font-weight: 700; }
+  #placeBar button.go { background: linear-gradient(#2e7a28, #134a0e); }
+  #tut { position: absolute; right: 8px; top: 40px; width: min(280px, 58%); background: rgba(6,18,6,.92); border: 2px solid #3cbf3c; color: #c9ffc0; font-size: 11.5px; line-height: 1.45; padding: 8px 10px; box-shadow: 0 0 0 2px #000; }
+  #tut b { color: #fff; } #tut .tb { display: flex; justify-content: space-between; margin-top: 6px; gap: 6px; }
+  #tut button { background: #123a10; color: #c9ffc0; border: 1px solid #3cbf3c; font-size: 11px; padding: 4px 8px; }
+  #tutMin { position: absolute; right: 8px; top: 40px; }
+
+  /* ---------- portrait: sidebar goes to the bottom ---------- */
+  @media (orientation: portrait) {
+    #app { flex-direction: column; }
+    #side { width: auto; height: 42%; max-height: 330px; min-height: 230px; border-left: 0; border-top: 2px solid var(--lo); display: grid;
+      grid-template-columns: 128px 1fr; grid-template-rows: auto auto 1fr; grid-template-areas: "cred tools" "radar build" "status build"; }
+    #credTab { grid-area: cred; } #tools { grid-area: tools; } #radarWrap { grid-area: radar; } #buildArea { grid-area: build; } #status { grid-area: status; max-height: none; }
+    #cameos { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); }
+    #tut { top: auto; bottom: 8px; right: 8px; width: min(330px, 92%); }
+    #sel { bottom: 8px; }
+    #clock { font-size: 10px; }
+    .hb { padding: 4px 5px; }
+  }
+
+  /* ---------- screens ---------- */
+  .screen { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: radial-gradient(ellipse at 50% 30%, #2a0c08 0%, #090605 60%, #000 100%); overflow-y: auto; }
+  .screen::before { content: ""; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px); pointer-events: none; }
+  .panel { position: relative; width: min(560px, 100%); margin: auto; padding: 16px; background: linear-gradient(var(--metal1), var(--metal2)); border: 3px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); box-shadow: 0 10px 40px #000; }
+  .logo { text-align: center; margin: 4px 0 14px; }
+  .logo .t1 { font: 900 clamp(22px, min(7vw, 8vh), 46px)/1 Impact, "Arial Black", "Helvetica Neue", sans-serif; letter-spacing: 1px; text-transform: uppercase;
+    background: linear-gradient(#ffffff, #c3c6c9 45%, #6c7176 52%, #d8dadc 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(2px 2px 0 #000) drop-shadow(0 0 1px #000); }
+  .logo .t2 { margin-top: 6px; font: 900 clamp(15px, 4vw, 22px)/1 Impact, "Arial Black", sans-serif; letter-spacing: 6px; color: #e3281c; text-shadow: 2px 2px 0 #000; text-transform: uppercase; }
+  .mbtn { display: block; width: 100%; margin: 6px 0; padding: 11px 10px; font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #f0ead0;
+    background: linear-gradient(#5f5d53, #3a3933); border: 3px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); }
+  .mbtn:active { border-color: var(--lo) var(--hi) var(--hi) var(--lo); }
+  .mbtn.red { background: linear-gradient(#8a2a20, #4a120c); }
+  .mbtn small { display: block; font-size: 10px; font-weight: 400; letter-spacing: 0; color: #c9c2a0; text-transform: none; margin-top: 2px; }
+  .mrow { display: flex; gap: 6px; } .mrow .mbtn { flex: 1; }
+  .foot { text-align: center; font-size: 10px; color: #9a927a; margin-top: 10px; line-height: 1.5; }
+  .term { background: #000; border: 2px solid #1b3a1b; color: #5dff5d; padding: 12px; font-size: 13px; line-height: 1.55; min-height: 170px; white-space: pre-wrap; text-shadow: 0 0 6px rgba(93,255,93,.4); }
+  .term .h { color: #fff; }
+  .goals { margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.6; }
+  .goals li::before { content: "▸ "; color: var(--gold); }
+  .goals li.done { color: #7dff6a; } .goals li.done::before { content: "✔ "; color: #7dff6a; }
+  .goals li.fail { color: #ff6a50; } .goals li.fail::before { content: "✘ "; color: #ff6a50; }
+  h2.sc { margin: 0 0 10px; text-align: center; font: 900 clamp(22px, 6vw, 34px)/1.1 Impact, "Arial Black", sans-serif; letter-spacing: 2px; text-transform: uppercase; }
+  h2.sc.win { color: #7dff6a; text-shadow: 0 0 12px rgba(125,255,106,.4), 2px 2px 0 #000; } h2.sc.lose { color: #ff4a3a; text-shadow: 2px 2px 0 #000; }
+  .stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 13px; background: #0b0b09; padding: 10px; border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); }
+  .stats span:nth-child(2n) { color: var(--gold); text-align: right; font-weight: 700; }
+  .help { font-size: 12.5px; line-height: 1.55; background: #0b0b09; padding: 12px; border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); max-height: 62vh; overflow-y: auto; }
+  .help b { color: var(--gold); } .help p { margin: 0 0 8px; }
+  .toggle { display: flex; justify-content: space-between; align-items: center; padding: 6px 2px; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,.3); }
+  .toggle button { min-width: 62px; padding: 5px; font-weight: 700; color: #fff; background: #3a3933; border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); }
+  .toggle button.on { background: #1e5a18; }
+  #toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 50; background: #000; color: var(--gold); border: 1px solid var(--gold); padding: 8px 14px; font-size: 13px; transition: opacity .4s; }
+</style>
+<script data-goatcounter="https://paolosarcade.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body>
+<div id="app" class="hidden">
+  <div id="view">
+    <canvas id="cv"></canvas>
+    <div id="hud">
+      <button class="hb" id="bMenu" aria-label="Menu">☰</button>
+      <div class="hb" id="clock"></div>
+      <button class="hb" id="bObj">OBJ</button>
+      <button class="hb" id="bSpeed">1×</button>
+    </div>
+    <div id="eva"></div>
+    <div id="sel" class="hidden"></div>
+    <div id="placeBar" class="hidden"></div>
+    <div id="tut" class="hidden"></div>
+  </div>
+  <aside id="side">
+    <div id="credTab"><div id="credits" class="bevin">$ 0</div></div>
+    <div id="radarWrap" class="bevin"><canvas id="radar" width="160" height="120"></canvas></div>
+    <div id="tools">
+      <button class="tbtn bev" data-mode="repair">REPAIR</button>
+      <button class="tbtn bev" data-mode="sell">SELL</button>
+      <button class="tbtn bev" data-mode="power">POWER</button>
+    </div>
+    <div id="buildArea">
+      <div id="pbar" class="bevin"><div id="pfill"></div><div id="pticks"></div><div id="pdem"></div></div>
+      <div id="cameos"></div>
+    </div>
+    <div id="status" class="bevin"></div>
+  </aside>
+</div>
+
+<div id="title" class="screen">
+  <div class="panel">
+    <div class="logo"><div class="t1">Command &amp; Conquer</div><div class="t2">Grid Management</div></div>
+    <button class="mbtn red hidden" id="bContinue">Continue<small id="contInfo"></small></button>
+    <div id="missionList"></div>
+    <div class="mrow"><button class="mbtn" id="bHelp">How to play</button><button class="mbtn" id="bShareGame">Share ↗</button></div>
+    <div class="mrow"><button class="mbtn" id="bSound">Sound: on</button><button class="mbtn" id="bVoice">Voice: on</button></div>
+    <div class="foot">A fan parody grid-operator game for Paolo's Arcade.<br>Not affiliated with or endorsed by EA. All art is drawn in code.</div>
+  </div>
+</div>
+
+<div id="brief" class="screen hidden">
+  <div class="panel">
+    <div class="term" id="briefText"></div>
+    <ul class="goals" id="briefGoals"></ul>
+    <div class="mrow" style="margin-top:10px"><button class="mbtn" id="bBriefBack">Back</button><button class="mbtn red" id="bBriefGo">Deploy</button></div>
+  </div>
+</div>
+
+<div id="menu" class="screen hidden">
+  <div class="panel">
+    <h2 class="sc" style="color:var(--gold)">Paused</h2>
+    <ul class="goals" id="menuGoals"></ul>
+    <button class="mbtn red" id="bResume" style="margin-top:12px">Resume</button>
+    <div class="toggle">Sound <button id="tSound"></button></div>
+    <div class="toggle">EVA voice <button id="tVoice"></button></div>
+    <div class="toggle">Vibration <button id="tVib"></button></div>
+    <div class="mrow"><button class="mbtn" id="bHelp2">How to play</button><button class="mbtn" id="bShare2">Share ↗</button></div>
+    <div class="mrow"><button class="mbtn" id="bRestart">Restart</button><button class="mbtn" id="bQuit">Quit</button></div>
+  </div>
+</div>
+
+<div id="help" class="screen hidden">
+  <div class="panel">
+    <h2 class="sc" style="color:var(--gold)">Field manual</h2>
+    <div class="help">
+      <p><b>The job.</b> Villages need power. You build plants, lay power lines to them and keep supply equal to demand, every hour of the day. Each MWh delivered pays credits. Blackouts make villages angry.</p>
+      <p><b>Building.</b> Tap a picture in the sidebar to start building. When it says READY, tap it again, then tap the map to place it (white squares = ok, red = blocked), then tap again or press PLACE. Plants must go near your base or next to a <b>Substation</b>. Tap a building picture while it builds to pause it; hold it to cancel.</p>
+      <p><b>Power lines.</b> Tap POWER LINE, then drag across the map from your base, plant or another line. Every tile costs credits. A village is connected when a line touches one of its houses. Two fingers pan the map while laying lines.</p>
+      <p><b>The power bar</b> (left of the pictures) shows what your plants can deliver right now; the white mark is demand. Green is fine, yellow is tight, red means blackouts. Low power slows construction and shuts down the radar and Tesla coils.</p>
+      <p><b>Plants.</b> Coal is cheap but slow, dirty and taxed for CO₂. Gas turbines start fast and run on AUTO. Wind and sun are free but follow the weather and the clock. Hydro must sit across the river. The SCADA Dome unlocks batteries, nuclear and Tesla coils and gives weather warnings.</p>
+      <p><b>Tools.</b> REPAIR fixes broken lines (instant, costs credits) and speeds up tripped plants. SELL demolishes for half the price back. POWER switches a plant on or off. Tapping a building also shows these buttons.</p>
+      <p><b>Trouble.</b> Blizzards and storms snap lines. Copper thieves walk in and strip pylons. Repair Trucks fix things for free; Patrol Jeeps and Tesla Coils deal with thieves. Plants sometimes trip offline. Build loops so one broken line can't black out a village.</p>
+      <p><b>Controls.</b> Drag to scroll, pinch or mouse wheel to zoom, tap the radar to jump. Select a truck or jeep and tap the ground to send it. Keyboard: Space pauses, Esc cancels.</p>
+    </div>
+    <button class="mbtn red" id="bHelpBack" style="margin-top:10px">Back</button>
+  </div>
+</div>
+
+<div id="end" class="screen hidden">
+  <div class="panel">
+    <h2 class="sc" id="endTitle"></h2>
+    <div id="endWhy" style="text-align:center;font-size:12px;margin-bottom:8px;color:#e8d8b0"></div>
+    <div class="stats" id="endStats"></div>
+    <ul class="goals" id="endGoals"></ul>
+    <button class="mbtn red" id="bEndNext" style="margin-top:12px"></button>
+    <div class="mrow"><button class="mbtn" id="bEndShare">Share ↗</button><button class="mbtn" id="bEndMenu">Menu</button></div>
+  </div>
+</div>
+<div id="toast" class="hidden"></div>
+
+<script src="data.js"></script>
+<script src="sprites.js"></script>
+<script src="world.js"></script>
+<script src="sim.js"></script>
+<script src="render.js"></script>
+<script src="ui.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
