@@ -431,6 +431,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
 for (const p of PLACES) {
   if (p.group) { const h = document.createElement('h2'); h.className = 'group'; h.textContent = p.group; $('placeList').appendChild(h); continue; }
   const b = document.createElement('button'), d = p.d || 2;
+  if (d === 2) b.dataset.mandel = '1';
   b.innerHTML = `<div><b></b><span></span></div><i>${d === 2 ? fmtZoomPlain(p.z) : formulaHtml(d)}</i>`;
   b.querySelector('b').textContent = p.name; b.querySelector('span').textContent = p.note;
   b.addEventListener('click', () => {
@@ -498,6 +499,15 @@ function showExpo() {
     : isWhole(S.d) ? `Multibrot set: ${S.d - 1}-fold symmetry.`
     : 'Fractional power: seams appear where the power jumps. Zoom stops at ×10¹¹.';
   $('expoBack').classList.toggle('hidden', S.d === 2);
+  refreshPlaces();
+}
+// The famous places are Mandelbrot (d = 2) spots: with another exponent they're greyed out, so a tap
+// doesn't silently switch the exponent back. The Multibrot cousins stay available.
+function refreshPlaces() {
+  const off = S.d !== 2;
+  for (const b of document.querySelectorAll('#placeList button[data-mandel]')) b.disabled = off;
+  $('placesNote').classList.toggle('hidden', !off);
+  $('placesNoteF').innerHTML = formulaHtml(S.d);
 }
 let expoRaf = 0;
 function setD(d, final) {

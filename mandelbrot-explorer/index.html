@@ -88,6 +88,10 @@
   .places button { text-align: left; display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px;
     border: 1px solid var(--line); min-height: 52px; }
   .places button:active { background: rgba(255, 255, 255, .06); }
+  .places button:disabled { opacity: .35; cursor: not-allowed; }
+  .places button:disabled:active { background: none; }
+  #placesNote { margin: 0 0 10px; color: #ffc94a; }
+  #placesNote sup { font-size: .7em; }
   .places b { display: block; font-size: 15px; }
   .places span { font-size: 12px; color: var(--muted); }
   .places i { margin-left: auto; font-style: normal; font-size: 12px; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -139,6 +143,7 @@
 
   <section class="sheet glass ui hidden" id="sheet-places">
     <h2>Famous places</h2>
+    <p class="hidden" id="placesNote">These are spots in the Mandelbrot set (z² + c). You're exploring <span id="placesNoteF"></span>, so they're switched off. Set the exponent back to 2 in Settings to use them, or pick a Multibrot cousin below.</p>
     <div class="places" id="placeList"></div>
   </section>
 
