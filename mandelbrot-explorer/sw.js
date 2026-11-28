@@ -1,6 +1,6 @@
 // Offline cache. Change VERSION whenever any file changes, so installed copies update.
 const APP = 'mandelbrot-explorer';
-const VERSION = APP + '-v5';
+const VERSION = APP + '-v6';
 const FILES = [
   './',
   './index.html',

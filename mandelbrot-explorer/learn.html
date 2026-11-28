@@ -283,13 +283,41 @@
 
   <section class="sec">
     <div class="txt a">
-  <h2><small>9 · Going deep</small>How the explorer reaches ×10²⁵⁰</h2>
+  <h2><small>9 · Other exponents</small>Multibrot sets: change the 2</h2>
+  <p>Nothing forces the exponent to be 2. Swap it for another number <span class="m">d</span> and the rule becomes</p>
+  <div class="eq">z &nbsp;→&nbsp; z<sup>d</sup> + c</div>
+  <p>The shapes you get are called <em>Multibrot sets</em>, and <span class="m">d <b>=</b> 2</span> is the Mandelbrot set itself. Drag the slider: it snaps to whole numbers, and in between it shows the fractional powers.</p>
+    </div>
+    <div class="side">
+  <div class="lab">
+    <h3>Change the exponent</h3>
+    <canvas id="mbCv" aria-label="Multibrot set for the chosen exponent"></canvas>
+    <div class="row"><label for="mbD">d</label><input id="mbD" type="range" min="2" max="8" step="0.01" value="2"><output id="mbOut"></output></div>
+    <div class="chips" id="mbChips"></div>
+    <div class="verdict" id="mbNote"></div>
+    <div class="row"><a class="btn" id="mbOpen" href="./">Explore this one in the explorer →</a></div>
+  </div>
+    </div>
+    <div class="txt b">
+  <ul>
+    <li><strong>Whole numbers (3, 4, 5 …)</strong> give tidy cousins with <span class="m">d − 1</span> identical lobes arranged around the centre: two for <span class="m">z³</span>, three for <span class="m">z⁴</span>, four for <span class="m">z⁵</span>. Everything else carries over: bulbs, antennas, baby copies, and the connected-or-dust rule for Julia sets. That's because <span class="m">z<sup>d</sup></span> still has just one critical point, 0, so the orbit of 0 still decides everything. As <span class="m">d</span> grows, the set gets rounder and closes in on the circle of radius 1.</li>
+    <li><strong>Fractional powers (like 2.5)</strong> have no single answer: <span class="m">z<sup>2.5</sup></span> could mean several different numbers, and the computer has to pick one. The usual choice jumps along a line, and those jumps show up as seams and slices in the picture. Sweep from 2 to 3 and you can watch a second lobe grow out of the seam until it becomes the symmetric cubic set. The pictures are pretty, but the clean theory breaks: no guaranteed connectedness, and no tidy Julia rule.</li>
+  </ul>
+  <p class="note">Two stranger cases, not in the explorer. An exponent just above 1, like 1.000001, squeezes the set to a microscopic speck around 0. Most programs draw it wrong, because "past 2 means gone" no longer holds when squaring is that weak. A complex exponent, like 2 + 0.3i, adds a twist to every step, so the whole set comes out swirled and lopsided: more art than theory.</p>
+  <p>In the explorer, open <strong>Settings → Exponent</strong>, or pick one of the Multibrot cousins at the end of <strong>Places</strong>.</p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="txt a">
+  <h2><small>10 · Going deep</small>How the explorer reaches ×10²⁵⁰</h2>
   <p>Phones do arithmetic with about 16 significant digits. Past a zoom of about 10¹³, neighbouring pixels become the same number and the picture breaks into blocks. The explorer gets round that in three steps:</p>
   <ul>
     <li><strong>One precise path.</strong> It works out the orbit of the centre point with whole-number arithmetic carrying as many digits as the zoom needs (hundreds of bits).</li>
     <li><strong>Only the differences.</strong> Every other pixel is tracked as a tiny offset from that path (<em>perturbation</em>). Tiny numbers are no problem for ordinary arithmetic, even at 10⁻³⁰⁰.</li>
     <li><strong>Skip the boring part.</strong> For the first few thousand steps all those offsets grow almost in lockstep, so a short polynomial predicts them, and the app jumps straight past (<em>series approximation</em>).</li>
   </ul>
+  <p>The first two tricks work for the Multibrot cousins with whole-number exponents too, so they also zoom to ×10²⁵⁰. Fractional powers stop at ×10¹¹: their seams make deeper zooms meaningless.</p>
     </div>
     <div class="side">
   <div class="aside">

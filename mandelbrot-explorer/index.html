@@ -52,7 +52,13 @@
   #where { font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
   #place { font-size: 13px; color: var(--accent); font-weight: 600; margin-top: 3px; }
-  #place:empty { display: none; }
+  #place:empty, #formula:empty { display: none; }
+  #formula { font-size: 13px; color: #ffc94a; font-weight: 600; margin-top: 3px; font-family: "Times New Roman", Georgia, serif; }
+  #formula sup { font-size: .75em; }
+  .places h2.group { margin: 12px 2px 2px; }
+  .expo output { font-family: "Times New Roman", Georgia, serif; font-size: 18px; color: var(--text); }
+  .expo output sup { font-size: .7em; }
+  .hint { font-size: 13px; color: var(--muted); flex: 1; }
 
   #cross { position: fixed; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; opacity: .55; }
   #cross::before, #cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
@@ -120,6 +126,7 @@
     <div class="glass">
       <div id="zoom">×1</div>
       <div id="where"></div>
+      <div id="formula"></div>
       <div id="place"></div>
     </div>
     <a id="learn" class="glass" href="learn.html" aria-label="The maths behind the set">∑ Maths</a>
@@ -144,10 +151,13 @@
 
   <section class="sheet glass ui hidden" id="sheet-settings">
     <h2>Settings</h2>
+    <div class="row expo"><label for="expo">Exponent</label><input id="expo" type="range" min="2" max="8" step="0.01" value="2" aria-describedby="expoNote"><output id="expoOut"></output></div>
+    <div class="row"><span class="hint" id="expoNote"></span><button class="btn hidden" id="expoBack">Back to z²</button></div>
     <div class="row"><label for="iters">Detail</label><input id="iters" type="range" min="-2" max="2" step="0.25"><output id="itersOut"></output></div>
     <div class="row"><span>Resolution</span><span class="seg" id="quality" style="margin-left:auto"><button data-q="fast">Fast</button><button data-q="sharp">Sharp</button></span></div>
     <div class="row"><button class="btn" id="reset">Back to the whole set</button><a class="btn" href="learn.html" style="color:var(--accent);text-decoration:none;display:inline-flex;align-items:center">How does it work? ∑</a></div>
     <p>Pinch or scroll to zoom, drag to move, double-tap to dive in. Tap once to hide the buttons.</p>
+    <p>Exponent turns z² + c into z<sup>d</sup> + c: 2 is the Mandelbrot set, other values give its Multibrot cousins. It snaps to whole numbers.</p>
     <p>Julia shows the Julia set of the point under the cross. Detail sets how many iterations each pixel gets: raise it if the edges look blobby deep down.</p>
   </section>
 

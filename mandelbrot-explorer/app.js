@@ -40,7 +40,7 @@ const cssGradient = p => `linear-gradient(90deg, ${p.stops.map(([t, c]) => `${c}
 
 // ---------------------------------------------------------------- famous places
 const PLACES = [
-  { name: 'The whole set', note: 'Where it all starts', x: '-0.75', y: '0', z: 1 },
+  { name: 'The whole set', note: 'Where it all starts', x: '-0.75', y: '0', z: 1, home: true },
   { name: 'Seahorse Valley', note: 'Curly seahorse tails between the two big bulbs', x: '-0.74364', y: '0.13182', z: 600 },
   { name: 'Elephant Valley', note: 'A parade of trunks by the cusp', x: '0.2865', y: '0.0145', z: 400 },
   { name: 'Scepter Valley', note: 'Royal sceptres off the left bulb', x: '-1.36', y: '0', z: 25 },
@@ -50,11 +50,30 @@ const PLACES = [
   { name: 'Spiral galaxy', note: 'A deep double spiral', x: '-0.761574', y: '-0.0847596', z: 2500 },
   { name: 'Deep dive', note: 'Seahorse Valley, much further down', x: '-0.743643887037158704752191506114774', y: '0.131825904205311970493132056385139', z: 1e14 },
   { name: 'Deeper still', note: 'Past what normal maths can reach (takes a moment)', x: '-0.743643887037158704752191506114774', y: '0.131825904205311970493132056385139', z: 1e28 },
+  { group: 'Multibrot cousins: other exponents' },
+  { name: 'Cubic set', note: 'Two lobes, mirror symmetric both ways', x: '0', y: '0', z: 1, d: 3, home: true },
+  { name: 'Cubic coastline', note: 'Bulbs and spirals on the cubic edge', x: '-0.2', y: '0.95', z: 20, d: 3 },
+  { name: 'Quartic set', note: 'Three-fold symmetry', x: '0', y: '0', z: 1, d: 4, home: true },
+  { name: 'Quintic set', note: 'Four lobes, like a clover', x: '0', y: '0', z: 1, d: 5, home: true },
+  { name: 'Halfway to cubic', note: 'A fractional power: watch for the seams', x: '-0.375', y: '0', z: 1, d: 2.5, home: true },
 ];
 
 // ---------------------------------------------------------------- fixed-point view maths
 // A view centre is a BigInt fixed-point number (value = x / 2^P), so zooming never runs out of digits.
-const Z_MAX = { m: 1e250, j: 1e12 }, Z_MIN = 0.3, PERT_BELOW = 2e-12;
+const Z_MIN = 0.3, PERT_BELOW = 2e-12, D_MIN = 2, D_MAX = 8;
+// Whole exponents zoom as deep as z² does; fractional ones (and Julia sets) stop where plain doubles run out.
+const zMax = (mode, d = S.d) => mode === 'j' ? 1e12 : isWhole(d) ? 1e250 : 1e11;
+// The exponent slider snaps to whole numbers; in between it moves in steps of 0.01.
+function snapD(v) {
+  if (!Number.isFinite(v)) return 2;
+  v = Math.min(D_MAX, Math.max(D_MIN, v));
+  const r = Math.round(v);
+  return Math.abs(v - r) < 0.12 ? r : Math.round(v * 100) / 100;
+}
+const homeX = d => d >= 3 ? 0 : -0.75 * (3 - d);
+const SUPD = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const formulaText = d => isWhole(d) ? `z${String(d).split('').map(k => SUPD[k]).join('')} + c` : `z^${d.toFixed(2)} + c`;
+const formulaHtml = d => isWhole(d) ? `z<sup>${d}</sup> + c` : `z<sup>${d.toFixed(2)}</sup> + c`;
 const needP = z => Math.max(64, Math.ceil(Math.log2(Math.max(1, z) * 4096)) + 52);
 const fromNum = (v, P) => BigInt(Math.round(v * 2 ** P));
 const toNum = (b, P) => Number(b) * 2 ** -P;
@@ -81,11 +100,14 @@ const ser = v => ({ x: toDec(v.x, v.P, decDigits(v)), y: toDec(v.y, v.P, decDigi
 const deser = (o, d) => (o && o.x != null && +o.z > 0) ? makeView(o.x, o.y, +o.z) : d;
 
 // ---------------------------------------------------------------- state
-const HOME = { m: () => makeView('-0.75', '0', 1), j: () => makeView('0', '0', 0.75) };
+const HOME = { m: d => makeView(String(homeX(d)), '0', 1), j: () => makeView('0', '0', 0.75) };
 const saved = store.get('state', {});
+const savedD2 = snapD(+saved.d || 2);
 const S = {
   mode: saved.mode === 'j' ? 'j' : 'm',
-  views: { m: deser(saved.m, HOME.m()), j: deser(saved.j, HOME.j()) },
+  d: savedD2,
+  atHome: saved.m ? !!saved.atHome : true,
+  views: { m: deser(saved.m, HOME.m(savedD2)), j: deser(saved.j, HOME.j()) },
   jc: Array.isArray(saved.jc) ? saved.jc : [-0.7453, 0.1127],
   palette: PALETTES.some(p => p.id === saved.palette) ? saved.palette : 'classic',
   density: Number.isFinite(saved.density) ? saved.density : 0,
@@ -99,17 +121,19 @@ let lut = buildLut(PALETTES.find(p => p.id === S.palette));
 const view = () => S.views[S.mode];
 function saveState() {
   store.set('state', { mode: S.mode, m: ser(S.views.m), j: ser(S.views.j), jc: S.jc, palette: S.palette,
-    density: S.density, iterLog: S.iterLog, quality: S.quality, cycle: S.cycle });
+    density: S.density, iterLog: S.iterLog, quality: S.quality, cycle: S.cycle, d: S.d, atHome: S.atHome });
 }
 function hashOf() {
   const v = ser(view()), q = new URLSearchParams({ v: S.mode, x: v.x, y: v.y, z: String(v.z), p: S.palette });
   if (S.mode === 'j') { q.set('cr', String(S.jc[0])); q.set('ci', String(S.jc[1])); }
+  if (S.d !== 2) q.set('d', String(S.d));
   return q.toString();
 }
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   if (!q.has('x') || !q.has('z') || !(+q.get('z') > 0)) return false;
-  const mode = q.get('v') === 'j' ? 'j' : 'm', z = Math.min(Z_MAX[mode], Math.max(Z_MIN, +q.get('z')));
+  S.d = snapD(+q.get('d') || 2); S.atHome = false;
+  const mode = q.get('v') === 'j' ? 'j' : 'm', z = Math.min(zMax(mode), Math.max(Z_MIN, +q.get('z')));
   S.mode = mode;
   S.views[mode] = makeView(q.get('x'), q.get('y') || '0', z);
   if (mode === 'j') S.jc = [+q.get('cr') || 0, +q.get('ci') || 0];
@@ -149,12 +173,13 @@ let GEN = 0, R = null, transforming = false;
 function render(boost = 0) {
   const gen = ++GEN, v = view(), W = cv.width, H = cv.height;
   const sc = scaleCss(v) / rsNow(), it = Math.min(60000, autoIter(v.z) * 2 ** boost);
-  R = { gen, W, H, sc, it, boost, cx: toNum(v.x, v.P), cy: toNum(v.y, v.P), kind: 'm', passes: [4, 1], pi: -1, done: false, dirty: false, jobsDone: 0, jobsAll: 0 };
+  R = { gen, W, H, sc, it, boost, d: S.d, cx: toNum(v.x, v.P), cy: toNum(v.y, v.P), kind: 'm', passes: [4, 1], pi: -1, done: false, dirty: false, jobsDone: 0, jobsAll: 0 };
   if (S.mode === 'j') { R.kind = 'j'; R.jr = S.jc[0]; R.ji = S.jc[1]; }
-  else if (sc < PERT_BELOW) {
+  else if (sc < PERT_BELOW && isWhole(S.d)) {
     R.kind = 'p';
-    const o = refOrbit(v.x, v.y, v.P, it);
-    R.sa = saCoeffs(o.orbit, o.len, Math.hypot(W / 2, H / 2) * sc, sc, it);
+    const o = refOrbitD(v.x, v.y, v.P, it, S.d);
+    R.refInside = refInside(o, it);
+    R.sa = S.d === 2 ? saCoeffs(o.orbit, o.len, Math.hypot(W / 2, H / 2) * sc, sc, it) : null;
     for (const w of workers) w.postMessage({ type: 'ref', gen, orbit: o.orbit, len: o.len });
   }
   R.jobsAll = R.passes.reduce((n, st) => { const gw = Math.ceil(W / st), gh = Math.ceil(H / st); return n + Math.ceil(gh / Math.max(1, Math.floor(24000 / gw))); }, 0);
@@ -164,7 +189,7 @@ function render(boost = 0) {
 }
 function nextPass() {
   R.pi++;
-  if (R.pi === 1 && R.kind === 'p' && R.boost < 3 && R.it < 60000 && !R.buf.some(x => x >= 0)) return render(R.boost + 1);
+  if (R.pi === 1 && R.kind === 'p' && !R.refInside && R.boost < 3 && R.it < 60000 && !R.buf.some(x => x >= 0)) return render(R.boost + 1);
   if (R.pi >= R.passes.length) return finish();
   const st = R.step = R.passes[R.pi], gw = R.gw = Math.ceil(R.W / st), gh = R.gh = Math.ceil(R.H / st);
   R.buf = new Float32Array(gw * gh);
@@ -181,7 +206,7 @@ function dispatch() {
     if (w.busy || !R.jobs.length) continue;
     const [y0, y1] = R.jobs.shift(); w.busy = true;
     w.postMessage({ type: 'rows', gen: R.gen, pass: R.pi, kind: R.kind, W: R.W, H: R.H, step: R.step, gw: R.gw,
-      y0, y1, sc: R.sc, cx: R.cx, cy: R.cy, jr: R.jr, ji: R.ji, it: R.it, sa: R.sa });
+      y0, y1, sc: R.sc, cx: R.cx, cy: R.cy, jr: R.jr, ji: R.ji, it: R.it, sa: R.sa, d: R.d, ic: !!R.refInside });
   }
 }
 function onResult(m) {
@@ -248,6 +273,7 @@ function updateHud() {
   $('where').textContent = (S.mode === 'j' ? `Julia of ${S.jc[0].toFixed(4)} ${S.jc[1] < 0 ? '−' : '+'} ${Math.abs(S.jc[1]).toFixed(4)}i` : coordText(v))
     + ` · ${(R ? R.it : autoIter(v.z)).toLocaleString('en')} it`;
   $('place').textContent = S.place || '';
+  $('formula').innerHTML = S.d === 2 ? '' : formulaHtml(S.d) + (S.mode === 'j' ? ' · Julia set' : ' · Multibrot');
   $('julia').setAttribute('aria-pressed', S.mode === 'j');
   $('cross').classList.toggle('hidden', S.mode === 'j');
   $('itersOut').textContent = autoIter(v.z).toLocaleString('en') + ' it';
@@ -266,7 +292,7 @@ function beginTransform() {
   sctx.drawImage(cv, 0, 0);
 }
 function clampS(s) {
-  const z = view().z, zmax = Z_MAX[S.mode];
+  const z = view().z, zmax = zMax(S.mode);
   return Math.min(zmax / z, Math.max(Z_MIN / z, s));
 }
 function drawT(s, tx, ty) {
@@ -284,12 +310,12 @@ function commit(s, tx, ty) {
   const v = view(), sc = scaleCss(v), cx = cssW / 2, cy = cssH / 2;
   const qx = (cx - tx) / s, qy = (cy - ty) / s;
   const want = v.z * s;
-  if (want >= Z_MAX[S.mode] * 0.999) toast(S.mode === 'j' ? 'Julia zoom stops here (double precision)' : 'That is as deep as this app goes');
-  v.z = Math.min(Z_MAX[S.mode], Math.max(Z_MIN, want));
+  if (want >= zMax(S.mode) * 0.999) toast(S.mode === 'j' ? 'Julia zoom stops here (double precision)' : isWhole(S.d) ? 'That is as deep as this app goes' : 'Fractional exponents stop at ×10¹¹');
+  v.z = Math.min(zMax(S.mode), Math.max(Z_MIN, want));
   ensureP(v);
   v.x += fromNum((qx - cx) * sc, v.P);
   v.y -= fromNum((qy - cy) * sc, v.P);
-  S.place = null;
+  S.place = null; S.atHome = false;
   afterMove();
 }
 function afterMove() {
@@ -403,11 +429,13 @@ addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
 
 // Places
 for (const p of PLACES) {
-  const b = document.createElement('button');
-  b.innerHTML = `<div><b></b><span></span></div><i>${fmtZoomPlain(p.z)}</i>`;
+  if (p.group) { const h = document.createElement('h2'); h.className = 'group'; h.textContent = p.group; $('placeList').appendChild(h); continue; }
+  const b = document.createElement('button'), d = p.d || 2;
+  b.innerHTML = `<div><b></b><span></span></div><i>${d === 2 ? fmtZoomPlain(p.z) : formulaHtml(d)}</i>`;
   b.querySelector('b').textContent = p.name; b.querySelector('span').textContent = p.note;
   b.addEventListener('click', () => {
-    S.mode = 'm'; S.views.m = makeView(p.x, p.y, p.z); S.place = p.name;
+    S.d = d; showExpo();
+    S.mode = 'm'; S.views.m = makeView(p.x, p.y, p.z); S.place = p.name; S.atHome = !!p.home;
     closeSheets(); afterMove();
   });
   $('placeList').appendChild(b);
@@ -459,7 +487,32 @@ const qBtns = [...$('quality').children];
 const showQ = () => qBtns.forEach(b => b.setAttribute('aria-pressed', b.dataset.q === S.quality));
 showQ();
 qBtns.forEach(b => b.addEventListener('click', () => { S.quality = b.dataset.q; showQ(); sizeCanvas(); recap = null; render(); saveState(); }));
-$('reset').addEventListener('click', () => { S.mode = 'm'; S.views.m = HOME.m(); S.place = null; closeSheets(); afterMove(); });
+$('reset').addEventListener('click', () => { S.mode = 'm'; S.views.m = HOME.m(S.d); S.place = null; S.atHome = true; closeSheets(); afterMove(); });
+
+// Exponent: z^d + c. d = 2 is the Mandelbrot set; the rest are its Multibrot cousins.
+const expo = $('expo');
+function showExpo() {
+  expo.value = S.d;
+  $('expoOut').innerHTML = formulaHtml(S.d);
+  $('expoNote').textContent = S.d === 2 ? 'The Mandelbrot set.'
+    : isWhole(S.d) ? `Multibrot set: ${S.d - 1}-fold symmetry.`
+    : 'Fractional power: seams appear where the power jumps. Zoom stops at ×10¹¹.';
+  $('expoBack').classList.toggle('hidden', S.d === 2);
+}
+let expoRaf = 0;
+function setD(d, final) {
+  if (d !== S.d && isWhole(d)) navigator.vibrate?.(8);
+  S.d = d; showExpo();
+  if (S.atHome && S.mode === 'm') S.views.m = HOME.m(d);
+  for (const k of ['m', 'j']) if (S.views[k].z > zMax(k)) S.views[k].z = zMax(k);
+  if (S.mode === 'm' && !S.atHome) S.place = null;
+  updateHud(); recap = null;
+  if (final) { cancelAnimationFrame(expoRaf); expoRaf = 0; afterMove(); }
+  else if (!expoRaf) expoRaf = requestAnimationFrame(() => { expoRaf = 0; render(); });
+}
+expo.addEventListener('input', () => { const d = snapD(+expo.value); if (d !== S.d) setD(d, false); else expo.value = d; });
+expo.addEventListener('change', () => setD(snapD(+expo.value), true));
+$('expoBack').addEventListener('click', () => setD(2, true));
 
 // Julia
 $('julia').addEventListener('click', () => {
@@ -477,16 +530,21 @@ $('surprise').addEventListener('click', () => {
   closeSheets();
   if (S.mode === 'j') {
     const t = Math.random() * Math.PI * 2, r = 0.97 + Math.random() * 0.06;
-    S.jc = [r * (Math.cos(t) / 2 - Math.cos(2 * t) / 4), r * (Math.sin(t) / 2 - Math.sin(2 * t) / 4)];
+    if (S.d === 2) S.jc = [r * (Math.cos(t) / 2 - Math.cos(2 * t) / 4), r * (Math.sin(t) / 2 - Math.sin(2 * t) / 4)];
+    else { // find the edge along a random ray, then step just off it
+      let lo = 0, hi = 2;
+      for (let k = 0; k < 32; k++) { const m = (lo + hi) / 2; mbD(m * Math.cos(t), m * Math.sin(t), 400, S.d) < 0 ? lo = m : hi = m; }
+      S.jc = [lo * r * Math.cos(t), lo * r * Math.sin(t)];
+    }
     S.views.j = HOME.j(); S.place = 'Random Julia set';
     return afterMove();
   }
-  let x = -0.75, y = 0, z = 1;
+  let x = homeX(S.d), y = 0, z = 1;
   const target = 2.5 + Math.random() * 6.5, N = 40;
   for (let guard = 0; Math.log10(z) < target && guard < 30; guard++) {
     const span = 3 / z, it = Math.min(4000, autoIter(z) * 2), cand = [];
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
-      const px = x + (gx / (N - 1) - 0.5) * span, py = y + (gy / (N - 1) - 0.5) * span, val = mbPlain(px, py, it);
+      const px = x + (gx / (N - 1) - 0.5) * span, py = y + (gy / (N - 1) - 0.5) * span, val = mbD(px, py, it, S.d);
       if (val >= 0) cand.push([val, px, py]);
     }
     if (!cand.length) break;
@@ -496,7 +554,7 @@ $('surprise').addEventListener('click', () => {
   }
   z = Math.min(z, 10 ** target);
   const P = needP(z);
-  S.mode = 'm'; S.views.m = { x: fromNum(x, P), y: fromNum(y, P), P, z }; S.place = 'Surprise!';
+  S.mode = 'm'; S.views.m = { x: fromNum(x, P), y: fromNum(y, P), P, z }; S.place = 'Surprise!'; S.atHome = false;
   afterMove();
 });
 
@@ -520,7 +578,7 @@ function buildRecap() {
   g.fillStyle = '#1fd1b9'; g.fillRect(0, IMG, W, 6);
   g.fillStyle = '#ffffff'; g.font = `800 56px ${F}`; g.fillText('Mandelbrot Explorer', 56, IMG + 82);
   g.fillStyle = '#ece8ff'; g.font = `600 36px ${F}`;
-  const label = S.mode === 'j' ? 'Julia set' : (S.place || 'Somewhere in the Mandelbrot set');
+  const label = S.mode === 'j' ? (S.d === 2 ? 'Julia set' : `Julia set of ${formulaText(S.d)}`) : (S.place || (S.d === 2 ? 'Somewhere in the Mandelbrot set' : `Multibrot ${formulaText(S.d)}`));
   g.fillText(`${fmtZoomPlain(v.z)}  ·  ${label}`, 56, IMG + 138);
   g.fillStyle = '#9a92c4'; g.font = `500 28px ui-monospace, Menlo, Consolas, monospace`;
   g.fillText(S.mode === 'j' ? `c = ${S.jc[0].toFixed(6)} ${S.jc[1] < 0 ? '−' : '+'} ${Math.abs(S.jc[1]).toFixed(6)}i` : coordText(v, 12), 56, IMG + 184);
@@ -530,7 +588,8 @@ function buildRecap() {
 }
 async function share() {
   const link = GAME_URL + '#' + hashOf(), v = view();
-  const text = `I found this spot ${S.mode === 'j' ? 'in a Julia set' : 'in the Mandelbrot set'} at zoom ${fmtZoomPlain(v.z)}. Fly there yourself: ${link}`;
+  const setName = S.d === 2 ? 'the Mandelbrot set' : `the Multibrot set ${formulaText(S.d)}`;
+  const text = `I found this spot ${S.mode === 'j' ? 'in a Julia set' : 'in ' + setName} at zoom ${fmtZoomPlain(v.z)}. Fly there yourself: ${link}`;
   const blob = await (recap || (recap = buildRecap()));
   const file = blob && new File([blob], 'mandelbrot.jpg', { type: 'image/jpeg' });
   try {
@@ -551,7 +610,8 @@ addEventListener('resize', () => {
 addEventListener('hashchange', () => { if (location.hash.slice(1) !== hashOf() && readHash()) { setPalette(S.palette); afterMove(); } });
 readHash();
 for (const b of $('paletteList').children) b.setAttribute('aria-pressed', b.dataset.id === S.palette);
-for (const k of ['m', 'j']) { S.views[k].z = Math.min(Z_MAX[k], Math.max(Z_MIN, S.views[k].z)); ensureP(S.views[k]); }
+for (const k of ['m', 'j']) { S.views[k].z = Math.min(zMax(k), Math.max(Z_MIN, S.views[k].z)); ensureP(S.views[k]); }
+showExpo();
 sizeCanvas();
 render();
 try { history.replaceState(null, '', '#' + hashOf()); } catch {}

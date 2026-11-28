@@ -323,10 +323,49 @@ function drawBif() {
 }
 dragOn($('bifCv'), x => { B.c = Math.max(-2.08, Math.min(0.42, B.re(x))); drawBif(); });
 
+// ---------------------------------------------------------------- 9. Multibrot: change the exponent
+const MB = { d: 2 };
+const snapD = v => { const r = Math.round(v); return Math.abs(v - r) < 0.12 ? r : Math.round(v * 100) / 100; };
+const homeXd = d => d >= 3 ? 0 : -0.75 * (3 - d);
+const whole = d => Math.abs(d - Math.round(d)) < 1e-9;
+function drawMulti(fine) {
+  const c = MB.cv || (MB.cv = fit($('mbCv'), 0.8)), d = MB.d, step = fine ? 1 : 3;
+  const W = Math.ceil(c.w * c.d / step), H = Math.ceil(c.h * c.d / step), s = W / 3.3, cx = homeXd(d);
+  const img = new ImageData(W, H), u32 = new Uint32Array(img.data.buffer), it = fine ? 250 : 90;
+  for (let py = 0; py < H; py++) {
+    const y = -(py - H / 2) / s;
+    for (let px = 0; px < W; px++) {
+      const v = mbD(cx + (px - W / 2) / s, y, it, d);
+      let col;
+      if (v < 0) col = (255 << 24 | 58 << 16 | 50 << 8 | 18) >>> 0;
+      else { const t = Math.min(1, Math.sqrt(v) / 9); col = (255 << 24 | Math.round(20 + 150 * t) << 16 | Math.round(6 + 180 * t * t) << 8 | Math.round(8 + 40 * t)) >>> 0; }
+      u32[py * W + px] = col;
+    }
+  }
+  const off = document.createElement('canvas'); off.width = W; off.height = H; off.getContext('2d').putImageData(img, 0, 0);
+  c.g.imageSmoothingEnabled = !fine; c.g.drawImage(off, 0, 0, c.w, c.h);
+  $('mbD').value = d;
+  $('mbOut').innerHTML = whole(d) ? `z<sup>${d}</sup> + c` : `z<sup>${d.toFixed(2)}</sup> + c`;
+  $('mbNote').innerHTML = d === 2 ? '<b>The Mandelbrot set.</b> One lobe pointing left, mirror symmetric top to bottom.'
+    : whole(d) ? `<b>Multibrot, d = ${d}:</b> ${d - 1} identical lobes around the centre (${d - 1}-fold symmetry).`
+    : `<b>Fractional power, d = ${d.toFixed(2)}:</b> look for the seams where the power jumps.`;
+  $('mbNote').className = 'verdict' + (whole(d) ? '' : ' edge');
+  $('mbOpen').href = `./#v=m&x=${homeXd(d)}&y=0&z=1&p=classic${d === 2 ? '' : '&d=' + d}`;
+}
+let mbRaf = 0;
+$('mbD').addEventListener('input', e => {
+  const d = snapD(+e.target.value);
+  if (d === MB.d) { e.target.value = d; return; }
+  MB.d = d; cancelAnimationFrame(mbRaf); mbRaf = requestAnimationFrame(() => drawMulti(false));
+});
+$('mbD').addEventListener('change', e => { MB.d = snapD(+e.target.value); cancelAnimationFrame(mbRaf); drawMulti(true); });
+chips($('mbChips'), [['2 (Mandelbrot)', 2], ['2.5', 2.5], ['3', 3], ['4', 4], ['5', 5], ['8', 8]], d => { MB.d = d; drawMulti(true); });
+
 // ---------------------------------------------------------------- start + resize
 function all() {
   L.cv = null; SQ.cv = null; SQ.m = null;
-  drawLine(); drawSq(); orbSetup(); drawOrbit(); queueJulia(true); drawLevels(); bifSetup(); drawBif();
+  MB.cv = null;
+  drawLine(); drawSq(); orbSetup(); drawOrbit(); queueJulia(true); drawLevels(); bifSetup(); drawBif(); drawMulti(true);
 }
 let lastW = 0, rt = 0;
 addEventListener('resize', () => {
